@@ -46,6 +46,14 @@ Avoid past tense:
 
 ## Branches
 
+The repository uses a two-level base flow:
+
+- `main`: stable production-ready history
+- `dev/1.0.0`: integration branch for ongoing implementation work
+
+Feature work must branch from `dev/1.0.0` and open PRs into `dev/1.0.0`.
+Only validated releases should merge from `dev/1.0.0` into `main`.
+
 Use short English branch names with hyphens:
 
 ```txt
@@ -56,6 +64,25 @@ chore/short-description
 ```
 
 Do not commit directly to `main`.
+
+### Branch setup (one-time)
+
+Run this when initializing a local clone:
+
+```bash
+git switch main
+git branch --set-upstream-to=origin/main main
+git pull --ff-only
+git switch -c dev/1.0.0
+git push -u origin dev/1.0.0
+```
+
+If `dev/1.0.0` already exists on origin:
+
+```bash
+git fetch origin
+git switch -c dev/1.0.0 --track origin/dev/1.0.0
+```
 
 ## Pull Requests
 
