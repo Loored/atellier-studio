@@ -11,6 +11,7 @@ export const queryKeys = {
   agents: {
     all: [QUERY_KEYS.AGENTS] as const,
     detail: (agentId: string) => [QUERY_KEYS.AGENTS, agentId] as const,
+    messages: (agentId: string) => [QUERY_KEYS.AGENTS, agentId, "messages"] as const,
   },
   tasks: {
     all: [QUERY_KEYS.TASKS] as const,

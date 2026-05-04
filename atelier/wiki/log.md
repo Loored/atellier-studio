@@ -98,3 +98,125 @@
 - Summary: Manual run completed from dashboard
 - type: manual
 - status: completed
+
+## [2026-05-04T20:22:00.000Z] decision | Agent run execution spine implemented
+
+- Summary: Added real local agent run execution endpoint, persistent per-agent message history, mock executor, and UI wiring from panel send action to run logs and stored responses.
+- Run log: atelier/runs/2026-05-04-agent-run-execution.md
+
+## [2026-05-04T20:30:00.000Z] decision | OpenAI executor mode added
+
+- Summary: Added configurable executor modes so agent runs can use mock execution by default or real OpenAI execution via environment variables without changing frontend contracts.
+- Run log: atelier/runs/2026-05-04-agent-executor-openai-mode.md
+
+## [2026-05-04T20:55:00.000Z] decision | Agent panel streaming output added
+
+- Summary: Added SSE-based stream route and frontend live-output rendering so users can see partial agent response while run execution is in progress.
+- Run log: atelier/runs/2026-05-04-agent-run-streaming.md
+
+## [2026-05-04T21:05:00.000Z] decision | Agent handoff MVP implemented
+
+- Summary: Added real handoff flow where one agent can pass work to a target agent with carried context, creating chained runs and persisted handoff messages.
+- Run log: atelier/runs/2026-05-04-agent-handoff-mvp.md
+
+## [2026-05-04T21:12:00.000Z] decision | Handoff guardrails and execution timeout added
+
+- Summary: Added configurable max handoff depth and execution timeout, with skip/cycle logs to prevent runaway orchestration chains and control cost/latency risk.
+- Run log: atelier/runs/2026-05-04-agent-handoff-policy-guardrails.md
+
+## [2026-05-04T21:28:00.000Z] decision | Stream CORS handling fixed for local dev origins
+
+- Summary: Fixed SSE stream route response headers to preserve local CORS compatibility and added regression coverage for `Access-Control-Allow-Origin` on stream responses.
+- Run log: atelier/runs/2026-05-04-agent-stream-cors-fix.md
+
+## [2026-05-04T21:36:00.000Z] decision | OpenAI output parsing and handoff motion corrected
+
+- Summary: Updated executor to parse Responses API `output[].content[].text` and refusal payloads, then improved office animation so executing/handoff agents move to execution zones instead of staying static.
+- Run log: atelier/runs/2026-05-04-openai-output-parser-and-handoff-motion-fix.md
+
+## [2026-05-04T21:46:00.000Z] decision | Agent panel now supports unblock + interactive terminal commands
+
+- Summary: Added active unblock controls and a working in-panel terminal command surface so operators can recover blocked agents, run commands, and set statuses without leaving the office panel.
+- Run log: atelier/runs/2026-05-04-agent-panel-unblock-and-terminal.md
+
+## [2026-05-04T20:25:54.057Z] run_completed | Builder Agent completed execution and requests review.
+- Run ID: 69f900d21661ff12a5751f51
+- Agent ID: 69f85dc0ce37ffaf49e8d4da
+- Summary: Builder Agent completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T20:55:37.951Z] run_completed | u better design! completed execution and requests review.
+- Run ID: e58bac4f-2ab7-45e9-ad31-f66470d54cc4
+- Agent ID: 82ca1ab5-0997-49e7-ad3d-178bf8c1f4ee
+- Summary: u better design! completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T20:55:46.486Z] run_completed | u better design! completed execution and requests review.
+- Run ID: 6842ee6b-5c55-4412-92ee-8a6ae5ad62c6
+- Agent ID: 82ca1ab5-0997-49e7-ad3d-178bf8c1f4ee
+- Summary: u better design! completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T20:55:48.720Z] run_completed | u better design! completed execution and requests review.
+- Run ID: 5fbefc28-f8b0-4387-8702-a7d48bb65ae7
+- Agent ID: 82ca1ab5-0997-49e7-ad3d-178bf8c1f4ee
+- Summary: u better design! completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T20:55:49.387Z] run_completed | u better design! completed execution and requests review.
+- Run ID: e6651484-2660-4dc5-b7da-8a9603358720
+- Agent ID: 82ca1ab5-0997-49e7-ad3d-178bf8c1f4ee
+- Summary: u better design! completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T20:56:58.666Z] run_completed | designer 1 completed execution and requests review.
+- Run ID: 69f9081a092c7f8fdfe947dc
+- Agent ID: 69f86e98396bef24839c87d3
+- Summary: designer 1 completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T20:58:33.430Z] run_completed | designer 1 completed execution and requests review.
+- Run ID: 69f9087997e3ca0c6ca07177
+- Agent ID: 69f86e98396bef24839c87d3
+- Summary: designer 1 completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T21:24:04.782Z] run_completed | Ana Designer completed execution and requests review.
+- Run ID: 69f90e7473d5caa92f2844b6
+- Agent ID: 69f86e5a396bef24839c87d0
+- Summary: Ana Designer completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T21:33:21.475Z] run_completed | Ana Designer completed execution and requests review.
+- Run ID: 69f9109f4e7d6e8f0f429d04
+- Agent ID: 69f86e5a396bef24839c87d0
+- Summary: Ana Designer completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T21:39:49.446Z] run_completed | Ana Designer completed execution and requests review.
+- Run ID: 69f912224e7d6e8f0f429d2a
+- Agent ID: 69f86e5a396bef24839c87d0
+- Summary: Ana Designer completed execution and requests review.
+- type: manual
+- status: completed
+
+## [2026-05-04T21:39:53.744Z] run_completed | designer 1 completed handoff execution.
+- Run ID: 69f912254e7d6e8f0f429d37
+- Agent ID: 69f86e98396bef24839c87d3
+- Summary: designer 1 completed handoff execution.
+- type: manual
+- status: completed
+
+## [2026-05-04T22:05:00.000Z] decision | Terminal handoff command added for faster delegation
+
+- Summary: Added `handoff <agent-name-or-id> :: <instruction>` command in the panel terminal so operators can delegate tasks directly without switching to form controls.
+- Run log: atelier/runs/2026-05-04-agent-terminal-handoff-command.md

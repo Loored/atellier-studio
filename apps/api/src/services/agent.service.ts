@@ -46,6 +46,15 @@ export class AgentService {
     return agent;
   }
 
+  async getById(id: string): Promise<Agent | null> {
+    if (this.storageMode === "mongo") {
+      const agent = await AgentModel.findById(id);
+      return agent ? toJsonRecord<Agent>(agent) : null;
+    }
+
+    return this.records.get(id) ?? null;
+  }
+
   async updateStatus(id: string, input: UpdateAgentStatusInput): Promise<Agent | null> {
     if (this.storageMode === "mongo") {
       const agent = await AgentModel.findByIdAndUpdate(

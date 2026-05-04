@@ -51,6 +51,25 @@ Run only the API:
 pnpm --filter @atellier/api dev
 ```
 
+Run the API with OpenAI-backed agent execution:
+
+```bash
+AGENT_EXECUTOR_MODE=openai OPENAI_API_KEY=<YOUR_OPENAI_API_KEY> pnpm --filter @atellier/api dev
+```
+
+Optional model override:
+
+```bash
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Optional execution policy controls:
+
+```bash
+AGENT_MAX_HANDOFF_DEPTH=1
+AGENT_EXECUTION_TIMEOUT_MS=45000
+```
+
 Run the API without MongoDB for local UI review:
 
 ```bash
@@ -65,6 +84,7 @@ pnpm --filter @atellier/web dev
 
 The API defaults to `http://127.0.0.1:4000`.
 The web app defaults to Vite's local dev URL.
+Agent execution defaults to `mock` mode. Set `AGENT_EXECUTOR_MODE=openai` to enable real LLM execution.
 
 The API CORS default is intentionally local-first: browser origins on `localhost`, `127.0.0.1`, and `::1` are allowed for local development, while arbitrary remote origins are not reflected.
 The API listen host also defaults to `127.0.0.1`; set `API_HOST=0.0.0.0` only when you intentionally want LAN exposure.

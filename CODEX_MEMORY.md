@@ -10,6 +10,7 @@ This file is durable project memory for future Codex sessions. Read it before im
 - Add useful tests as work changes, but avoid large or noisy test suites.
 - When the user approves publishing, use organized branches, commit messages, PR bodies, and merges.
 - Do not commit directly to `main` after the repository has a base branch.
+- Use `main` as stable branch and `dev/1.0.0` as integration branch for ongoing work.
 
 ## Project Identity
 
@@ -22,7 +23,7 @@ This file is durable project memory for future Codex sessions. Read it before im
 
 - Repo: `/Users/e.juarez/Desktop/atellier-studio`
 - GitHub remote: `https://github.com/Loored/atellier-studio.git`
-- Local branch: `main`
+- Local branch: `dev/1.0.0`
 - Package manager: `pnpm@9.15.4`
 - Docker path: Docker CLI + Docker Compose + Colima, not Docker Desktop.
 - Mongo container: `atellier-mongo` from `mongo:7`, exposed on `localhost:27017`.
@@ -78,6 +79,12 @@ docker compose up -d mongo
 - PR titles start with an action verb and stay at 80 characters or fewer.
 - PR descriptions include Summary, Context, Changes, Benefits, and Screenshots / Demos.
 
+### 2026-05-04 - Branch model update
+
+- Standardized repository flow as `main` (stable) + `dev/1.0.0` (integration).
+- Feature and bugfix branches should start from `dev/1.0.0` and merge back into `dev/1.0.0`.
+- `main` should only receive validated merges from `dev/1.0.0` or explicit hotfixes.
+
 ### 2026-05-04 - UI/UX and security review
 
 - Installed user-scoped skills: `pdf`, `security-threat-model`, `security-best-practices`, and `playwright`; restart Codex to make them appear in the active skill list.
@@ -86,6 +93,53 @@ docker compose up -d mongo
 - Hardened API defaults with `127.0.0.1` listen host, local-only CORS reflection, explicit 1 MiB body limit, and baseline response security headers.
 - Web API client defaults to `http://127.0.0.1:4000` instead of `localhost` because this machine can resolve `localhost` to IPv6 while the API is reachable on IPv4 loopback.
 - Captured review notes at `atelier/wiki/synthesis/2026-05-04-ui-security-review.md` and run log at `atelier/runs/2026-05-04-ui-security-review.md`.
+
+### 2026-05-04 - Agent run execution spine
+
+- Added `POST /agents/:id/run` for real local instruction execution flow with run lifecycle updates.
+- Added `GET /agents/:id/messages` plus persistent `Message` model/service (Mongo + memory mode).
+- Added shared types for `RunAgentInput/RunAgentResult` and `AgentMessage`.
+- Wired pixel office `AgentDetailPanel` to real execution and persisted message history.
+- Added latest run log preview in `RunsTimeline`.
+- Added API tests for run execution and message persistence.
+
+### 2026-05-04 - Executor mode switch
+
+- Refactored agent execution into pluggable modes: `mock` (default) and `openai`.
+- Added env-based executor settings in API startup:
+  - `AGENT_EXECUTOR_MODE=mock|openai`
+  - `OPENAI_API_KEY`
+  - `OPENAI_MODEL` (default `gpt-5-mini`)
+- Kept tests and local dev stable by leaving `mock` as default.
+
+### 2026-05-04 - Handoff MVP + streaming
+
+- Added SSE streaming route for live agent output in panel (`/agents/:id/run/stream`).
+- Added handoff-capable run input fields (`handoffAgentId`, `handoffInstruction`).
+- Implemented chained run handoff flow: source run logs handoff, target agent executes with accumulated context, target run and messages persist.
+- Added panel controls to choose handoff target and pass optional handoff instruction.
+- Added API tests covering handoff path.
+
+### 2026-05-04 - Handoff policy guardrails
+
+- Added `AGENT_MAX_HANDOFF_DEPTH` (default `1`) and `AGENT_EXECUTION_TIMEOUT_MS` (default `45000`) policy controls.
+- Added run-time guard behavior for depth limits and circular handoff targets with explicit run logs.
+- Wrapped executor calls with timeout enforcement so stalled executions fail predictably.
+- Removed accidental plaintext API key from README examples and replaced with placeholders.
+
+### 2026-05-04 - Stream reliability fixes
+
+- Added explicit id validation for agent/run routes, supporting both Mongo ObjectId and memory-mode UUID ids.
+- Fixed SSE stream route to return local-origin CORS headers on stream responses, preventing browser `failed to fetch` after successful preflight.
+- Added API regression test to verify `Access-Control-Allow-Origin` on `/agents/:id/run/stream`.
+
+### 2026-05-04 - Agent panel interactivity upgrade
+
+- `Open Agent Terminal` is now functional and toggles an interactive command surface in the panel.
+- Added panel command support for `help`, `status`, `unblock`, `clear`, `run <instruction>`, and `set-status <status>`.
+- Added terminal `handoff <agent-name-or-id> :: <instruction>` command to delegate directly from panel command mode.
+- Added explicit `Resume` action for `blocked`/`needs-human` states to recover agents quickly.
+- `needs-human` is now treated as waiting state in panel visuals instead of hard blocked.
 
 ## Git Workflow Standard
 
@@ -130,6 +184,11 @@ fix/short-description
 refactor/short-description
 chore/short-description
 ```
+
+Base branch policy:
+
+- `main` is stable and protected by process.
+- `dev/1.0.0` is the integration branch for daily implementation.
 
 Do not commit directly to `main` after the initial base branch exists.
 
@@ -190,9 +249,8 @@ Summary of changes:
 ## Not Implemented Yet
 
 - MCP integrations
-- Codex worker execution (real LLM calls from agents)
 - Real orchestration (currently simulated with random timers)
-- Chat history persistence in MongoDB
+- Robust multi-agent orchestration planning and prioritization beyond single-step handoff
 - GRAFO / knowledge graph view
 - Auth
 - Cloud deployment
