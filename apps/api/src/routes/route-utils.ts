@@ -1,5 +1,9 @@
 import type { FastifyReply } from "fastify";
 
+const MONGO_OBJECT_ID_PATTERN = /^[a-fA-F0-9]{24}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LOCAL_CORS_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
+
 export function bodyRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -31,6 +35,23 @@ export function stringArrayField(body: Record<string, unknown>, key: string): st
 
 export function isOneOf<T extends readonly string[]>(value: unknown, values: T): value is T[number] {
   return typeof value === "string" && values.includes(value);
+}
+
+export function isValidObjectId(value: string): boolean {
+  return MONGO_OBJECT_ID_PATTERN.test(value) || UUID_PATTERN.test(value);
+}
+
+export function isAllowedLocalOrigin(origin: string | undefined): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+    return ["http:", "https:"].includes(parsedOrigin.protocol) && LOCAL_CORS_HOSTS.has(parsedOrigin.hostname);
+  } catch {
+    return false;
+  }
 }
 
 export function badRequest(reply: FastifyReply, message: string): FastifyReply {

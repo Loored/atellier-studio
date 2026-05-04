@@ -9,7 +9,15 @@ import {
   type CreateRunInput,
 } from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
-import { badRequest, bodyRecord, isOneOf, notFound, optionalStringField, stringField } from "./route-utils";
+import {
+  badRequest,
+  bodyRecord,
+  isOneOf,
+  isValidObjectId,
+  notFound,
+  optionalStringField,
+  stringField,
+} from "./route-utils";
 
 export async function runsRoutes(fastify: FastifyInstance, services: AppServices): Promise<void> {
   fastify.get("/runs", async () => services.runs.list());
@@ -41,6 +49,9 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
 
   fastify.patch("/runs/:id/log", async (request, reply) => {
     const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
     const body = bodyRecord(request.body);
     if (!body) {
       return badRequest(reply, "Request body must be an object.");
@@ -69,6 +80,9 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
 
   fastify.patch("/runs/:id/complete", async (request, reply) => {
     const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
     const body = bodyRecord(request.body) ?? {};
     const input: CompleteRunInput = {
       output: body.output,

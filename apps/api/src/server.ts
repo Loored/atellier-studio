@@ -1,9 +1,10 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
-import { createAppServices, type AppServices } from "./services/app-services";
+import { createAppServices, type AppServices, type CreateAppServicesOptions } from "./services/app-services";
 import { type StorageMode } from "./services/service-utils";
 import { agentsRoutes } from "./routes/agents.routes";
 import { healthRoutes } from "./routes/health.routes";
+import { isAllowedLocalOrigin } from "./routes/route-utils";
 import { runsRoutes } from "./routes/runs.routes";
 import { tasksRoutes } from "./routes/tasks.routes";
 import { wikiRoutes } from "./routes/wiki.routes";
@@ -13,22 +14,10 @@ export type BuildServerOptions = {
   atelierRoot?: string;
   logger?: boolean;
   services?: AppServices;
-};
-
-const LOCAL_CORS_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-
-export function isAllowedLocalOrigin(origin: string | undefined): boolean {
-  if (!origin) {
-    return true;
-  }
-
-  try {
-    const parsedOrigin = new URL(origin);
-    return ["http:", "https:"].includes(parsedOrigin.protocol) && LOCAL_CORS_HOSTS.has(parsedOrigin.hostname);
-  } catch {
-    return false;
-  }
-}
+} & Pick<
+  CreateAppServicesOptions,
+  "agentExecutorMode" | "openaiApiKey" | "openaiModel" | "maxHandoffDepth" | "executionTimeoutMs"
+>;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const fastify = Fastify({
