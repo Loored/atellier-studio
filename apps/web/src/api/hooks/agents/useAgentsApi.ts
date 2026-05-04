@@ -1,5 +1,13 @@
 import { useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
-import type { Agent, CreateAgentInput, UpdateAgentStatusInput } from "@atellier/shared";
+import type {
+  Agent,
+  AgentRunStreamEvent,
+  AgentMessage,
+  CreateAgentInput,
+  RunAgentInput,
+  RunAgentResult,
+  UpdateAgentStatusInput,
+} from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
 import { useMutationInstance } from "../../query/useMutationInstance";
@@ -10,6 +18,13 @@ export function useAgentsApi() {
   return useQueryInstance<Agent[]>({
     queryKey: queryKeys.agents.all,
     queryFn: agentsService.list,
+  });
+}
+
+export function useAgentMessagesApi(agentId: string) {
+  return useQueryInstance<AgentMessage[]>({
+    queryKey: queryKeys.agents.messages(agentId),
+    queryFn: () => agentsService.listMessages(agentId),
   });
 }
 
@@ -55,6 +70,72 @@ export function useUpdateAgentStatusApi(options: UseUpdateAgentStatusApiOptions 
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agent.id) }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type RunAgentVariables = {
+  agentId: string;
+  input: RunAgentInput;
+};
+
+export type UseRunAgentApiOptions = UseMutationOptions<RunAgentResult, Error, RunAgentVariables>;
+
+export function useRunAgentApi(options: UseRunAgentApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<RunAgentResult, Error, RunAgentVariables>(
+    {
+      mutationFn: ({ agentId, input }) => agentsService.run(agentId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (result) => {
+        notifySuccess("Agent run completed");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(result.agent.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.messages(result.agent.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type RunAgentStreamVariables = {
+  agentId: string;
+  input: RunAgentInput;
+  onEvent: (event: AgentRunStreamEvent) => void;
+};
+
+export type UseRunAgentStreamApiOptions = UseMutationOptions<void, Error, RunAgentStreamVariables>;
+
+export function useRunAgentStreamApi(options: UseRunAgentStreamApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<void, Error, RunAgentStreamVariables>(
+    {
+      mutationFn: ({ agentId, input, onEvent }) => agentsService.runStream(agentId, input, onEvent),
+      ...options,
+    },
+    {
+      onSuccess: async (_result, variables) => {
+        notifySuccess("Agent run completed");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(variables.agentId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.messages(variables.agentId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
         ]);
       },
       onError: (error) => notifyError(error),

@@ -38,6 +38,7 @@ export function RunsTimeline() {
       <ul className="item-list">
         {runList.map((run) => {
           const pendingLogMessage = runLogMessages[run.id]?.trim() ?? "";
+          const latestLog = run.logs.at(-1);
 
           return (
             <li className="item-card run-item" data-status={run.status} key={run.id}>
@@ -51,6 +52,11 @@ export function RunsTimeline() {
                   </span>
                 </div>
               </div>
+              {latestLog ? (
+                <p className="run-latest-log">
+                  {latestLog.level}: {latestLog.message}
+                </p>
+              ) : null}
               {run.status !== "completed" ? (
                 <div className="run-actions">
                   <form className="run-log-form" onSubmit={(event) => handleAppendRunLog(event, run.id)}>

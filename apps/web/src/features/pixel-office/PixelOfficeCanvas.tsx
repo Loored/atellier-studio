@@ -58,16 +58,19 @@ export function PixelOfficeCanvas({ characters, onCharacterClick }: Props) {
 
       // Update movement for each character
       for (const char of charsRef.current) {
-        // Set target based on desk position
-        const targetX = char.deskX;
-        const targetY = char.deskY;
+        const isExecuting = char.status === "executing";
+        const isWorking = char.state === "working";
+        const targetX = isExecuting || isWorking ? char.workX : char.deskX;
+        const targetY = isExecuting || isWorking ? char.workY : char.deskY;
 
         // Wander offset for idle characters (small oscillation)
         const wanderX = char.state === 'idle' ? Math.sin(tick * 0.008 + char.deskX) * 8 : 0;
         const wanderY = char.state === 'idle' ? Math.cos(tick * 0.008 + char.deskY) * 4 : 0;
+        const workJitterX = isExecuting ? Math.sin(tick * 0.02 + char.workX) * 6 : 0;
+        const workJitterY = isExecuting ? Math.cos(tick * 0.02 + char.workY) * 3 : 0;
 
-        char.targetX = targetX + wanderX;
-        char.targetY = targetY + wanderY;
+        char.targetX = targetX + wanderX + workJitterX;
+        char.targetY = targetY + wanderY + workJitterY;
 
         // Move towards target
         const dx = char.targetX - char.currentX;
