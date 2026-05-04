@@ -5,6 +5,7 @@ import {
   type CreateRunInput,
   type Run,
   type RunLogEntry,
+  type RunStatus,
 } from "@atellier/shared";
 import { RunModel } from "../db/models/Run";
 import { cleanUndefined, toIso, toJsonRecord, type StorageMode } from "./service-utils";
@@ -120,6 +121,35 @@ export class RunService {
     };
     this.records.set(id, next);
     await this.appendRunCompletedLog(next, input);
+    return next;
+  }
+
+  async updateStatus(id: string, status: RunStatus, output?: unknown): Promise<Run | null> {
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findByIdAndUpdate(
+        id,
+        cleanUndefined({
+          status,
+          output,
+          updatedAt: new Date(),
+        }),
+        { new: true },
+      );
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+
+    const current = this.records.get(id);
+    if (!current) {
+      return null;
+    }
+
+    const next: Run = {
+      ...current,
+      status,
+      output: output ?? current.output,
+      updatedAt: toIso(new Date()),
+    };
+    this.records.set(id, next);
     return next;
   }
 

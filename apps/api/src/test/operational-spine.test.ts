@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Run, Task, WikiPageResponse } from "@atellier/shared";
+import type { Agent, AgentMessage, Run, RunAgentResult, Task, WikiPageResponse } from "@atellier/shared";
 import { buildServer } from "../server";
 
 describe("operational spine routes", () => {
@@ -162,5 +162,137 @@ describe("operational spine routes", () => {
     expect(wikiLog.ready).toBe(true);
     expect(wikiLog.content).toContain("run_completed | Manual run accepted");
     expect(wikiLog.content).toContain(`Run ID: ${run.id}`);
+  });
+
+  it("executes agent runs and persists agent chat messages", async () => {
+    const createAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Builder Agent",
+        role: "builder",
+      },
+    });
+
+    expect(createAgentResponse.statusCode).toBe(201);
+    const agent = createAgentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run`,
+      payload: {
+        instruction: "Resume implementation and report blockers.",
+        context: "Task: execution spine hardening",
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(200);
+    const runResult = runResponse.json<RunAgentResult>();
+    expect(runResult.agent.id).toBe(agent.id);
+    expect(runResult.agent.status).toBe("needs-human");
+    expect(runResult.run.status).toBe("completed");
+    expect(runResult.run.logs.length).toBeGreaterThanOrEqual(2);
+    expect(runResult.assistantMessage.role).toBe("assistant");
+
+    const messageResponse = await server.inject({
+      method: "GET",
+      url: `/agents/${agent.id}/messages`,
+    });
+
+    expect(messageResponse.statusCode).toBe(200);
+    const messageList = messageResponse.json<AgentMessage[]>();
+    expect(messageList).toHaveLength(2);
+    expect(messageList[0]?.role).toBe("user");
+    expect(messageList[1]?.role).toBe("assistant");
+  });
+
+  it("supports handoff execution to a second agent", async () => {
+    const firstAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "PM Agent",
+        role: "pm",
+      },
+    });
+    const firstAgent = firstAgentResponse.json<Agent>();
+
+    const secondAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Builder Agent",
+        role: "builder",
+      },
+    });
+    const secondAgent = secondAgentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${firstAgent.id}/run`,
+      payload: {
+        instruction: "Define technical plan.",
+        handoffAgentId: secondAgent.id,
+        handoffInstruction: "Implement the first actionable step.",
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(200);
+
+    const runsResponse = await server.inject({
+      method: "GET",
+      url: "/runs",
+    });
+    const runList = runsResponse.json<Run[]>();
+    expect(runList.length).toBeGreaterThanOrEqual(2);
+
+    const builderMessagesResponse = await server.inject({
+      method: "GET",
+      url: `/agents/${secondAgent.id}/messages`,
+    });
+    expect(builderMessagesResponse.statusCode).toBe(200);
+    const builderMessages = builderMessagesResponse.json<AgentMessage[]>();
+    expect(builderMessages.some((message) => message.role === "system")).toBe(true);
+    expect(builderMessages.some((message) => message.role === "assistant")).toBe(true);
+  });
+
+  it("returns 400 for invalid object ids on agent run stream route", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/agents/not-an-id/run/stream",
+      payload: {
+        instruction: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Agent id is invalid." });
+  });
+
+  it("returns CORS headers for local origins on agent run stream route", async () => {
+    const createAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Designer Agent",
+        role: "designer",
+      },
+    });
+    const agent = createAgentResponse.json<Agent>();
+
+    const response = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run/stream`,
+      headers: {
+        origin: "http://localhost:5173",
+      },
+      payload: {
+        instruction: "Draft a concept outline.",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    expect(response.headers["content-type"]).toContain("text/event-stream");
   });
 });
