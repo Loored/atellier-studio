@@ -15,12 +15,40 @@ export type BuildServerOptions = {
   services?: AppServices;
 };
 
+const LOCAL_CORS_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+export function isAllowedLocalOrigin(origin: string | undefined): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+    return ["http:", "https:"].includes(parsedOrigin.protocol) && LOCAL_CORS_HOSTS.has(parsedOrigin.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
-  const fastify = Fastify({ logger: options.logger ?? false });
+  const fastify = Fastify({
+    bodyLimit: 1024 * 1024,
+    logger: options.logger ?? false,
+  });
   const services = options.services ?? createAppServices(options);
 
   await services.wiki.ensureWiki();
-  await fastify.register(cors, { origin: true });
+  fastify.addHook("onRequest", async (_request, reply) => {
+    reply.header("Referrer-Policy", "no-referrer");
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+  });
+
+  await fastify.register(cors, {
+    origin: (origin, callback) => {
+      callback(null, isAllowedLocalOrigin(origin));
+    },
+  });
   await fastify.register(healthRoutes);
   await fastify.register(async (instance) => agentsRoutes(instance, services));
   await fastify.register(async (instance) => tasksRoutes(instance, services));

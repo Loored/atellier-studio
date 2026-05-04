@@ -36,6 +36,33 @@ describe("operational spine routes", () => {
     });
   });
 
+  it("uses local-first CORS and baseline API security headers", async () => {
+    const localResponse = await server.inject({
+      method: "GET",
+      url: "/health",
+      headers: {
+        origin: "http://127.0.0.1:5174",
+      },
+    });
+
+    expect(localResponse.statusCode).toBe(200);
+    expect(localResponse.headers["access-control-allow-origin"]).toBe("http://127.0.0.1:5174");
+    expect(localResponse.headers["referrer-policy"]).toBe("no-referrer");
+    expect(localResponse.headers["x-content-type-options"]).toBe("nosniff");
+    expect(localResponse.headers["x-frame-options"]).toBe("DENY");
+
+    const remoteResponse = await server.inject({
+      method: "GET",
+      url: "/health",
+      headers: {
+        origin: "https://example.com",
+      },
+    });
+
+    expect(remoteResponse.statusCode).toBe(200);
+    expect(remoteResponse.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
   it("creates tasks", async () => {
     const response = await server.inject({
       method: "POST",
@@ -52,6 +79,38 @@ describe("operational spine routes", () => {
     expect(task.title).toBe("Prepare project spine");
     expect(task.status).toBe("inbox");
     expect(task.priority).toBe("high");
+  });
+
+  it("rejects oversized task titles and run log messages", async () => {
+    const oversizedTaskResponse = await server.inject({
+      method: "POST",
+      url: "/tasks",
+      payload: {
+        title: "x".repeat(161),
+      },
+    });
+
+    expect(oversizedTaskResponse.statusCode).toBe(400);
+
+    const createRunResponse = await server.inject({
+      method: "POST",
+      url: "/runs",
+      payload: {
+        type: "manual",
+        status: "running",
+      },
+    });
+    const run = createRunResponse.json<Run>();
+
+    const oversizedLogResponse = await server.inject({
+      method: "PATCH",
+      url: `/runs/${run.id}/log`,
+      payload: {
+        message: "x".repeat(1001),
+      },
+    });
+
+    expect(oversizedLogResponse.statusCode).toBe(400);
   });
 
   it("creates runs, appends run logs, and writes wiki log on completion", async () => {

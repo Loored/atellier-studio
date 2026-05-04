@@ -6,20 +6,25 @@ import { WikiPanel } from "../wiki/components/WikiPanel";
 import { useDashboard } from "./hooks/useDashboard";
 
 export function Dashboard() {
-  const { agentCount, activeTaskCount, recentRunCount, wikiLogReady, isRefreshingDashboard } = useDashboard();
+  const { agentCount, activeTaskCount, recentRunCount, wikiLogReady, isRefreshingDashboard } =
+    useDashboard();
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
+    <div className="dashboard-content">
+      <div className="dashboard-topbar">
         <div>
           <p className="eyebrow">Milestone 0</p>
-          <h1>Atellier Studio Dashboard</h1>
+          <h1 className="dashboard-title">Atellier Studio</h1>
         </div>
         <div className="topbar-status" aria-live="polite">
-          {isRefreshingDashboard ? <Loader2 size={16} className="spin" /> : <CheckCircle2 size={16} />}
+          {isRefreshingDashboard ? (
+            <Loader2 size={16} className="spin" />
+          ) : (
+            <CheckCircle2 size={16} />
+          )}
           <span>{isRefreshingDashboard ? "Syncing" : "Ready"}</span>
         </div>
-      </header>
+      </div>
 
       <section className="metric-row" aria-label="Workspace status">
         <div className="metric">
@@ -35,7 +40,7 @@ export function Dashboard() {
         <div className="metric">
           <Activity size={18} />
           <span>{recentRunCount}</span>
-          <small>Runs</small>
+          <small>Recent runs</small>
         </div>
         <div className="metric">
           <BookOpen size={18} />
@@ -46,10 +51,10 @@ export function Dashboard() {
 
       <div className="dashboard-grid">
         <AgentsPanel />
-        <TasksPanel />
         <RunsTimeline />
+        <TasksPanel />
         <WikiPanel />
       </div>
-    </main>
+    </div>
   );
 }

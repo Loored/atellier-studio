@@ -63,8 +63,11 @@ Run only the web app:
 pnpm --filter @atellier/web dev
 ```
 
-The API defaults to `http://localhost:4000`.
+The API defaults to `http://127.0.0.1:4000`.
 The web app defaults to Vite's local dev URL.
+
+The API CORS default is intentionally local-first: browser origins on `localhost`, `127.0.0.1`, and `::1` are allowed for local development, while arbitrary remote origins are not reflected.
+The API listen host also defaults to `127.0.0.1`; set `API_HOST=0.0.0.0` only when you intentionally want LAN exposure.
 
 ## Testing
 

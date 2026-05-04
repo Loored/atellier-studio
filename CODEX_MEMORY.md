@@ -78,6 +78,15 @@ docker compose up -d mongo
 - PR titles start with an action verb and stay at 80 characters or fewer.
 - PR descriptions include Summary, Context, Changes, Benefits, and Screenshots / Demos.
 
+### 2026-05-04 - UI/UX and security review
+
+- Installed user-scoped skills: `pdf`, `security-threat-model`, `security-best-practices`, and `playwright`; restart Codex to make them appear in the active skill list.
+- Improved the dashboard layout so Agents and Recent Runs share the first row, with compact scannable lists and mobile two-column metrics.
+- Added shared task title and run log message length limits, enforced in the API and reflected in the UI controls.
+- Hardened API defaults with `127.0.0.1` listen host, local-only CORS reflection, explicit 1 MiB body limit, and baseline response security headers.
+- Web API client defaults to `http://127.0.0.1:4000` instead of `localhost` because this machine can resolve `localhost` to IPv6 while the API is reachable on IPv4 loopback.
+- Captured review notes at `atelier/wiki/synthesis/2026-05-04-ui-security-review.md` and run log at `atelier/runs/2026-05-04-ui-security-review.md`.
+
 ## Git Workflow Standard
 
 ### Commit messages
@@ -155,16 +164,41 @@ docker compose ps
 curl -s http://127.0.0.1:4000/health
 ```
 
+### 2026-05-04 - Pixel Office + Dark UI + Mobile + Orchestration (Claude session)
+
+Full handover document at `atelier/wiki/handover-claude-to-codex-2026-05-04.md`.
+
+Summary of changes:
+- Added `"designer"` to `AGENT_ROLES` in shared types.
+- Complete CSS dark theme overhaul (`styles.css`, ~1400 lines). Tokens: `--bg-base #0b0c16`, `--accent-purple #7c5cfc`, `--accent-teal #1de5b5`.
+- New app shell: `AppShell.tsx` (header + sidebar + conditional view), `Sidebar.tsx` (64px icon nav + roster), `MobileView.tsx` (phone layout with agent grid + activity list + bottom tabs).
+- Mobile breakpoint: `useIsMobile()` at `window.innerWidth < 768` in AppShell. Default view = 'dashboard' (required for tests).
+- New `features/pixel-office/` feature:
+  - Canvas 640×640px, 4 rooms in 2×2 grid, real sprites from pixel-agents VS Code extension.
+  - Sprites copied to `apps/web/public/sprites/` (characters char_0–5, floors, furniture).
+  - Smooth character movement: `currentX/Y` animated at 1.2px/frame toward `targetX/Y` in RAF loop.
+  - Directional sprites: row 0=down, row 1=up, row 2=right/left(mirrored), 7 animation frames.
+  - Click on character → floating glass panel with agent details + functional Send button.
+  - `useOrchestrationSim` hook: auto-chains 2–3 agents every 15s through working statuses.
+  - `⚡ ORQUESTACIÓN` toggle button in office bottom bar.
+- AgentsPanel updated with name input + role selector (all 6 roles).
+- Dashboard extracted from shell wrapper; PixelOfficePanel removed from dashboard grid.
+- Tests: 3/3 pass. TypeScript: 0 errors.
+
+**Canvas JSDOM pitfall:** `canvas.getContext("2d")` THROWS in jsdom — always use try/catch, not null-check.
+
 ## Not Implemented Yet
 
 - MCP integrations
-- Codex worker execution
-- Pixel/Phaser UI
+- Codex worker execution (real LLM calls from agents)
+- Real orchestration (currently simulated with random timers)
+- Chat history persistence in MongoDB
+- GRAFO / knowledge graph view
 - Auth
 - Cloud deployment
 - Multi-user/team workflows
-- External LLM calls in tests
-- Vector search/embeddings
+- Cross-room character pathfinding
+- Per-agent custom sprites
 
 ## Update Rule
 
