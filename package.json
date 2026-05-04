@@ -1,0 +1,37 @@
+{
+  "name": "atellier-studio",
+  "version": "1.0.0",
+  "description": "Atellier Studio is a private AI operating system for personal and client work.",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r test:watch",
+    "test:coverage": "pnpm -r test:coverage",
+    "test:api": "pnpm --filter @atellier/api test",
+    "test:web": "pnpm --filter @atellier/web test",
+    "typecheck": "pnpm -r typecheck",
+    "codex:review": "codex exec --cd . --ask-for-approval never \"Review the current changes using the atellier-reviewer skill. Do not modify files.\"",
+    "codex:test-fix": "codex exec --cd . --ask-for-approval on-request \"Run relevant tests and fix only test-related issues. Use atellier-test-runner.\"",
+    "codex:wiki-lint": "codex exec --cd . --ask-for-approval on-request \"Use atellier-wiki-ingest rules to lint atelier/wiki for stale pages, missing index entries, and orphan pages.\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Loored/atellier-studio.git"
+  },
+  "keywords": [
+    "atellier",
+    "studio",
+    "ai",
+    "system"
+  ],
+  "author": "L",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/Loored/atellier-studio/issues"
+  },
+  "homepage": "https://github.com/Loored/atellier-studio#readme"
+}
