@@ -16,7 +16,7 @@ export function OfficeView() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<AgentRole>("builder");
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([]);
-  const [orchestrationEnabled, setOrchestrationEnabled] = useState(true);
+  const [orchestrationEnabled, setOrchestrationEnabled] = useState(false);
 
   useOrchestrationSim(agents, orchestrationEnabled);
 

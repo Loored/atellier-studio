@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { X } from "lucide-react";
 import type { Agent } from "@atellier/shared";
-import { useUpdateAgentStatusApi } from "../../api/hooks/agents/useAgentsApi";
+import { useAgentDetailPanel } from "./hooks/useAgentDetailPanel";
 
 const ROLE_COLORS: Record<string, string> = {
   intake: "#2e6ea8",
@@ -42,13 +41,36 @@ type Props = {
 };
 
 export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: Props) {
-  const [instruction, setInstruction] = useState("");
-  const updateStatus = useUpdateAgentStatusApi();
+  const {
+    instruction,
+    handoffAgentId,
+    handoffInstruction,
+    isTerminalOpen,
+    terminalCommand,
+    terminalLines,
+    handoffCandidateList,
+    messageList,
+    streamingResponse,
+    streamingStatus,
+    streamErrorMessage,
+    isLoadingMessagesWithoutCache,
+    isRunningInstruction,
+    isUpdatingAgentStatus,
+    setHandoffAgentId,
+    setHandoffInstruction,
+    setInstruction,
+    setTerminalCommand,
+    handleResumeAgent,
+    handleRunTerminalCommand,
+    handleSendInstruction,
+    handleToggleTerminal,
+  } = useAgentDetailPanel(agent);
 
-  const isActive = agent.status !== "idle" && agent.status !== "done";
-  const isBlocked = agent.status === "blocked" || agent.status === "needs-human";
+  const isActive = agent.status !== "idle" && agent.status !== "done" && agent.status !== "needs-human";
+  const isHardBlocked = agent.status === "blocked";
+  const isWaiting = agent.status === "needs-human";
 
-  const pillClass = isBlocked ? "blocked" : isActive ? "active" : "idle";
+  const pillClass = isHardBlocked ? "blocked" : isWaiting ? "waiting" : isActive ? "active" : "idle";
 
   // Progress based on actual status
   const progressWidth =
@@ -69,29 +91,9 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
       reviewing: "Revisando...",
       reading: "Leyendo contexto...",
       blocked: "Bloqueado — necesita atención",
-      "needs-human": "Esperando input humano",
+      "needs-human": "Esperando input humano para continuar",
       done: "Tarea completada",
     } as Record<string, string>)[agent.status] ?? "En proceso...";
-
-  const handleSend = () => {
-    const trimmed = instruction.trim();
-    if (!trimmed) return;
-
-    // Update agent status to executing
-    updateStatus.mutate(
-      { agentId: agent.id, input: { status: "executing" } },
-      {
-        onSuccess: () => {
-          // After 4 seconds, simulate work done → return to idle
-          setTimeout(() => {
-            updateStatus.mutate({ agentId: agent.id, input: { status: "idle" } });
-          }, 4000);
-        },
-      },
-    );
-
-    setInstruction("");
-  };
 
   return (
     <div className={`agent-float-panel agent-float-panel--${side}`}>
@@ -120,11 +122,55 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
 
       {/* Toolbar */}
       <div className="agent-float-toolbar">
-        <button className="agent-float-terminal-btn">Open Agent Terminal</button>
+        <button className="agent-float-terminal-btn" onClick={handleToggleTerminal}>
+          {isTerminalOpen ? "Hide Agent Terminal" : "Open Agent Terminal"}
+        </button>
+        {(isHardBlocked || isWaiting) ? (
+          <button
+            className="agent-float-action-btn"
+            onClick={handleResumeAgent}
+            disabled={isUpdatingAgentStatus}
+          >
+            {isUpdatingAgentStatus ? "..." : "Resume"}
+          </button>
+        ) : null}
         <span className={`agent-float-status-dot agent-float-status-dot--${pillClass}`} />
         <span className="agent-float-status-label">{STATUS_LABELS[agent.status] ?? agent.status}</span>
-        <span className="agent-float-msgs">0 messages</span>
+        <span className="agent-float-msgs">{messageList.length} messages</span>
       </div>
+
+      {isTerminalOpen ? (
+        <div className="agent-terminal">
+          <div className="agent-terminal-log">
+            {terminalLines.length === 0 ? (
+              <p className="agent-terminal-line agent-terminal-line--muted">terminal empty</p>
+            ) : (
+              terminalLines.slice(-14).map((line) => (
+                <p
+                  className={`agent-terminal-line agent-terminal-line--${line.tone}`}
+                  key={line.id}
+                >
+                  {line.text}
+                </p>
+              ))
+            )}
+          </div>
+          <div className="agent-terminal-input-row">
+            <input
+              className="agent-terminal-input"
+              value={terminalCommand}
+              onChange={(event) => setTerminalCommand(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  handleRunTerminalCommand();
+                }
+              }}
+              placeholder="run crea propuesta visual"
+            />
+            <button className="agent-terminal-run" onClick={handleRunTerminalCommand}>Run</button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Live activity */}
       <div className="agent-float-section">
@@ -139,6 +185,15 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
           />
         </div>
         <p className="agent-float-activity-text">{activityText}</p>
+        {isRunningInstruction || streamingResponse ? (
+          <p className="agent-float-streaming">
+            {streamingStatus !== "idle" ? `[${streamingStatus}] ` : ""}
+            {streamingResponse || "Esperando salida del agente..."}
+          </p>
+        ) : null}
+        {streamErrorMessage ? (
+          <p className="agent-float-stream-error">{streamErrorMessage}</p>
+        ) : null}
       </div>
 
       {/* Agent instructions */}
@@ -148,6 +203,19 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
             ? `Tarea activa: ${agent.currentTaskId}`
             : `${ROLE_DESCRIPTIONS[agent.role] ?? agent.role}. Define las instrucciones para este agente.`}
         </p>
+        <div className="agent-float-messages">
+          {isLoadingMessagesWithoutCache ? (
+            <p className="agent-float-msg-empty">Cargando mensajes…</p>
+          ) : messageList.length === 0 ? (
+            <p className="agent-float-msg-empty">Sin historial aún.</p>
+          ) : (
+            messageList.slice(-4).map((message) => (
+              <p className="agent-float-msg-item" key={message.id}>
+                <strong>{message.role}:</strong> {message.content}
+              </p>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Footer: chat */}
@@ -161,12 +229,34 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
             onChange={(e) => setInstruction(e.target.value)}
             rows={3}
           />
+          <div className="agent-float-handoff">
+            <select
+              className="agent-float-handoff-select"
+              value={handoffAgentId}
+              onChange={(event) => setHandoffAgentId(event.target.value)}
+            >
+              <option value="">Sin handoff</option>
+              {handoffCandidateList.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name} ({candidate.role})
+                </option>
+              ))}
+            </select>
+            {handoffAgentId ? (
+              <input
+                className="agent-float-handoff-input"
+                placeholder="Instrucción para el siguiente agente"
+                value={handoffInstruction}
+                onChange={(event) => setHandoffInstruction(event.target.value)}
+              />
+            ) : null}
+          </div>
           <button
             className="agent-float-send"
-            onClick={handleSend}
-            disabled={!instruction.trim() || updateStatus.isPending}
+            onClick={handleSendInstruction}
+            disabled={!instruction.trim() || isRunningInstruction || isUpdatingAgentStatus}
           >
-            {updateStatus.isPending ? "Enviando..." : "Send"}
+            {isRunningInstruction ? "Ejecutando..." : "Send"}
           </button>
         </div>
       </div>

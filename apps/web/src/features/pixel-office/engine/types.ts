@@ -9,9 +9,12 @@ export type PixelCharacter = {
   name: string;
   role: AgentRole;
   status: AgentStatus;
+  lastRunId?: string;
   state: PixelCharacterState;
   deskX: number;    // home seat X
   deskY: number;    // home seat Y
+  workX: number;    // execution zone X
+  workY: number;    // execution zone Y
   currentX: number; // animated position X
   currentY: number; // animated position Y
   targetX: number;  // movement target X

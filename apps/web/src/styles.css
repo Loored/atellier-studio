@@ -354,6 +354,12 @@ body {
   border: 1px solid rgba(249,115,22,0.3);
 }
 
+.agent-status-pill--waiting {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
 /* ─── Floating agent panels ─── */
 .agent-float-panel {
   position: absolute;
@@ -468,6 +474,23 @@ body {
 
 .agent-float-terminal-btn:hover { border-color: var(--border-accent); color: var(--text-primary); }
 
+.agent-float-action-btn {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.agent-float-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .agent-float-status-dot {
   width: 7px;
   height: 7px;
@@ -478,6 +501,7 @@ body {
 .agent-float-status-dot--idle { background: var(--text-tertiary); }
 .agent-float-status-dot--active { background: var(--accent-teal); box-shadow: 0 0 5px var(--accent-teal); }
 .agent-float-status-dot--blocked { background: var(--accent-orange); }
+.agent-float-status-dot--waiting { background: #f59e0b; box-shadow: 0 0 5px rgba(245, 158, 11, 0.45); }
 
 .agent-float-status-label {
   font-size: 0.72rem;
@@ -489,6 +513,64 @@ body {
   font-size: 0.68rem;
   color: var(--text-tertiary);
   margin-left: auto;
+}
+
+.agent-terminal {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.agent-terminal-log {
+  border: 1px solid var(--border-card);
+  background: rgba(6, 8, 18, 0.95);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 120px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.agent-terminal-line {
+  margin: 0 0 4px;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent-terminal-line--muted { color: var(--text-tertiary); }
+.agent-terminal-line--info { color: var(--text-secondary); }
+.agent-terminal-line--success { color: #4ade80; }
+.agent-terminal-line--error { color: #fca5a5; }
+
+.agent-terminal-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.agent-terminal-input {
+  min-height: 30px;
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.agent-terminal-run {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-accent);
+  border-radius: 6px;
+  background: var(--accent-purple-glow);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  cursor: pointer;
 }
 
 .agent-float-section {
@@ -537,6 +619,22 @@ body {
   margin: 0;
 }
 
+.agent-float-streaming {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--accent-teal);
+  white-space: pre-wrap;
+}
+
+.agent-float-stream-error {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #fca5a5;
+  white-space: pre-wrap;
+}
+
 .agent-float-body {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-subtle);
@@ -547,6 +645,28 @@ body {
   color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;
+}
+
+.agent-float-messages {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 148px;
+  overflow-y: auto;
+}
+
+.agent-float-msg-empty {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.agent-float-msg-item {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .agent-float-footer {
@@ -566,6 +686,22 @@ body {
   display: grid;
   grid-template-rows: 1fr auto;
   gap: 8px;
+}
+
+.agent-float-handoff {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-float-handoff-select,
+.agent-float-handoff-input {
+  min-height: 30px;
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
 }
 
 .agent-float-input {
@@ -1008,6 +1144,13 @@ select option { background: #1a1c2e; }
   grid-template-columns: auto minmax(0,1fr);
   align-items: center;
   gap: 10px;
+}
+
+.run-latest-log {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .run-actions {
