@@ -1,4 +1,4 @@
-export const AGENT_ROLES = ["intake", "wiki-curator", "pm", "builder", "qa"] as const;
+export const AGENT_ROLES = ["intake", "wiki-curator", "pm", "builder", "qa", "designer"] as const;
 
 export type AgentRole = (typeof AGENT_ROLES)[number];
 

@@ -109,7 +109,7 @@ describe("App", () => {
   it("renders the dashboard with operational data", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Atellier Studio Dashboard")).toBeInTheDocument();
+    expect(await screen.findByText("Atellier Studio")).toBeInTheDocument();
     expect(await screen.findByText("Builder Agent")).toBeInTheDocument();
     expect(await screen.findByText("Prepare project spine")).toBeInTheDocument();
     expect(await screen.findByText("Wiki Log")).toBeInTheDocument();

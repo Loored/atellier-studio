@@ -1,10 +1,10 @@
 import { AppProviders } from "./app/AppProviders";
-import { Dashboard } from "./features/dashboard/Dashboard";
+import { AppShell } from "./app/AppShell";
 
 export default function App() {
   return (
     <AppProviders>
-      <Dashboard />
+      <AppShell />
     </AppProviders>
   );
 }

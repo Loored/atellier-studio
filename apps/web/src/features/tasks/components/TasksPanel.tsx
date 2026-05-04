@@ -1,4 +1,5 @@
 import { Check, CircleDot, Plus } from "lucide-react";
+import { TASK_TITLE_MAX_LENGTH } from "@atellier/shared";
 import { useTasksPanel } from "../hooks/useTasksPanel";
 
 export function TasksPanel() {
@@ -23,11 +24,13 @@ export function TasksPanel() {
           <p className="eyebrow">Queue</p>
           <h2>Tasks</h2>
         </div>
+        <span className="panel-chip">{taskList.length} total</span>
       </div>
 
       <form className="task-form" onSubmit={handleCreateTask}>
         <input
           aria-label="Task title"
+          maxLength={TASK_TITLE_MAX_LENGTH}
           value={taskTitle}
           onChange={(event) => setTaskTitle(event.target.value)}
           placeholder="Task title"
@@ -41,7 +44,7 @@ export function TasksPanel() {
           <option value="medium">Medium</option>
           <option value="high">High</option>
         </select>
-        <button type="submit" disabled={isCreatingTask} title="Create task">
+        <button type="submit" disabled={isCreatingTask || taskTitle.trim().length === 0} title="Create task">
           <Plus size={18} />
           <span>Create</span>
         </button>
@@ -56,8 +59,9 @@ export function TasksPanel() {
             <CircleDot size={18} />
             <div>
               <strong>{task.title}</strong>
-              <span>
-                {task.priority} priority - {task.status}
+              <span className="item-meta">
+                <span>{task.priority} priority</span>
+                <small className={`status-badge status-badge-${task.status}`}>{task.status}</small>
               </span>
             </div>
             <div className="button-cluster">
@@ -65,7 +69,7 @@ export function TasksPanel() {
                 className="icon-only-button"
                 type="button"
                 onClick={() => markTaskActive(task.id)}
-                disabled={isUpdatingTask}
+                disabled={isUpdatingTask || task.status === "active"}
                 title="Mark active"
                 aria-label={`Mark ${task.title} active`}
               >
@@ -75,7 +79,7 @@ export function TasksPanel() {
                 className="icon-only-button"
                 type="button"
                 onClick={() => markTaskDone(task.id)}
-                disabled={isUpdatingTask}
+                disabled={isUpdatingTask || task.status === "done"}
                 title="Mark done"
                 aria-label={`Mark ${task.title} done`}
               >

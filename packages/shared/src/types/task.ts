@@ -6,6 +6,8 @@ export const TASK_PRIORITIES = ["low", "medium", "high"] as const;
 
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
+export const TASK_TITLE_MAX_LENGTH = 160;
+
 export type Task = {
   id: string;
   title: string;

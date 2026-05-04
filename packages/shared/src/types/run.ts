@@ -10,6 +10,8 @@ export const RUN_LOG_LEVELS = ["info", "warn", "error"] as const;
 
 export type RunLogLevel = (typeof RUN_LOG_LEVELS)[number];
 
+export const RUN_LOG_MESSAGE_MAX_LENGTH = 1000;
+
 export type RunLogEntry = {
   timestamp: string;
   level: RunLogLevel;

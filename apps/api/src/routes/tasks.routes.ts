@@ -1,5 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { TASK_PRIORITIES, TASK_STATUSES, type CreateTaskInput, type UpdateTaskInput } from "@atellier/shared";
+import {
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  TASK_TITLE_MAX_LENGTH,
+  type CreateTaskInput,
+  type UpdateTaskInput,
+} from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
 import {
   badRequest,
@@ -23,6 +29,9 @@ export async function tasksRoutes(fastify: FastifyInstance, services: AppService
     const title = stringField(body, "title");
     if (!title) {
       return badRequest(reply, "Task title is required.");
+    }
+    if (title.length > TASK_TITLE_MAX_LENGTH) {
+      return badRequest(reply, `Task title must be ${TASK_TITLE_MAX_LENGTH} characters or fewer.`);
     }
 
     if (body.status !== undefined && !isOneOf(body.status, TASK_STATUSES)) {
@@ -62,8 +71,13 @@ export async function tasksRoutes(fastify: FastifyInstance, services: AppService
       return badRequest(reply, "Task priority is invalid.");
     }
 
+    const title = optionalStringField(body, "title");
+    if (title && title.length > TASK_TITLE_MAX_LENGTH) {
+      return badRequest(reply, `Task title must be ${TASK_TITLE_MAX_LENGTH} characters or fewer.`);
+    }
+
     const update: UpdateTaskInput = {
-      title: optionalStringField(body, "title"),
+      title,
       description: optionalStringField(body, "description"),
       status: body.status,
       priority: body.priority,

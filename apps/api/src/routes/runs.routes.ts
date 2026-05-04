@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import {
   RUN_LOG_LEVELS,
+  RUN_LOG_MESSAGE_MAX_LENGTH,
   RUN_STATUSES,
   RUN_TYPES,
   type AppendRunLogInput,
@@ -48,6 +49,9 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
     const message = stringField(body, "message");
     if (!message) {
       return badRequest(reply, "Run log message is required.");
+    }
+    if (message.length > RUN_LOG_MESSAGE_MAX_LENGTH) {
+      return badRequest(reply, `Run log message must be ${RUN_LOG_MESSAGE_MAX_LENGTH} characters or fewer.`);
     }
 
     if (body.level !== undefined && !isOneOf(body.level, RUN_LOG_LEVELS)) {

@@ -21,7 +21,7 @@ export function WikiPanel() {
 
       {isLoadingWiki ? <p className="empty-state">Loading wiki</p> : null}
 
-      <pre className="wiki-log">{latestLog || "No wiki log entries yet"}</pre>
+      <pre className="wiki-log" aria-label="Latest wiki log entries">{latestLog || "No wiki log entries yet"}</pre>
     </section>
   );
 }
