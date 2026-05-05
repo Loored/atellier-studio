@@ -465,6 +465,9 @@ describe("App", () => {
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: /create run/i }));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining("OpenAI execution is active"),
+    );
     await waitFor(() => expect(createCodexRunMock).toHaveBeenCalled());
 
     await user.click(screen.getByRole("button", { name: "Plan" }));
