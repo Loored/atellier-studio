@@ -20,5 +20,6 @@ export type CodexWorkerStep = {
   finishedAt?: string;
   exitCode?: number;
   output?: string;
+  stdoutPath?: string;
+  stderrPath?: string;
 };
-
