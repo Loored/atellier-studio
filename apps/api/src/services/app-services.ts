@@ -53,7 +53,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     openai: options.openaiApiKey
       ? {
           apiKey: options.openaiApiKey,
-          model: options.openaiModel ?? "gpt-5-mini",
+          model: options.openaiModel ?? "gpt-4.1-mini",
         }
       : undefined,
   });
