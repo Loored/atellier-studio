@@ -33,7 +33,7 @@ Long history and setup details live in docs so this file stays small.
 
 - Repo: `/Users/e.juarez/Desktop/atellier-studio`
 - GitHub remote: `https://github.com/Loored/atellier-studio.git`
-- Local branch: `dev/1.0.0`
+- Active branch policy: work from `dev/1.0.0` into short-lived feature branches; keep `main` stable.
 - Package manager: `pnpm@9.15.4`
 - Docker path: Docker CLI + Docker Compose + Colima, not Docker Desktop.
 - Mongo container: `atellier-mongo` from `mongo:7`, exposed on `localhost:27017`.
@@ -90,15 +90,34 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 ## Current Priorities
 
-1. Executor/model safety visibility: make real OpenAI mode and model profile obvious before runs.
-2. Wiki Brain MVP: deterministic `ingest`, `query`, and `lint` routes before heavier agent autonomy.
-3. Codex Worker design doc: plan command execution, sandbox, approvals, logs, tests, and UI controls before building.
-4. Orchestration reliability: keep templates readable and avoid growing one huge orchestration service.
-5. MCP later: only after Wiki Brain, model safety, and Codex Worker are stable.
+1. Codex Worker evidence pass: strengthen per-step output evidence and finalize review payloads.
+2. Wiki Brain v2: add safe wiki write/update flows and improve contradiction reuse workflow.
+3. Orchestration reliability: keep templates readable and avoid growing one huge orchestration service.
+4. MCP later: only after Wiki Brain and Codex Worker execution evidence are stable.
 
 Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, multiplayer, or broad MCP.
 
 ## Recent Operational Notes
+
+### 2026-05-05 - Safety + Wiki Brain + Codex Worker control-plane
+
+- `/health` includes `executorMode`, `executorModel`, and `modelProfile`.
+- OpenAI safety warnings/confirmations are active across:
+  - orchestration start
+  - manual run start
+  - office live mode
+  - codex worker run creation
+- Wiki Brain MVP is implemented with deterministic routes:
+  - `POST /wiki/ingest`
+  - `POST /wiki/query`
+  - `POST /wiki/lint`
+- Codex Worker design doc exists at `docs/codex-worker.md`.
+- Codex Worker control-plane v1 is implemented:
+  - create/plan/approve-step/execute-next/cancel/finalize
+  - transition guardrails
+  - blocked-reason UI messaging
+  - durable finalize run artifact + wiki event
+  - focused API and web tests
 
 ### 2026-05-05 - Full UI redesign + Office pixel engine
 
