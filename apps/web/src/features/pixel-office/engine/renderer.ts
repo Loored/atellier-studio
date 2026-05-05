@@ -777,60 +777,308 @@ function drawCharacterSprite(
   }
 }
 
+const STATUS_DOT_COLOR: Record<string, string> = {
+  idle:         '#4a506a',
+  reading:      '#10f2aa',
+  thinking:     '#10f2aa',
+  planning:     '#10f2aa',
+  writing:      '#10f2aa',
+  executing:    '#10f2aa',
+  reviewing:    '#10f2aa',
+  blocked:      '#f97316',
+  'needs-human':'#fbbf24',
+  done:         '#4ade80',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  idle:         'Idle',
+  reading:      'Running',
+  thinking:     'Running',
+  planning:     'Running',
+  writing:      'Running',
+  executing:    'Running',
+  reviewing:    'Running',
+  blocked:      'Blocked',
+  'needs-human':'Waiting',
+  done:         'Done',
+};
+
 function drawCharacterLabel(
   ctx: CanvasRenderingContext2D,
   char: PixelCharacter,
 ): void {
-  const cx = char.currentX;
-  const baseY = char.currentY + 20;
+  const cx    = char.currentX;
+  const baseY = char.currentY + 22;
 
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 10px Inter, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(char.name, cx, baseY);
+  const dotColor    = STATUS_DOT_COLOR[char.status]  ?? '#4a506a';
+  const statusText  = STATUS_LABEL[char.status]      ?? char.status;
 
+  // Measure text to size the box
+  ctx.font = 'bold 9px Inter, sans-serif';
+  const nameW = ctx.measureText(char.name).width;
   ctx.font = '8px Inter, sans-serif';
-  ctx.fillStyle = '#8b8fa8';
-  ctx.fillText(char.role, cx, baseY + 12);
+  const statusW = ctx.measureText(statusText).width + 10; // dot + gap
+  const boxW = Math.max(nameW, statusW) + 16;
+  const boxH = 28;
+  const bx = cx - boxW / 2;
+  const by = baseY - 2;
+
+  // Sign background — opaque enough to read over any room tile
+  ctx.fillStyle = 'rgba(4, 6, 16, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, boxW, boxH, 5);
+  ctx.fill();
+
+  // Border — color-coded by status; glow when working
+  const isWorking = ['reading','thinking','planning','writing','executing','reviewing'].includes(char.status);
+  if (isWorking) {
+    ctx.shadowColor = dotColor;
+    ctx.shadowBlur  = 6;
+  }
+  ctx.strokeStyle = dotColor + (isWorking ? 'cc' : '55');
+  ctx.lineWidth = isWorking ? 1.5 : 1;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, boxW, boxH, 5);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Agent name
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 9px Inter, sans-serif';
+  ctx.fillStyle = '#eef0f8';
+  ctx.fillText(char.name, cx, by + 11);
+
+  // Status dot
+  const dotX = cx - statusW / 2 + 4;
+  const dotY = by + 20.5;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor;
+  ctx.fill();
+
+  // Status text
+  ctx.font = '8px Inter, sans-serif';
+  ctx.fillStyle = dotColor;
+  ctx.textAlign = 'left';
+  ctx.fillText(statusText, dotX + 5, by + 23);
 
   ctx.textAlign = 'start';
 }
 
-function drawStepBubble(
+// ─── Status metadata for action bubble ───
+
+const ACTION_ICON: Record<string, string> = {
+  idle:         '',
+  reading:      '◎',
+  thinking:     '◎',
+  planning:     '◎',
+  writing:      '✎',
+  executing:    '▶',
+  reviewing:    '✔',
+  blocked:      '✖',
+  'needs-human':'⏸',
+  done:         '✔',
+};
+
+const ACTION_COLOR: Record<string, string> = {
+  idle:         '#4a506a',
+  reading:      '#10f2aa',
+  thinking:     '#10f2aa',
+  planning:     '#10f2aa',
+  writing:      '#10f2aa',
+  executing:    '#10f2aa',
+  reviewing:    '#10f2aa',
+  blocked:      '#f97316',
+  'needs-human':'#fbbf24',
+  done:         '#4ade80',
+};
+
+function drawLoadingDots(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  y: number,
+  tick: number,
+  color: string,
+): void {
+  for (let i = 0; i < 3; i++) {
+    const alpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(tick * 0.12 - i * 1.1));
+    ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2, '0');
+    ctx.beginPath();
+    ctx.arc(cx - 6 + i * 6, y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawActionBubble(
   ctx: CanvasRenderingContext2D,
   char: PixelCharacter,
+  tick: number,
 ): void {
-  if (!char.currentStep) return;
+  // Only show for non-idle agents
+  if (char.state === 'idle' || char.status === 'idle' || char.status === 'done') return;
 
-  const label = char.currentStep.label;
-  const next = char.currentStep.nextAgentName;
-  const cx = char.currentX;
-  const by = char.currentY - 92;
+  const cx    = char.currentX;
+  const spriteTop = char.currentY - CHAR_FRAME_H * 2 - 4; // top of sprite
+
+  const isLoading = ['reading', 'thinking', 'planning'].includes(char.status);
+  const acColor   = ACTION_COLOR[char.status] ?? '#4a506a';
+  const icon      = ACTION_ICON[char.status]  ?? '';
+
+  // ── Build lines ──────────────────────────────────────────
+  type Line = { text: string; color: string; bold?: boolean };
+  const lines: Line[] = [];
+
+  // 1. Status line
+  const statusName =
+    char.status === 'needs-human' ? 'Waiting for input' :
+    char.status === 'blocked'     ? 'Blocked'            :
+    char.status === 'executing'   ? 'Executing'          :
+    char.status === 'writing'     ? 'Writing'            :
+    char.status === 'reviewing'   ? 'Reviewing'          :
+    char.status === 'reading'     ? 'Reading…'           :
+    char.status === 'thinking'    ? 'Thinking…'          :
+    char.status === 'planning'    ? 'Planning…'          :
+    char.status;
+
+  lines.push({ text: `${icon} ${statusName}`, color: acColor, bold: true });
+
+  // 2. Step label (current task)
+  if (char.currentStep?.label) {
+    const raw   = char.currentStep.label;
+    const short = raw.length > 22 ? raw.slice(0, 20) + '…' : raw;
+    lines.push({ text: short, color: '#eef0f8' });
+  }
+
+  // 3. Handoff target
+  if (char.currentStep?.nextAgentName) {
+    lines.push({ text: `→ ${char.currentStep.nextAgentName}`, color: '#c4b5fd', bold: true });
+  }
+
+  // 4. Movement destination
+  if (char.isMoving) {
+    const goingToWork =
+      Math.abs(char.targetX - char.workX) < 20 &&
+      Math.abs(char.targetY - char.workY) < 20;
+    const goingToDesk =
+      Math.abs(char.targetX - char.deskX) < 20 &&
+      Math.abs(char.targetY - char.deskY) < 20;
+
+    if (goingToWork && !char.currentStep?.label) {
+      lines.push({ text: '⇒ Execution zone', color: '#10f2aa' });
+    } else if (goingToDesk) {
+      lines.push({ text: '⇐ Returning to desk', color: '#8890ae' });
+    }
+  }
+
+  // ── Measure ───────────────────────────────────────────────
+  const LINE_H = 12;
+  const PAD    = { x: 10, y: 6 };
+  const DOTS_H = isLoading ? 10 : 0;
 
   ctx.font = 'bold 8px Inter, sans-serif';
-  const labelW = ctx.measureText(label).width;
-  const boxW = Math.max(labelW + 12, 60);
-  const boxH = next ? 26 : 16;
+  const maxW = Math.max(...lines.map((l) => {
+    ctx.font = l.bold ? 'bold 8px Inter, sans-serif' : '8px Inter, sans-serif';
+    return ctx.measureText(l.text).width;
+  }));
 
-  // Pill background
-  ctx.fillStyle = 'rgba(124, 58, 237, 0.92)';
+  const boxW = maxW + PAD.x * 2;
+  const boxH = lines.length * LINE_H + PAD.y * 2 + DOTS_H;
+  const bx   = cx - boxW / 2;
+  const by   = spriteTop - boxH - 6;
+
+  // ── Background ────────────────────────────────────────────
+  ctx.save();
+  ctx.fillStyle = 'rgba(3, 4, 14, 0.95)';
   ctx.beginPath();
-  ctx.roundRect(cx - boxW / 2, by, boxW, boxH, 4);
+  ctx.roundRect(bx, by, boxW, boxH, 5);
   ctx.fill();
 
-  // Step label
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.fillText(label, cx, by + 10);
+  // Border
+  ctx.strokeStyle = acColor + '66';
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, boxW, boxH, 5);
+  ctx.stroke();
 
-  // Next agent hint
-  if (next) {
-    ctx.font = '7px Inter, sans-serif';
-    ctx.fillStyle = '#c4b5fd';
-    ctx.fillText(`→ ${next}`, cx, by + 22);
+  // Small triangle caret pointing down to sprite
+  ctx.fillStyle = 'rgba(3, 4, 14, 0.95)';
+  ctx.strokeStyle = acColor + '44';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5, by + boxH);
+  ctx.lineTo(cx + 5, by + boxH);
+  ctx.lineTo(cx,     by + boxH + 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // ── Text lines ────────────────────────────────────────────
+  ctx.textAlign = 'center';
+  lines.forEach((line, i) => {
+    ctx.font      = line.bold ? 'bold 8px Inter, sans-serif' : '8px Inter, sans-serif';
+    ctx.fillStyle = line.color;
+    ctx.fillText(line.text, cx, by + PAD.y + 8 + i * LINE_H);
+  });
+
+  // ── Animated loading dots (thinking/planning/reading) ─────
+  if (isLoading) {
+    drawLoadingDots(ctx, cx, by + boxH - PAD.y - 1, tick, acColor);
   }
 
   ctx.textAlign = 'start';
+  ctx.restore();
+}
+
+// ─── Destination ghost marker ─────────────────────────────
+
+function drawDestinationMarkers(
+  ctx: CanvasRenderingContext2D,
+  characters: PixelCharacter[],
+  tick: number,
+): void {
+  for (const char of characters) {
+    if (!char.isMoving) continue;
+
+    const tx = char.targetX;
+    const ty = char.targetY;
+
+    // Skip if very close (already arrived)
+    const dist = Math.hypot(tx - char.currentX, ty - char.currentY);
+    if (dist < 12) continue;
+
+    const pulse = 0.4 + 0.3 * Math.sin(tick * 0.1);
+    const color = char.state === 'blocked'      ? '#f97316' :
+                  char.status === 'needs-human' ? '#fbbf24' : '#10f2aa';
+
+    ctx.save();
+
+    // Dashed line from current position to destination
+    ctx.strokeStyle = color + Math.round(pulse * 180).toString(16).padStart(2, '0');
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.lineDashOffset = -(tick * 0.4) % 8;
+    ctx.beginPath();
+    ctx.moveTo(char.currentX, char.currentY);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    // Target crosshair / ring
+    ctx.strokeStyle = color + Math.round(pulse * 220).toString(16).padStart(2, '0');
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.arc(tx, ty, 5 + 2 * Math.sin(tick * 0.15), 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner dot
+    ctx.fillStyle = color + Math.round(pulse * 255).toString(16).padStart(2, '0');
+    ctx.beginPath();
+    ctx.arc(tx, ty, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
 }
 
 function drawStatusBubble(
@@ -856,6 +1104,119 @@ function drawStatusBubble(
   ctx.textAlign = 'start';
 }
 
+// ─── Connection lines between agents ───
+
+function drawArrowHead(
+  ctx: CanvasRenderingContext2D,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  len: number,
+): void {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawConnectionLines(
+  ctx: CanvasRenderingContext2D,
+  characters: PixelCharacter[],
+  tick: number,
+): void {
+  const working = characters.filter((c) => c.state === 'working');
+
+  // ── Pass 1: collaboration mesh between ALL working agents ──
+  if (working.length > 1) {
+    for (let i = 0; i < working.length; i++) {
+      for (let j = i + 1; j < working.length; j++) {
+        const a = working[i];
+        const b = working[j];
+        const hasExplicit =
+          a.currentStep?.nextAgentName === b.name ||
+          b.currentStep?.nextAgentName === a.name;
+        if (hasExplicit) continue;
+
+        const pulse = 0.28 + 0.12 * Math.sin(tick * 0.05 + i * 1.3 + j * 0.7);
+        ctx.save();
+        ctx.strokeStyle    = `rgba(139,92,246,${pulse})`;
+        ctx.lineWidth      = 1.5;
+        ctx.setLineDash([4, 6]);
+        ctx.lineDashOffset = -(tick * 0.35 + i * 5) % 10;
+        ctx.beginPath();
+        ctx.moveTo(a.currentX, a.currentY);
+        ctx.lineTo(b.currentX, b.currentY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+        ctx.restore();
+      }
+    }
+  }
+
+  // ── Pass 2: explicit directed handoff arrows ──
+  for (const char of characters) {
+    if (!char.currentStep?.nextAgentName) continue;
+
+    const target = characters.find((c) => c.name === char.currentStep!.nextAgentName);
+    if (!target) continue;
+
+    const x1 = char.currentX;
+    const y1 = char.currentY;
+    const x2 = target.currentX;
+    const y2 = target.currentY;
+
+    ctx.save();
+
+    if (char.state === 'working') {
+      const pulse = 0.7 + 0.3 * Math.sin(tick * 0.09 + x1 * 0.01);
+
+      // Double-render: wide glow + sharp core
+      ctx.shadowColor = '#10f2aa';
+      ctx.shadowBlur  = 16;
+      ctx.strokeStyle = `rgba(16,242,170,${pulse * 0.6})`;
+      ctx.lineWidth   = 5;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.shadowBlur  = 6;
+      ctx.strokeStyle = `rgba(16,242,170,${pulse})`;
+      ctx.lineWidth   = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle  = `rgba(16,242,170,${pulse})`;
+      drawArrowHead(ctx, x1, y1, x2, y2, 12);
+    } else {
+      // Queued: dashed purple, clearly visible
+      const offset = -(tick * 0.6 + x1 * 0.05) % 10;
+      ctx.strokeStyle    = 'rgba(167,139,250,0.75)';
+      ctx.lineWidth      = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.lineDashOffset = offset;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+
+      ctx.fillStyle = 'rgba(167,139,250,0.75)';
+      drawArrowHead(ctx, x1, y1, x2, y2, 10);
+    }
+
+    ctx.restore();
+  }
+}
+
 // ─── Main render function ───
 
 export function renderOffice(
@@ -878,12 +1239,18 @@ export function renderOffice(
   // Room dividers
   drawRoomDividers(ctx);
 
-  // Draw characters with accessories
+  // 1. Destination markers (dashed line + ring at target) — below everything
+  drawDestinationMarkers(ctx, characters, tick);
+
+  // 2. Handoff / connection lines — above floor, below sprites
+  drawConnectionLines(ctx, characters, tick);
+
+  // 3. Characters: sprite → accessory → name label → action bubble → status badge
   for (const char of characters) {
     drawCharacterSprite(ctx, char, tick);
     drawCharacterAccessory(ctx, char, tick);
     drawCharacterLabel(ctx, char);
-    drawStepBubble(ctx, char);
+    drawActionBubble(ctx, char, tick);
     drawStatusBubble(ctx, char);
   }
 }

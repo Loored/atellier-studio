@@ -63,14 +63,13 @@ export function PixelOfficeCanvas({ characters, onCharacterClick }: Props) {
         const targetX = isExecuting || isWorking ? char.workX : char.deskX;
         const targetY = isExecuting || isWorking ? char.workY : char.deskY;
 
-        // Wander offset for idle characters (small oscillation)
-        const wanderX = char.state === 'idle' ? Math.sin(tick * 0.008 + char.deskX) * 8 : 0;
-        const wanderY = char.state === 'idle' ? Math.cos(tick * 0.008 + char.deskY) * 4 : 0;
+        // Work jitter only — no wander for idle (wander kept isMoving=true forever,
+        // causing perpetual walk-in-place animation).
         const workJitterX = isExecuting ? Math.sin(tick * 0.02 + char.workX) * 6 : 0;
         const workJitterY = isExecuting ? Math.cos(tick * 0.02 + char.workY) * 3 : 0;
 
-        char.targetX = targetX + wanderX + workJitterX;
-        char.targetY = targetY + wanderY + workJitterY;
+        char.targetX = targetX + workJitterX;
+        char.targetY = targetY + workJitterY;
 
         // Move towards target
         const dx = char.targetX - char.currentX;
