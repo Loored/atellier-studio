@@ -10,6 +10,9 @@ export function CodexWorkerPanel() {
     setProfile,
     runId,
     runStatus,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     runLogPath,
     finalizedAt,
     runLogContent,
@@ -68,6 +71,11 @@ export function CodexWorkerPanel() {
         <p className="mt-0 mb-3 text-xs text-ink-muted">
           Status: <span className="text-ink">{runStatus}</span>
           {finalizedAtLabel ? <span> · Finalized at: <span className="text-ink">{finalizedAtLabel}</span></span> : null}
+        </p>
+      ) : null}
+      {isOpenAiExecution ? (
+        <p className="mt-0 mb-3 border border-orange/35 rounded-lg px-2.5 py-2 text-[0.78rem] text-orange bg-orange/10">
+          OpenAI execution is active ({modelProfile} · {executorModel}). Create and execution actions may consume tokens.
         </p>
       ) : null}
       <div className="grid grid-cols-12 gap-2.5 mb-3">

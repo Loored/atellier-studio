@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CodexWorkerMode, CodexWorkerProfile } from "@atellier/shared";
 import { useCodexWorkerApi } from "../../../api/hooks/codex/useCodexWorkerApi";
+import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import { wikiService } from "../../../api/services/wiki.service";
 
 type CodexWorkerPanelStep = {
@@ -15,7 +16,11 @@ export function useCodexWorkerPanel() {
   const [mode, setMode] = useState<CodexWorkerMode>("approved_step");
   const [profile, setProfile] = useState<CodexWorkerProfile>("standard");
   const [runId, setRunId] = useState<string | null>(null);
+  const { data: healthStatus } = useHealthApi();
   const api = useCodexWorkerApi(runId);
+  const isOpenAiExecution = healthStatus?.executorMode === "openai";
+  const executorModel = healthStatus?.executorModel ?? "unknown";
+  const modelProfile = healthStatus?.modelProfile ?? "standard";
 
   const steps: CodexWorkerPanelStep[] = api.codexWorkerQuery.data?.steps ?? [];
   const runLogPath = api.codexWorkerQuery.data?.run?.output?.finalize?.runLog ?? null;
@@ -75,6 +80,12 @@ export function useCodexWorkerPanel() {
 
   async function createRun() {
     setActionError(null);
+    if (isOpenAiExecution) {
+      const confirmed = window.confirm(
+        `OpenAI execution is active (${executorModel}, ${modelProfile}). Creating and running codex steps may consume tokens. Continue?`,
+      );
+      if (!confirmed) return;
+    }
     try {
       const run = await api.createCodexWorkerMutation.mutateAsync({ goal, mode, profile });
       setRunId(run.id);
@@ -153,6 +164,9 @@ export function useCodexWorkerPanel() {
     setProfile,
     runId,
     runStatus,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     runLogPath,
     finalizedAt,
     runLogContent,
