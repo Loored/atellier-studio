@@ -13,7 +13,16 @@ export function CodexWorkerPanel() {
     runLogPath,
     finalizedAt,
     runLogContent,
+    actionError,
     steps,
+    canPlan,
+    canExecuteNext,
+    canCancel,
+    canFinalize,
+    planBlockedReason,
+    executeBlockedReason,
+    cancelBlockedReason,
+    finalizeBlockedReason,
     createRun,
     plan,
     approve,
@@ -74,19 +83,55 @@ export function CodexWorkerPanel() {
           <option value="deep">deep</option>
         </select>
       </div>
+      {actionError ? (
+        <p className="mt-0 mb-3 border border-orange/35 rounded-lg px-2.5 py-2 text-[0.78rem] text-orange bg-orange/10">
+          {actionError}
+        </p>
+      ) : null}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button type="button" onClick={() => void createRun()}>Create run</button>
-        <button type="button" onClick={() => void plan()} disabled={!runId}>Plan</button>
-        <button type="button" onClick={() => void executeNext()} disabled={!runId}>Execute next</button>
-        <button type="button" className="border-orange/35 text-orange bg-orange/10 hover:bg-orange/20" onClick={() => void cancel()} disabled={!runId}>Cancel</button>
-        <button type="button" onClick={() => void finalize()} disabled={!runId}>Finalize</button>
+        <button type="button" onClick={() => void plan()} disabled={!canPlan} title={planBlockedReason ?? "Build execution plan"}>
+          Plan
+        </button>
+        <button type="button" onClick={() => void executeNext()} disabled={!canExecuteNext} title={executeBlockedReason ?? "Execute next available step"}>
+          Execute next
+        </button>
+        <button
+          type="button"
+          className="border-orange/35 text-orange bg-orange/10 hover:bg-orange/20"
+          onClick={() => void cancel()}
+          disabled={!canCancel}
+          title={cancelBlockedReason ?? "Cancel current run"}
+        >
+          Cancel
+        </button>
+        <button type="button" onClick={() => void finalize()} disabled={!canFinalize} title={finalizeBlockedReason ?? "Finalize run and persist evidence"}>
+          Finalize
+        </button>
+      </div>
+      {!canExecuteNext && executeBlockedReason ? (
+        <p className="mt-0 mb-3 text-xs text-ink-faint">Execute next blocked: <span className="text-ink">{executeBlockedReason}</span></p>
+      ) : null}
+      {!canFinalize && finalizeBlockedReason ? (
+        <p className="mt-0 mb-3 text-xs text-ink-faint">Finalize blocked: <span className="text-ink">{finalizeBlockedReason}</span></p>
+      ) : null}
+      {!canCancel && cancelBlockedReason ? (
+        <p className="mt-0 mb-3 text-xs text-ink-faint">Cancel blocked: <span className="text-ink">{cancelBlockedReason}</span></p>
+      ) : null}
+      {!canPlan && planBlockedReason ? (
+        <p className="mt-0 mb-3 text-xs text-ink-faint">Plan blocked: <span className="text-ink">{planBlockedReason}</span></p>
+      ) : null}
+      <div className="mt-2 mb-3 border border-[var(--border-card)] rounded-md p-2 text-xs text-ink-muted">
+        Approval queue: {steps.filter((step) => step.needsApproval && step.status === "pending").length} protected step(s) waiting.
       </div>
       <ul className="m-0 p-0 list-none space-y-2">
         {steps.map((step) => (
           <li key={step.id} className="border border-[var(--border-card)] rounded-md px-3 py-2 text-sm text-ink flex items-center justify-between gap-2">
             <span>{step.summary} <small className="text-ink-muted">({step.status})</small></span>
             {step.needsApproval && step.status === "pending" ? (
-              <button type="button" className="icon-only-button" onClick={() => void approve(step.id)}>Approve step</button>
+              <button type="button" className="icon-only-button" onClick={() => void approve(step.id)} title="Approve protected step">
+                Approve step
+              </button>
             ) : null}
           </li>
         ))}
