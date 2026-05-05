@@ -465,6 +465,9 @@ describe("App", () => {
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: /create run/i }));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining("OpenAI execution is active"),
+    );
     await waitFor(() => expect(createCodexRunMock).toHaveBeenCalled());
 
     await user.click(screen.getByRole("button", { name: "Plan" }));
@@ -476,13 +479,13 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Execute next" }));
     await waitFor(() => expect(executeNextCodexMock).toHaveBeenCalledWith("codex-run-1"));
 
+    expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
+    expect(screen.getByText(/Finalize blocked:/i)).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(cancelCodexMock).toHaveBeenCalledWith("codex-run-1"));
 
-    await user.click(screen.getByRole("button", { name: "Finalize" }));
-    await waitFor(() =>
-      expect(finalizeCodexMock).toHaveBeenCalledWith("codex-run-1", "Finalized from dashboard codex worker panel."),
-    );
+    expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Open run log" }));
     expect(await screen.findByText(/Run Log - Codex Worker Finalize/i)).toBeInTheDocument();
