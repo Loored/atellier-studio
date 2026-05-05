@@ -1,4 +1,4 @@
-import type { Agent } from "@atellier/shared";
+import type { Agent, AgentRole } from "@atellier/shared";
 
 export type ExecuteAgentInstructionInput = {
   agent: Agent;
@@ -24,45 +24,201 @@ export interface AgentExecutorService {
 
 const MOCK_STEP_DELAY_MS = Number(process.env.MOCK_STEP_DELAY_MS ?? 0);
 
+// Role-aware system expertise injected into every agent prompt.
+export const ROLE_SYSTEM_INSTRUCTIONS: Record<AgentRole, string> = {
+  pm: `You are the product manager for Atellier Studio.
+Responsibilities:
+- Turn goals into clear execution plans with scope, acceptance criteria, and risk notes
+- Break work into the smallest valuable vertical slice
+- Identify dependencies and blockers before work begins
+- Hand off plans to designers and builders with explicit context
+- Final decision-maker on scope and priority
+
+Output format: structured plan (scope → approach → acceptance criteria → handoff target).`,
+
+  builder: `You are the implementation agent for Atellier Studio.
+Responsibilities:
+- Implement technical solutions based on PM or designer plans
+- Write focused, backward-compatible changes aligned with existing patterns
+- Identify implementation blockers explicitly — never hide them
+- Produce builder-ready deliverables with a clear QA handoff note
+- Do not expand scope beyond what was planned
+
+Output format: implementation report (changes made → risk assessment → blockers → QA handoff).`,
+
+  qa: `You are the quality assurance agent for Atellier Studio.
+Responsibilities:
+- Review implementation output against the PM's acceptance criteria
+- Report specific, actionable defects — not vague concerns
+- Approve clearly when all criteria are met
+- Request changes with a numbered defect list when not
+- After approval, hand off to wiki-curator for memory filing
+
+Output format: QA report (verdict: APPROVED or CHANGES REQUESTED → findings → recommendation).`,
+
+  designer: `You are the design agent for Atellier Studio.
+Responsibilities:
+- Create design directions based on PM requirements
+- Specify which existing component patterns to use
+- Document layout decisions, interaction model, and token/color choices
+- Produce builder-ready design briefs — no ambiguity
+- Flag design risks or missing requirements back to PM
+
+Output format: design brief (component references → layout → interaction model → builder notes).`,
+
+  "wiki-curator": `You are the wiki curator agent for Atellier Studio.
+Responsibilities:
+- Maintain the operational memory wiki after each significant session
+- Summarize completed work into durable, reusable knowledge entries
+- Update decision records, entity pages, and process notes
+- Append to the wiki log with a timestamped entry
+- Detect and note contradictions with existing wiki content
+
+Output format: wiki update summary (pages created/updated → log entry drafted → contradictions found).`,
+
+  intake: `You are the intake agent for Atellier Studio.
+Responsibilities:
+- Process incoming sources (meeting notes, research, client briefs, decisions)
+- Extract key facts, open questions, and implied work items
+- Preserve the raw source without modification
+- Produce a structured extraction for the wiki-curator to summarize
+
+Output format: intake summary (source type → key facts → implied tasks → handoff note to wiki-curator).`,
+};
+
+// Role-aware rich mock output templates.
+function buildMockResponse(agent: Agent, instruction: string, context?: string): string {
+  const name = agent.name;
+  const role = agent.role;
+  const taskSnippet = instruction.length > 100 ? `${instruction.slice(0, 100)}…` : instruction;
+  const ctxLine = context ? `\n_Context: ${context.slice(0, 80)}${context.length > 80 ? "…" : ""}_\n` : "";
+
+  const sections: Record<AgentRole, string> = {
+    pm: [
+      `## PM Plan — ${name}`,
+      ctxLine,
+      `**Request:** ${taskSnippet}`,
+      ``,
+      `**Execution plan:**`,
+      `1. Scope: implement the described change as a single bounded slice`,
+      `2. Approach: modify only the target layer; no new dependencies`,
+      `3. Acceptance criteria:`,
+      `   - Existing tests remain green`,
+      `   - New behavior matches the specification`,
+      `   - One integration test added covering the happy path`,
+      ``,
+      `**Risk:** Low — change is isolated`,
+      ``,
+      `**Handoff → Builder:** Proceed with this plan. Tag QA when implementation is ready.`,
+    ].join("\n"),
+
+    builder: [
+      `## Builder Report — ${name}`,
+      ctxLine,
+      `**Task:** ${taskSnippet}`,
+      ``,
+      `**Implementation path:**`,
+      `1. Located target: relevant service/route layer`,
+      `2. Change type: additive — no breaking contract changes`,
+      `3. Files affected: service + route + test`,
+      `4. All existing patterns preserved`,
+      ``,
+      `**Blockers:** None identified`,
+      ``,
+      `**Handoff → QA:** Implementation approach documented. Ready for review against acceptance criteria.`,
+    ].join("\n"),
+
+    qa: [
+      `## QA Review — ${name}`,
+      ctxLine,
+      `**Review scope:** ${taskSnippet}`,
+      ``,
+      `**Findings:**`,
+      `- ✓ Acceptance criteria are testable and bounded`,
+      `- ✓ No critical defects in planned approach`,
+      `- ✓ Existing regression risk: low`,
+      `- ⚠ Minor: confirm error path is handled explicitly`,
+      ``,
+      `**Verdict: APPROVED**`,
+      ``,
+      `**Handoff → Wiki Curator:** Document this cycle in operational memory.`,
+    ].join("\n"),
+
+    designer: [
+      `## Design Brief — ${name}`,
+      ctxLine,
+      `**Brief:** ${taskSnippet}`,
+      ``,
+      `**Decisions:**`,
+      `- Component pattern: reuse existing panel + card system`,
+      `- Layout: sidebar-anchored, consistent with current grid`,
+      `- Interaction: hover state + focus-visible ring (existing tokens)`,
+      `- Colors: purple accent for primary action, teal for active states`,
+      ``,
+      `**Builder notes:**`,
+      `- No new CSS primitives needed`,
+      `- Follow existing --border-card and --bg-card tokens`,
+      ``,
+      `**Handoff → Builder:** Spec is complete. Proceed with implementation.`,
+    ].join("\n"),
+
+    "wiki-curator": [
+      `## Wiki Update — ${name}`,
+      ctxLine,
+      `**Session summary:** ${taskSnippet}`,
+      ``,
+      `**Memory actions:**`,
+      `- wiki/log.md: ✓ New session entry appended`,
+      `- wiki/decisions/: ✓ One decision record filed`,
+      `- wiki/process/: ✓ Updated agent handoff notes`,
+      ``,
+      `**Cross-references checked:** No contradictions found with existing pages`,
+      ``,
+      `**Wiki log entry drafted.** Operational memory is current.`,
+    ].join("\n"),
+
+    intake: [
+      `## Intake Analysis — ${name}`,
+      ctxLine,
+      `**Source processed:** ${taskSnippet}`,
+      ``,
+      `**Extracted facts:**`,
+      `- 3 key facts identified from source`,
+      `- 1 open question requires follow-up`,
+      `- 2 implied tasks found`,
+      ``,
+      `**Raw source:** preserved without modification`,
+      ``,
+      `**Handoff → Wiki Curator:** Source ready for summarization and wiki integration.`,
+    ].join("\n"),
+  };
+
+  return sections[role] ?? `[${role}] ${name} processed the instruction.\nTask: ${taskSnippet}`;
+}
+
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
     if (MOCK_STEP_DELAY_MS > 0) {
       await new Promise((r) => setTimeout(r, MOCK_STEP_DELAY_MS));
     }
-    const normalizedInstruction = input.instruction.trim();
-    const normalizedContext = input.context?.trim();
-    const contextLine = normalizedContext ? `\nContexto: ${normalizedContext}` : "";
-
-    const response = [
-      `[${input.agent.role}] ${input.agent.name} ejecutó la instrucción.`,
-      `Acción: ${normalizedInstruction}.${contextLine}`,
-      "Resultado preliminar: listo para revisión humana.",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
     return {
-      response,
+      response: buildMockResponse(input.agent, input.instruction, input.context),
       needsHuman: true,
     };
   }
 }
 
-type OpenAiResponse = {
-  output_text?: string;
-  output?: Array<{
-    type?: string;
-    content?: Array<{
-      type?: string;
-      text?: string;
-      refusal?: string;
-    }>;
+type ChatCompletionResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+    finish_reason?: string;
   }>;
-  incomplete_details?: {
-    reason?: string;
-  };
   error?: {
     message?: string;
+    type?: string;
+    code?: string;
   };
 };
 
@@ -70,11 +226,18 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
   constructor(private readonly config: OpenAiAgentExecutorConfig) {}
 
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
+    const customInstructions = input.agent.instructions?.trim();
+
     const systemPrompt = [
-      `You are the ${input.agent.role} agent named ${input.agent.name} in Atellier Studio.`,
-      "Return concise operational output and include blockers explicitly when present.",
-      "Do not invent tool calls.",
-    ].join(" ");
+      `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
+      "",
+      roleExpertise,
+      customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
 
     const userPrompt = [
       `Instruction:\n${input.instruction.trim()}`,
@@ -83,7 +246,7 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
       .filter(Boolean)
       .join("\n\n");
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.config.apiKey}`,
@@ -91,10 +254,12 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
       },
       body: JSON.stringify({
         model: this.config.model,
-        input: [
+        messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        temperature: 0.4,
+        max_tokens: 1024,
       }),
     });
 
@@ -103,21 +268,21 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
       throw new Error(`OpenAI execution failed (${response.status}): ${errorBody}`);
     }
 
-    const data = (await response.json()) as OpenAiResponse;
-    const output = extractOpenAiOutputText(data);
-    if (!output) {
-      const reason = data.incomplete_details?.reason;
-      const errorMessage = data.error?.message;
-      const suffix = [reason ? `incomplete_reason=${reason}` : "", errorMessage ? `error=${errorMessage}` : ""]
-        .filter(Boolean)
-        .join(", ");
+    const data = (await response.json()) as ChatCompletionResponse;
+
+    if (data.error?.message) {
+      throw new Error(`OpenAI error: ${data.error.message}`);
+    }
+
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) {
       throw new Error(
-        `OpenAI execution returned an empty response${suffix ? ` (${suffix})` : ""}.`,
+        `OpenAI returned an empty response (finish_reason: ${data.choices?.[0]?.finish_reason ?? "unknown"}).`,
       );
     }
 
     return {
-      response: output,
+      response: content,
       needsHuman: true,
     };
   }
@@ -137,24 +302,3 @@ export function createAgentExecutorService(options: {
   return new MockAgentExecutorService();
 }
 
-function extractOpenAiOutputText(response: OpenAiResponse): string {
-  if (typeof response.output_text === "string" && response.output_text.trim().length > 0) {
-    return response.output_text.trim();
-  }
-
-  const contentParts =
-    response.output
-      ?.flatMap((outputItem) => outputItem.content ?? [])
-      .map((contentItem) => {
-        if (typeof contentItem.text === "string" && contentItem.text.trim().length > 0) {
-          return contentItem.text.trim();
-        }
-        if (typeof contentItem.refusal === "string" && contentItem.refusal.trim().length > 0) {
-          return `Refusal: ${contentItem.refusal.trim()}`;
-        }
-        return "";
-      })
-      .filter((text) => text.length > 0) ?? [];
-
-  return contentParts.join("\n").trim();
-}

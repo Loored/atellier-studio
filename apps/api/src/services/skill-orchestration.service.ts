@@ -1,3 +1,4 @@
+import { ROLE_SYSTEM_INSTRUCTIONS } from "./agent-executor.service";
 import type {
   Agent,
   AgentRole,
@@ -384,7 +385,8 @@ export class SkillOrchestrationService {
       name: agentName,
       role: agentRole,
       status: "idle",
-      instructions: `Operate as the ${agentRole} step agent for skill-driven Atellier orchestration.`,
+      instructions: ROLE_SYSTEM_INSTRUCTIONS[agentRole] ??
+        `Operate as the ${agentRole} agent in Atellier Studio.`,
     });
   }
 
