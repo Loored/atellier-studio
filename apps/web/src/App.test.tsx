@@ -305,11 +305,13 @@ describe("App", () => {
   it("renders the dashboard with operational data", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Atellier Studio")).toBeInTheDocument();
+    // Dashboard h1 now reads "Dashboard"
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(await screen.findByText("Builder Agent")).toBeInTheDocument();
     expect(await screen.findByText("Prepare project spine")).toBeInTheDocument();
-    expect(await screen.findByText("Wiki Log")).toBeInTheDocument();
-    expect(await screen.findByText(/OpenAI execution is active/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Wiki Log" })).toBeInTheDocument();
+    // Executor mode badge in header shows the mode name
+    expect(await screen.findByText("openai")).toBeInTheDocument();
   });
 
   it("creates a task through the dashboard form", async () => {
@@ -332,6 +334,8 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    // RunsTimeline is now in the dedicated Runs view, not the Dashboard
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
     await user.type(await screen.findByLabelText("Run log message for manual run"), "Reviewed V3");
     await user.click(screen.getByRole("button", { name: "Append log" }));
 
@@ -347,6 +351,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
     const approveButtons = await screen.findAllByRole("button", { name: /approve/i });
     await user.click(approveButtons[0]);
 
@@ -361,6 +366,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
     const promoteButton = await screen.findByRole("button", { name: /promote/i });
     await user.click(promoteButton);
 
@@ -373,6 +379,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
     const unlinkButton = await screen.findByRole("button", { name: /unlink/i });
     await user.click(unlinkButton);
 

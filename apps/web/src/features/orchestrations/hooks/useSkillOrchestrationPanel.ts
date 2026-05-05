@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ORCHESTRATION_SKILL_IDS, type OrchestrationSkillId } from "@atellier/shared";
+import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
   useOrchestrationSkillsApi,
   useOrchestrationStatusApi,
@@ -25,9 +26,13 @@ export function useSkillOrchestrationPanel() {
   const [mode, setMode] = useState<Mode>("form");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const invalidatedRef = useRef(false);
+  const { data: healthStatus } = useHealthApi();
 
   const startSkillOrchestration = useStartSkillOrchestrationApi();
   const { data: liveStatus } = useOrchestrationStatusApi(activeRunId);
+  const isOpenAiExecution = healthStatus?.executorMode === "openai";
+  const executorModel = healthStatus?.executorModel ?? "unknown";
+  const modelProfile = healthStatus?.modelProfile ?? "standard";
 
   const selectedSkill = useMemo(
     () => orchestrationSkillList.find((s) => s.id === selectedSkillId) ?? orchestrationSkillList[0],
@@ -50,6 +55,12 @@ export function useSkillOrchestrationPanel() {
   function handleStartOrchestration() {
     const trimmedGoal = goal.trim();
     if (!selectedSkill || !trimmedGoal) return;
+    if (isOpenAiExecution) {
+      const confirmed = window.confirm(
+        `OpenAI execution is active (${executorModel}, ${modelProfile}). Starting this orchestration may consume tokens. Continue?`,
+      );
+      if (!confirmed) return;
+    }
 
     startSkillOrchestration.mutate(
       { skillId: selectedSkill.id, goal: trimmedGoal, context: context.trim() || undefined },
@@ -79,6 +90,9 @@ export function useSkillOrchestrationPanel() {
     context,
     mode,
     liveStatus,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     isFetchingOrchestrationSkills,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration: startSkillOrchestration.isPending,

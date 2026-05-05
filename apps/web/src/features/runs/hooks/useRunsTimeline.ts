@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import type { RunReviewStatus } from "@atellier/shared";
 import { useAgentsApi } from "../../../api/hooks/agents/useAgentsApi";
+import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
   useAppendRunLogApi,
   useCompleteRunApi,
@@ -18,6 +19,7 @@ export function useRunsTimeline() {
     isLoadingWithoutCache: isLoadingRunsWithoutCache,
   } = useRunsApi();
   const { data: agentList = [] } = useAgentsApi();
+  const { data: healthStatus } = useHealthApi();
   const createRun = useCreateRunApi();
   const appendRunLog = useAppendRunLogApi();
   const completeRun = useCompleteRunApi();
@@ -27,6 +29,9 @@ export function useRunsTimeline() {
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
+  const isOpenAiExecution = healthStatus?.executorMode === "openai";
+  const executorModel = healthStatus?.executorModel ?? "unknown";
+  const modelProfile = healthStatus?.modelProfile ?? "standard";
 
   const filteredRunList = runList.filter((run) => {
     const relatedAgent = run.agentId ? agentList.find((agent) => agent.id === run.agentId) : undefined;
@@ -91,6 +96,9 @@ export function useRunsTimeline() {
     reviewFilter,
     isFetchingRuns,
     isLoadingRunsWithoutCache,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     isCreatingRun: createRun.isPending,
     isAppendingRunLog: appendRunLog.isPending,
     isCompletingRun: completeRun.isPending,
@@ -101,14 +109,21 @@ export function useRunsTimeline() {
     setAgentFilter,
     setReviewFilter,
     handleAppendRunLog,
-    startManualRun: () =>
+    startManualRun: () => {
+      if (isOpenAiExecution) {
+        const confirmed = window.confirm(
+          `OpenAI execution is active (${executorModel}, ${modelProfile}). Starting this run may consume tokens. Continue?`,
+        );
+        if (!confirmed) return;
+      }
       createRun.mutate({
         type: "manual",
         status: "running",
         input: {
           source: "dashboard",
         },
-      }),
+      });
+    },
     completeRun: (runId: string) =>
       completeRun.mutate({
         runId,
