@@ -1,4 +1,4 @@
-import { BookOpenText } from "lucide-react";
+import { BookOpenText, Loader2 } from "lucide-react";
 import { useWikiPanel } from "../hooks/useWikiPanel";
 
 export function WikiPanel() {
@@ -55,20 +55,21 @@ export function WikiPanel() {
       </div>
 
       {isLoadingWiki ? (
-        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+        <p className="m-0 flex items-center gap-2 border border-[var(--border-card)] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          <Loader2 size={14} className="spin text-purple flex-shrink-0" />
           Loading wiki
         </p>
       ) : null}
 
       <pre
-        className="min-h-[120px] max-h-[240px] overflow-auto border border-[var(--border-card)] rounded-lg p-3 text-ink-muted bg-black/25 whitespace-pre-wrap text-[0.78rem] font-mono leading-relaxed m-0"
+        className="min-h-[100px] max-h-[180px] overflow-auto border border-[var(--border-card)] rounded-lg p-3 text-ink-muted bg-black/25 whitespace-pre-wrap text-[0.78rem] font-mono leading-relaxed m-0"
         aria-label="Latest wiki log entries"
       >
         {latestLog || "No wiki log entries yet"}
       </pre>
 
-      <div className="mt-3.5 grid grid-cols-12 gap-3">
-        <section className="col-span-12 lg:col-span-4 border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
+      <div className="mt-3.5 grid gap-2.5">
+        <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
           <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-2">Ingest</p>
           <label className="block text-[0.74rem] text-ink-muted mb-1" htmlFor="wiki-ingest-title">Title</label>
           <input
@@ -101,12 +102,12 @@ export function WikiPanel() {
             type="button"
             onClick={() => void submitIngest()}
             disabled={!canRunIngest}
-            className="mt-2 min-h-8 px-3 border border-purple/35 rounded-md text-[0.78rem] font-semibold text-purple disabled:opacity-50"
+            className="mt-2 border-purple/35 text-purple bg-purple/10 hover:bg-purple/20"
           >
             {isIngesting ? "Ingesting..." : "Ingest Source"}
           </button>
           {ingestResult ? (
-            <div className="mt-2">
+            <div className="mt-2" aria-live="polite">
               <p className="text-[0.74rem] text-ink-muted">Saved: {ingestResult.summaryPagePath}</p>
               <button
                 type="button"
@@ -135,7 +136,8 @@ export function WikiPanel() {
           ) : null}
         </section>
 
-        <section className="col-span-12 lg:col-span-4 border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
+        <div className="grid grid-cols-2 gap-2.5">
+        <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
           <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-2">Query</p>
           <label className="block text-[0.74rem] text-ink-muted mb-1" htmlFor="wiki-query-input">Search term</label>
           <input
@@ -162,11 +164,11 @@ export function WikiPanel() {
             type="button"
             onClick={submitQuery}
             disabled={!canRunQuery}
-            className="mt-2 min-h-8 px-3 border border-teal/35 rounded-md text-[0.78rem] font-semibold text-teal disabled:opacity-50"
+            className="mt-2 border-teal/35 text-teal bg-teal/10 hover:bg-teal/20"
           >
             {isFetchingQuery ? "Searching..." : "Query Wiki"}
           </button>
-          <div className="mt-2 max-h-24 overflow-auto">
+          <div className="mt-2 max-h-24 overflow-auto" aria-live="polite" aria-label="Query results">
             {queryMatches.map((match) => (
               <p key={`${match.path}-${match.snippet}`} className="text-[0.74rem] text-ink-muted mb-1">
                 {match.path}: {match.snippet}
@@ -178,12 +180,12 @@ export function WikiPanel() {
           </div>
         </section>
 
-        <section className="col-span-12 lg:col-span-4 border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
+        <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
           <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-2">Lint</p>
           <button
             type="button"
             onClick={() => void runLint()}
-            className="min-h-8 px-3 border border-orange/35 rounded-md text-[0.78rem] font-semibold text-orange"
+            className="border-orange/35 text-orange bg-orange/10 hover:bg-orange/20"
           >
             {isLinting ? "Linting..." : "Run Wiki Lint"}
           </button>
@@ -199,6 +201,7 @@ export function WikiPanel() {
             ))}
           </div>
         </section>
+        </div>
       </div>
     </section>
   );

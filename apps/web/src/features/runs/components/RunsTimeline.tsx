@@ -1,4 +1,4 @@
-import { Check, CircleSlash, FilePlus2, Play, ShieldCheck, TimerReset } from "lucide-react";
+import { Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
 import { RUN_REVIEW_STATUSES } from "@atellier/shared";
 import { RUN_LOG_MESSAGE_MAX_LENGTH } from "@atellier/shared";
 import { useRunsTimeline } from "../hooks/useRunsTimeline";
@@ -31,21 +31,23 @@ export function RunsTimeline() {
   return (
     <section className="col-span-6 min-w-0 border border-[var(--border-card)] rounded-[var(--panel-radius)] p-4 bg-[var(--bg-card)] shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-3.5">
-        <div>
+      <div className="mb-3.5">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div>
           <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Timeline</p>
           <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Recent Runs</h2>
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
+              {runList.filter((run) => run.status === "running").length} running
+            </span>
+            <button className="whitespace-nowrap" type="button" onClick={startManualRun} disabled={isCreatingRun} title="Start run">
+              <Play size={18} />
+              <span>Start</span>
+            </button>
+          </div>
         </div>
-        <div className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
-            {runList.filter((run) => run.status === "running").length} running
-          </span>
-          <button className="whitespace-nowrap" type="button" onClick={startManualRun} disabled={isCreatingRun} title="Start run">
-            <Play size={18} />
-            <span>Start</span>
-          </button>
-        </div>
-        <div className="inline-flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value as typeof agentFilter)}>
             <option value="all">All agents</option>
             <option value="needs-human">Needs human</option>
@@ -61,7 +63,8 @@ export function RunsTimeline() {
       </div>
 
       {isLoadingRunsWithoutCache ? (
-        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+        <p className="m-0 flex items-center gap-2 border border-[var(--border-card)] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          <Loader2 size={14} className="spin text-purple flex-shrink-0" />
           Loading runs
         </p>
       ) : null}
@@ -76,7 +79,12 @@ export function RunsTimeline() {
         </p>
       ) : null}
 
-      <ul className="grid gap-2 list-none m-0 p-0 max-h-[340px] overflow-auto">
+      <p className="mb-2 text-[0.75rem] text-ink-faint">
+        Review queue: prioritize runs marked <span className="text-ink">pending review</span>, and resolve any
+        <span className="text-orange"> blocked</span> or <span className="text-purple">needs-human</span> state quickly.
+      </p>
+
+      <ul className="grid gap-2 list-none m-0 p-0 max-h-[44vh] overflow-auto">
         {filteredRunList.map((run) => {
           const pendingLogMessage = runLogMessages[run.id]?.trim() ?? "";
           const latestLog = run.logs.at(-1);
@@ -151,7 +159,9 @@ export function RunsTimeline() {
               ) : null}
 
               {run.status === "completed" ? (
-                <div className="inline-flex flex-wrap gap-1.5 mt-2.5">
+                <div className="mt-2.5 border border-[var(--border-card)] rounded-md px-2.5 py-2 bg-black/15">
+                  <p className="m-0 mb-1 text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">Review actions</p>
+                  <div className="inline-flex flex-wrap gap-1.5">
                   {!run.deliverablePath ? (
                     <button
                       type="button"
@@ -175,6 +185,7 @@ export function RunsTimeline() {
                   )}
                   <button
                     type="button"
+                    className="border-green-400/35 text-green-400 bg-green-400/10 hover:bg-green-400/20"
                     onClick={() => setRunReview(run.id, "approved")}
                     disabled={isUpdatingRunReview}
                     title="Approve run"
@@ -184,6 +195,7 @@ export function RunsTimeline() {
                   </button>
                   <button
                     type="button"
+                    className="border-orange/35 text-orange bg-orange/10 hover:bg-orange/20"
                     onClick={() => setRunReview(run.id, "changes-requested")}
                     disabled={isUpdatingRunReview}
                     title="Request changes"
@@ -196,11 +208,12 @@ export function RunsTimeline() {
                     type="button"
                     onClick={() => setRunReview(run.id, "pending")}
                     disabled={isUpdatingRunReview}
-                    title="Set pending review"
-                    aria-label="Set pending review"
+                    title="Reset to pending review"
+                    aria-label="Reset to pending review"
                   >
-                    <TimerReset size={16} />
+                    <RotateCcw size={16} />
                   </button>
+                  </div>
                 </div>
               ) : null}
             </li>

@@ -1,4 +1,4 @@
-import { Check, CircleDot, Plus } from "lucide-react";
+import { Check, CircleDot, Loader2, Plus } from "lucide-react";
 import { TASK_TITLE_MAX_LENGTH } from "@atellier/shared";
 import { useTasksPanel } from "../hooks/useTasksPanel";
 
@@ -58,7 +58,8 @@ export function TasksPanel() {
       </form>
 
       {isLoadingTasksWithoutCache ? (
-        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+        <p className="m-0 flex items-center gap-2 border border-[var(--border-card)] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          <Loader2 size={14} className="spin text-purple flex-shrink-0" />
           Loading tasks
         </p>
       ) : null}
