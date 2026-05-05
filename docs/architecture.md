@@ -22,3 +22,7 @@ MongoDB stores operational state. Markdown stores inspectable memory.
 Milestone 0 builds the operational spine:
 
 agents -> tasks -> runs -> logs -> wiki log
+
+Skill-triggered orchestration now sits on top of that spine:
+
+skill -> parent orchestration run -> child agent runs -> validation/review logs -> wiki memory
