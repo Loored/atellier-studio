@@ -5,3 +5,4 @@ export * from "./types/orchestration";
 export * from "./types/task";
 export * from "./types/run";
 export * from "./types/wiki";
+export * from "./types/health";

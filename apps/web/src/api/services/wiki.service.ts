@@ -1,4 +1,13 @@
-import type { AppendWikiLogInput, AppendWikiLogResponse, WikiPageResponse } from "@atellier/shared";
+import type {
+  AppendWikiLogInput,
+  AppendWikiLogResponse,
+  WikiIngestInput,
+  WikiIngestResponse,
+  WikiLintResponse,
+  WikiPageResponse,
+  WikiQueryInput,
+  WikiQueryResponse,
+} from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
 export const wikiService = {
@@ -21,6 +30,21 @@ export const wikiService = {
 
   async appendLog(input: AppendWikiLogInput): Promise<AppendWikiLogResponse> {
     const response = await httpClient.post<AppendWikiLogResponse>("/wiki/append-log", input);
+    return response.data;
+  },
+
+  async ingest(input: WikiIngestInput): Promise<WikiIngestResponse> {
+    const response = await httpClient.post<WikiIngestResponse>("/wiki/ingest", input);
+    return response.data;
+  },
+
+  async query(input: WikiQueryInput): Promise<WikiQueryResponse> {
+    const response = await httpClient.post<WikiQueryResponse>("/wiki/query", input);
+    return response.data;
+  },
+
+  async lint(): Promise<WikiLintResponse> {
+    const response = await httpClient.post<WikiLintResponse>("/wiki/lint");
     return response.data;
   },
 };

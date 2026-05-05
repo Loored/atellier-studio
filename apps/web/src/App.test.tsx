@@ -11,6 +11,9 @@ const updateRunReviewMock = vi.hoisted(() => vi.fn());
 const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
+const ingestWikiMock = vi.hoisted(() => vi.fn());
+const queryWikiMock = vi.hoisted(() => vi.fn());
+const lintWikiMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -132,6 +135,25 @@ vi.mock("./api/services/wiki.service", () => ({
       ready: true,
     }),
     appendLog: vi.fn(),
+    ingest: ingestWikiMock,
+    query: queryWikiMock,
+    lint: lintWikiMock,
+  },
+}));
+
+vi.mock("./api/services/system.service", () => ({
+  systemService: {
+    readHealth: vi.fn().mockResolvedValue({
+      status: "ok",
+      service: "atellier-api",
+      storageMode: "memory",
+      executorMode: "openai",
+      executorModel: "gpt-4.1-mini",
+      modelProfile: "standard",
+      mongo: { connected: false, state: "disconnected" },
+      metrics: { agentsTotal: 1, waitingAgents: 0, activeRuns: 1 },
+      memory: { rssBytes: 1000, heapUsedBytes: 500 },
+    }),
   },
 }));
 
@@ -207,6 +229,26 @@ describe("App", () => {
       },
       steps: [],
     });
+    ingestWikiMock.mockResolvedValue({
+      rawPath: "raw/ingest/2026-05-05-client-meeting-notes.md",
+      summaryPagePath: "wiki/sources/2026-05-05-client-meeting-notes.md",
+      logPath: "wiki/log.md",
+      proposedTasks: ["- [ ] Client meeting notes (source: wiki/sources/2026-05-05-client-meeting-notes.md)"],
+    });
+    queryWikiMock.mockResolvedValue({
+      query: "raw sources",
+      matches: [
+        {
+          path: "wiki/sources/2026-05-05-client-meeting-notes.md",
+          snippet: "preserve raw sources first",
+        },
+      ],
+    });
+    lintWikiMock.mockResolvedValue({
+      ok: true,
+      issues: [],
+      checkedAt: "2026-05-05T00:00:00.000Z",
+    });
   });
 
   it("renders the dashboard with operational data", async () => {
@@ -216,6 +258,7 @@ describe("App", () => {
     expect(await screen.findByText("Builder Agent")).toBeInTheDocument();
     expect(await screen.findByText("Prepare project spine")).toBeInTheDocument();
     expect(await screen.findByText("Wiki Log")).toBeInTheDocument();
+    expect(await screen.findByText(/OpenAI execution is active/i)).toBeInTheDocument();
   });
 
   it("creates a task through the dashboard form", async () => {
@@ -324,6 +367,37 @@ describe("App", () => {
         skillId: "atellier-build-loop",
         goal: "Build orchestration",
         context: "Use the existing run spine.",
+      });
+    });
+  });
+
+  it("runs wiki ingest and query actions from the wiki panel", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByLabelText("Title"), "Client meeting notes");
+    await user.type(screen.getByLabelText("Content"), "Need to preserve raw sources first.");
+    const sourceTypeSelects = screen.getAllByLabelText("Source type");
+    await user.selectOptions(sourceTypeSelects[0] as HTMLElement, "research");
+    await user.click(screen.getByRole("button", { name: /ingest source/i }));
+
+    await waitFor(() => {
+      expect(ingestWikiMock).toHaveBeenCalledWith({
+        title: "Client meeting notes",
+        content: "Need to preserve raw sources first.",
+        sourceType: "research",
+      });
+    });
+
+    await user.type(screen.getByLabelText("Search term"), "raw sources");
+    await user.selectOptions(screen.getAllByLabelText("Source type")[1] as HTMLElement, "note");
+    await user.click(screen.getByRole("button", { name: /query wiki/i }));
+
+    await waitFor(() => {
+      expect(queryWikiMock).toHaveBeenCalledWith({
+        query: "raw sources",
+        limit: 5,
+        sourceType: "note",
       });
     });
   });

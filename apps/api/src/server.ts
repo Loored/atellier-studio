@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createAppServices, type AppServices, type CreateAppServicesOptions } from "./services/app-services";
 import { type StorageMode } from "./services/service-utils";
+import type { ModelProfile } from "@atellier/shared";
 import { agentsRoutes } from "./routes/agents.routes";
 import { healthRoutes } from "./routes/health.routes";
 import { isAllowedLocalOrigin } from "./routes/route-utils";
@@ -17,7 +18,7 @@ export type BuildServerOptions = {
   services?: AppServices;
 } & Pick<
   CreateAppServicesOptions,
-  "agentExecutorMode" | "openaiApiKey" | "openaiModel" | "maxHandoffDepth" | "executionTimeoutMs"
+  "agentExecutorMode" | "openaiApiKey" | "openaiModel" | "openaiModelProfile" | "maxHandoffDepth" | "executionTimeoutMs"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -43,6 +44,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     healthRoutes(instance, services, {
       storageMode: options.storageMode ?? "mongo",
       agentExecutorMode: options.agentExecutorMode ?? "mock",
+      executorModel: options.openaiModel ?? "gpt-4.1-mini",
+      modelProfile: options.openaiModelProfile ?? "standard",
     }),
   );
   await fastify.register(async (instance) => agentsRoutes(instance, services));

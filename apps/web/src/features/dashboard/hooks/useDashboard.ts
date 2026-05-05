@@ -1,5 +1,6 @@
 import { useAgentsApi } from "../../../api/hooks/agents/useAgentsApi";
 import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
+import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import { useTasksApi } from "../../../api/hooks/tasks/useTasksApi";
 import { useWikiLogApi } from "../../../api/hooks/wiki/useWikiApi";
 
@@ -8,6 +9,7 @@ export function useDashboard() {
   const { data: taskList = [], isFetching: isFetchingTasks } = useTasksApi();
   const { data: runList = [], isFetching: isFetchingRuns } = useRunsApi();
   const { data: wikiLog, isFetching: isFetchingWikiLog } = useWikiLogApi();
+  const { data: healthStatus, isFetching: isFetchingHealth } = useHealthApi();
 
   return {
     agentCount: agentList.length,
@@ -17,6 +19,10 @@ export function useDashboard() {
     recentRunCount: runList.length,
     pendingReviewRunCount: runList.filter((run) => run.reviewStatus === "pending").length,
     wikiLogReady: Boolean(wikiLog?.ready),
-    isRefreshingDashboard: isFetchingAgents || isFetchingTasks || isFetchingRuns || isFetchingWikiLog,
+    executorMode: healthStatus?.executorMode ?? "mock",
+    executorModel: healthStatus?.executorModel ?? "gpt-4.1-mini",
+    modelProfile: healthStatus?.modelProfile ?? "standard",
+    isRefreshingDashboard:
+      isFetchingAgents || isFetchingTasks || isFetchingRuns || isFetchingWikiLog || isFetchingHealth,
   };
 }

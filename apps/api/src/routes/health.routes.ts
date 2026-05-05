@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { AppServices } from "../services/app-services";
 import type { AgentExecutorMode } from "../services/agent-executor.service";
 import type { StorageMode } from "../services/service-utils";
+import type { ModelProfile } from "@atellier/shared";
 import mongoose from "mongoose";
 
 const MONGO_STATE_LABELS: Record<number, string> = {
@@ -17,6 +18,8 @@ export async function healthRoutes(
   options: {
     storageMode: StorageMode;
     agentExecutorMode: AgentExecutorMode;
+    executorModel: string;
+    modelProfile: ModelProfile;
   },
 ): Promise<void> {
   fastify.get("/health", async () => {
@@ -31,6 +34,8 @@ export async function healthRoutes(
       service: "atellier-api",
       storageMode: options.storageMode,
       executorMode: options.agentExecutorMode,
+      executorModel: options.executorModel,
+      modelProfile: options.modelProfile,
       mongo: {
         connected: mongoose.connection.readyState === 1,
         state: mongoState,

@@ -1,6 +1,6 @@
 # Architecture
 
-Atellier Studio uses a small local monorepo.
+Atellier Studio uses a small local monorepo for a private, local-first AI operating system. The core product is not the pixel office; it is the memory, execution, review, and deliverable loop.
 
 ## Packages
 
@@ -17,12 +17,38 @@ Atellier Studio uses a small local monorepo.
 
 MongoDB stores operational state. Markdown stores inspectable memory.
 
-## Current milestone
+## Current stage
 
-Milestone 0 builds the operational spine:
+The project has moved beyond Milestone 0 into:
 
-agents -> tasks -> runs -> logs -> wiki log
+```txt
+Operational Spine + Agent Orchestration + Deliverables + Review UI
+```
+
+The core loop is:
+
+```txt
+source/input -> wiki update -> task -> agent run -> review -> deliverable -> memory update
+```
 
 Skill-triggered orchestration now sits on top of that spine:
 
 skill -> parent orchestration run -> child agent runs -> validation/review logs -> wiki memory
+
+## Design direction
+
+The next architecture work should follow the Karpathy-style agentic system pattern:
+
+- context manager: curate files, history, wiki pages, tools, constraints, and examples per task
+- memory layer: keep session memory, persistent wiki memory, and Mongo operational state separate
+- verification layer: expose evidence, logs, diffs, previews, and tests
+- permission layer: require approval for sensitive, expensive, or destructive actions
+- autonomy slider: explain, suggest, prepare artifact, execute with approval, execute monitored
+
+## Near-term priorities
+
+1. Executor/model safety visibility.
+2. Deterministic Wiki Brain MVP.
+3. Codex Worker design doc before implementation.
+4. Orchestration reliability if templates grow.
+5. MCP after the above is stable.

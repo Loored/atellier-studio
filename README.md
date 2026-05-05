@@ -2,18 +2,21 @@
 
 Atellier Studio is a private local-first AI operating system for personal and mini-agency style work.
 
-It is not a game, not a public SaaS MVP, and not a generic task manager. The first milestone builds the operational spine for agents, tasks, runs, logs, and durable wiki memory.
+It is not a game, not a public SaaS MVP, and not a generic task manager. The current stage is the operational spine plus agent orchestration, deliverables, review UI, and durable wiki memory.
 
-## Current Milestone
+## Current Stage
 
-Milestone 0: Operational Spine
+Current stage: Operational Spine + Agent Orchestration + Deliverables + Review UI
 
 - Local MongoDB
 - Fastify API
 - React dashboard
 - Skill-triggered agent orchestration runs
+- Agent run logs and handoffs
+- Deliverable generation, preview, promotion, unlink, and review states
 - Markdown wiki index and log
 - Minimal API and UI tests
+- Tailwind CSS v4 dashboard/shell migration in progress
 
 ## Setup
 
@@ -140,12 +143,12 @@ pnpm codex:test-fix
 pnpm codex:wiki-lint
 ```
 
-## Next Milestones
+## Next Work
 
 1. Wiki Brain
-2. Codex Worker
-3. Agent Roles
-4. Pixel Atelier
-5. MCP Layer
+2. Executor/model cost safety
+3. Codex Worker design
+4. Orchestration reliability
+5. MCP Layer later
 
-MCP, Codex worker execution, auth, cloud deploy, multiplayer, vector search, and pixel UI are intentionally out of scope for Milestone 0.
+MCP, Codex worker execution, auth, cloud deploy, multiplayer, and vector search are intentionally out of scope until the Wiki Brain and safety layers are stable. Pixel office exists as a visualization layer, but it is not the next product priority.

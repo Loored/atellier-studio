@@ -2,6 +2,7 @@ import {
   createAgentExecutorService,
   type AgentExecutorMode,
 } from "./agent-executor.service";
+import type { ModelProfile } from "@atellier/shared";
 import { AgentRunService } from "./agent-run.service";
 import path from "node:path";
 import { AgentService } from "./agent.service";
@@ -28,6 +29,7 @@ export type CreateAppServicesOptions = {
   agentExecutorMode?: AgentExecutorMode;
   openaiApiKey?: string;
   openaiModel?: string;
+  openaiModelProfile?: ModelProfile;
   maxHandoffDepth?: number;
   executionTimeoutMs?: number;
 };
