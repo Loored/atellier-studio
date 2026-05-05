@@ -51,3 +51,29 @@ export type SkillOrchestrationResult = {
   orchestrationRun: Run;
   steps: SkillOrchestrationStepResult[];
 };
+
+export type OrchestrationStepStatusEntry = {
+  stepId: string;
+  label: string;
+  phase: string;
+  agentRole: AgentRole;
+  agentName: string;
+  agentId?: string;
+  runId?: string;
+  status: "pending" | "running" | "completed" | "failed";
+  isActive: boolean;
+};
+
+export type OrchestrationStatusResult = {
+  orchestrationRunId: string;
+  skillId: OrchestrationSkillId;
+  goal: string;
+  status: string;
+  steps: OrchestrationStepStatusEntry[];
+  activeStep: OrchestrationStepStatusEntry | null;
+  nextStep: OrchestrationStepStatusEntry | null;
+};
+
+export type StartSkillOrchestrationResponse = {
+  runId: string;
+};

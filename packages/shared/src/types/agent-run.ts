@@ -4,12 +4,20 @@ import type { Run } from "./run";
 
 export const AGENT_INSTRUCTION_MAX_LENGTH = 2000;
 
+export type OrchestrationStepRef = {
+  orchestrationRunId: string;
+  label: string;
+  phase: string;
+  nextAgentName?: string;
+};
+
 export type RunAgentInput = {
   instruction: string;
   context?: string;
   handoffAgentId?: string;
   handoffInstruction?: string;
   recordDeliverable?: boolean;
+  orchestrationStep?: OrchestrationStepRef;
 };
 
 export type RunAgentResult = {
