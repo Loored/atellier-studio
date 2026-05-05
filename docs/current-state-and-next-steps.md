@@ -1,0 +1,501 @@
+# Atellier Studio — Current State and Next Steps
+
+This document captures the product/architecture review after the initial Atellier Studio implementation. It is intended for future Codex sessions so they understand what has already been built, what still matches the original vision, and what should happen next.
+
+Read this together with:
+
+- `AGENTS.md`
+- `CODEX_MEMORY.md`
+- `README.md`
+- `apps/web/AGENTS.md`
+- `apps/api/AGENTS.md`
+
+## Executive verdict
+
+Atellier Studio is directionally correct and already satisfies most of the original vision for this stage.
+
+It is no longer just boilerplate. It has a real operational spine:
+
+- private/local-first product identity
+- monorepo structure
+- Fastify API
+- React/Vite dashboard
+- MongoDB operational state
+- Markdown wiki memory
+- agents/tasks/runs
+- deliverables and review lifecycle
+- skill-triggered orchestration
+- Codex rules, memory, and skills
+- frontend API conventions
+- BED/FED tests
+
+Estimated current alignment with the original vision: **75–85% for this phase**.
+
+The project should now focus on **learning and execution quality**, not more visual polish.
+
+## Original product vision
+
+Atellier Studio is a private, local-first AI operating system for daily work and mini-agency style operations.
+
+It is not:
+
+- a public SaaS MVP
+- a game
+- a generic task manager
+- a multiplayer/team product yet
+
+The intended core loop is:
+
+```txt
+source/input → wiki update → task → agent run → review → deliverable → memory update
+```
+
+The pixel/atelier UI is only a visualization layer. The true product is persistent operational memory plus controlled agent execution.
+
+## What is already working well
+
+### 1. Product identity is strong
+
+`AGENTS.md` correctly defines Atellier Studio as a private local-first AI operating system for personal and mini-agency style work.
+
+It also correctly states that Atellier is not a game and not a public SaaS MVP.
+
+This matches the original direction.
+
+### 2. LLM Wiki philosophy is encoded
+
+The root `AGENTS.md` includes the LLM Wiki principle:
+
+- do not treat the wiki as passive notes
+- treat it as persistent operational memory
+- prefer durable markdown, explicit links, chronological logs, source summaries, client/project/entity pages, contradiction notes, and human-readable run outputs
+- avoid hiding important context only in MongoDB
+- avoid relying only on chat history
+- avoid building a generic task app with no memory layer
+
+This is one of the most important parts of the project.
+
+The architecture must continue to protect this distinction:
+
+```txt
+MongoDB = operational state
+Markdown wiki = durable human-readable memory
+```
+
+### 3. Monorepo structure is correct
+
+The project correctly uses one repo rather than separate frontend/backend repos.
+
+Expected structure:
+
+```txt
+apps/web        → frontend
+apps/api        → backend
+packages/shared → shared contracts/types/constants
+atelier/        → raw/wiki/tasks/runs memory layer
+.agents/skills  → Codex workflows
+.codex/         → Codex config
+```
+
+This is the right structure for a private/local-first fullstack project.
+
+### 4. Frontend conventions are implemented
+
+The frontend convention we wanted is present:
+
+```txt
+service function → API hook → feature hook/coordinator → visual component
+```
+
+Codex should preserve this. Do not allow components to call `fetch`/`axios` directly.
+
+The project already includes important API-layer primitives such as:
+
+- query keys
+- query wrapper
+- mutation wrapper
+- hook callbacks
+- API alerts
+- feature hooks
+
+Future frontend work should follow the same vertical slice pattern.
+
+### 5. Backend conventions are in place
+
+The API conventions are correct:
+
+- Fastify owns HTTP routes
+- Mongoose owns MongoDB models
+- services own business logic
+- route handlers should stay thin
+- tests should use Fastify `app.inject`
+- tests should not require real Codex/MCP/OpenAI execution
+
+Continue preserving this separation.
+
+### 6. Agent orchestration exists
+
+The project now has skill-triggered orchestration routes and services.
+
+Current orchestration skills include:
+
+- `atellier-build-loop`
+- `llm-wiki-ingest-loop`
+
+The build loop follows the original Pepe/Toto/Jaco idea, but formalizes it into phases:
+
+- PM / scope
+- Builder / implementation planning
+- Runtime / compile/run checks
+- QA / blocker reporting
+- Fix pass
+- Approval
+- Wiki memory capture
+
+This is very aligned with the original goal.
+
+### 7. Deliverables and review lifecycle exist
+
+Runs can now become deliverables.
+
+The system supports:
+
+- auto deliverable generation
+- manual deliverable promotion
+- deliverable unlink
+- deliverable preview
+- review states
+- approval audit entries
+- deliverables index metadata
+
+This is a strong step toward Atellier becoming a real mini-agency operating system instead of a toy.
+
+### 8. Tests exist and should stay focused
+
+The repo has backend and frontend tests and root scripts for validation.
+
+Keep tests focused on critical behavior:
+
+- API routes
+- run lifecycle
+- orchestration lifecycle
+- wiki/deliverable safety
+- frontend interaction flows
+- service/API hook conventions
+
+Avoid:
+
+- huge snapshots
+- styling-only tests
+- tests that call real OpenAI/Codex/MCP tools
+
+## Main gaps and risks
+
+### 1. README/current-state drift
+
+The README still describes the project as Milestone 0 / Operational Spine, but the codebase has moved beyond that.
+
+Current stage is closer to:
+
+```txt
+Operational Spine + Agent Orchestration + Deliverables + Review UI
+```
+
+Next stage should be:
+
+```txt
+Wiki Brain + Codex Worker + Cost Safety + MCP later
+```
+
+Recommended action:
+
+- update `README.md` to reflect the current state
+- avoid saying Pixel UI is purely future if it already exists
+- clarify that MCP and Codex Worker are still pending
+
+### 2. CODEX_MEMORY.md is becoming too large
+
+`CODEX_MEMORY.md` is useful but is starting to behave like a full implementation history.
+
+That can make future Codex sessions noisy and expensive.
+
+Recommended split:
+
+```txt
+CODEX_MEMORY.md                       → compact active memory
+
+docs/history/implementation-log.md     → long chronological log
+
+docs/operations/local-setup.md         → Docker/Colima/Mongo setup
+
+docs/architecture/current-state.md     → architecture snapshot
+```
+
+Keep `CODEX_MEMORY.md` focused on:
+
+- user preferences
+- current local setup
+- active branch policy
+- current architecture constraints
+- known pitfalls
+- most recent operational notes
+
+Move older chronological detail elsewhere.
+
+### 3. Pixel UI arrived early
+
+Originally, Pixel Atelier UI was supposed to come after the Operational Spine and Wiki Brain.
+
+It now exists and has been partially converted away from fake simulation toward real backend execution.
+
+Do not remove it if it works, but do not spend the next cycle polishing sprites, animations, room layouts, or visual polish.
+
+Priority should shift back to:
+
+1. Wiki Brain
+2. Codex Worker
+3. cost/quota safety
+4. orchestration reliability
+5. MCP only after the above
+
+### 4. Real OpenAI mode can burn quota
+
+The project currently supports real OpenAI-backed execution.
+
+This is powerful but risky. The user already experienced quota burn from leaving a high-reasoning model enabled.
+
+Recommended safety changes:
+
+- make executor mode highly visible in UI
+- show model name in UI and `/health`
+- prefer explicit opt-in for real model execution
+- keep mock mode easy to enable
+- add per-run warnings when using OpenAI mode
+- add model profile options:
+
+```txt
+cheap     → small/mini model for routine work
+standard  → default coding/agent tasks
+deep      → architecture/review only
+```
+
+Do not default expensive/deep models for routine orchestration.
+
+### 5. Skill orchestration templates are hardcoded
+
+The orchestration templates currently live in code.
+
+That is acceptable for the MVP, but conceptually Atellier should treat skills/workflows as configurable durable operating knowledge.
+
+Recommended future direction:
+
+```txt
+apps/api/src/orchestration/templates/*.ts       → short-term clean code organization
+atelier/wiki/workflows/*.md                     → human-readable workflow memory
+.agents/skills/*/SKILL.md                       → Codex workflow contract
+```
+
+Do not over-engineer this now, but avoid expanding a single huge service file indefinitely.
+
+### 6. Wiki Brain is still incomplete
+
+The LLM Wiki principle is documented, but the product still needs stronger first-class wiki operations.
+
+Recommended next Wiki Brain capabilities:
+
+```txt
+POST /wiki/ingest
+POST /wiki/query
+POST /wiki/lint
+GET  /wiki/index
+GET  /wiki/page
+PATCH or POST /wiki/page with path safety
+```
+
+Important behavior:
+
+- preserve raw source
+- summarize source
+- update index
+- update log
+- create/update related pages
+- detect contradictions
+- propose tasks only when source implies work
+- save reusable answers/deliverables back into wiki
+
+### 7. Codex Worker is still pending
+
+Atellier currently has Codex rules, skills, and CLI scripts, but it does not yet have a controlled in-app Codex Worker.
+
+The intended architecture remains:
+
+```txt
+Atellier UI/Orchestrator → Codex Worker → code changes/logs → QA/review → wiki memory
+```
+
+Recommended future API:
+
+```txt
+POST /codex/run
+GET  /codex/runs/:id
+```
+
+Required constraints:
+
+- never use dangerous Codex flags by default
+- no `--dangerously-bypass-approvals-and-sandbox`
+- no background destructive actions
+- store logs as runs
+- require human review before applying risky changes
+- model profile should be explicit
+- do not call Codex in automated tests
+
+### 8. MCP should still wait
+
+MCP is not the next step unless the Codex Worker and Wiki Brain are stable.
+
+Correct order:
+
+```txt
+1. Wiki Brain
+2. Cost/model safety
+3. Codex Worker
+4. MCP layer
+5. external integrations
+```
+
+Future MCP candidates:
+
+- filesystem MCP with allowlist
+- docs/context MCP
+- Codex MCP
+- GitHub MCP
+- Figma MCP
+- browser/search MCP
+
+Use allowlists and avoid broad destructive permissions.
+
+## Recommended immediate next tasks for Codex
+
+### Task 1 — Update documentation to current state
+
+Update:
+
+- `README.md`
+- `CODEX_MEMORY.md`
+- optionally add docs under `docs/architecture/` and `docs/history/`
+
+Goal:
+
+- make the repo documentation match the actual implementation
+- make the next roadmap obvious
+- reduce context drift
+
+### Task 2 — Add executor/model safety visibility
+
+Add or improve:
+
+- `/health` fields for executor mode and model
+- UI badge showing executor mode/model
+- clear warning when running OpenAI-backed orchestration
+- mock mode as safe/easy local option
+- model profile naming if appropriate
+
+Goal:
+
+- avoid accidental quota burn
+- make real-mode obvious to the operator
+
+### Task 3 — Build Wiki Brain MVP
+
+Implement:
+
+```txt
+POST /wiki/ingest
+POST /wiki/query
+POST /wiki/lint
+```
+
+Initial version may be deterministic/non-LLM.
+
+Goal:
+
+- make the LLM Wiki principle operational, not only documented
+
+### Task 4 — Refactor orchestration templates if they grow
+
+If adding more orchestration workflows, move templates into separate files.
+
+Do not expand `SkillOrchestrationService` into a giant God service.
+
+### Task 5 — Plan Codex Worker, do not rush implementation
+
+Before implementing Codex Worker, write a design doc:
+
+```txt
+docs/architecture/codex-worker.md
+```
+
+It should cover:
+
+- command execution model
+- sandbox/approval settings
+- model profile
+- logging
+- run lifecycle
+- safety boundaries
+- tests/mocks
+- UI controls
+
+## Recommended Codex prompt for the next iteration
+
+Use this prompt for the next implementation pass:
+
+```txt
+Read AGENTS.md, CODEX_MEMORY.md, and docs/current-state-and-next-steps.md first.
+
+Goal:
+Bring Atellier Studio documentation and safety controls in line with the actual current implementation.
+
+Tasks:
+1. Update README.md so it reflects the current stage:
+   Operational Spine + Agent Orchestration + Deliverables + Review UI.
+2. Add or update docs/architecture/current-state.md with the current architecture.
+3. Add or update docs/architecture/next-roadmap.md with next priorities:
+   Wiki Brain, cost/model safety, Codex Worker, MCP later.
+4. Keep CODEX_MEMORY.md compact. If needed, move long historical detail into docs/history/implementation-log.md.
+5. Verify /health exposes executor mode and model information. If model is missing, add it.
+6. Add or improve a visible frontend executor-mode/model badge if the current UI does not clearly show it.
+7. Add or update tests for any behavior changed.
+
+Do not:
+- add MCP yet
+- add new pixel UI polish
+- add auth/cloud/multiplayer
+- call real OpenAI/Codex in tests
+- use dangerous Codex flags
+
+Run:
+- pnpm typecheck
+- pnpm test:api if API changed
+- pnpm test:web if web changed
+
+Final response must include:
+- files changed
+- commands run
+- what now matches the vision better
+- remaining gaps
+```
+
+## Product north star
+
+Do not let Atellier become a prettier task board.
+
+The north star is:
+
+```txt
+Atellier Studio turns scattered daily/client context into durable operational memory, coordinates agents through reviewable runs, and helps produce deliverables that improve the wiki over time.
+```
+
+Visuals are secondary.
+Memory, execution, review, and learning loops are primary.
