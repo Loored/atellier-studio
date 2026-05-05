@@ -33,6 +33,19 @@ Estimated current alignment with the original vision: **75–85% for this phase*
 
 The project should now focus on **learning and execution quality**, not more visual polish.
 
+## 2026-05-05 status update
+
+The documentation/memory cleanup recommended below has started:
+
+- `CODEX_MEMORY.md` is now compact active memory.
+- Long chronology moved to `docs/history/implementation-log.md`.
+- Local setup moved to `docs/operations/local-setup.md`.
+- README, architecture, agent protocol, and roadmap now describe the current stage instead of only Milestone 0.
+- Karpathy agentic-system insights were ingested into `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
+- The next prioritized work is captured in `docs/next-work-plan.md`.
+
+The immediate implementation priority should now be executor/model safety visibility, then deterministic Wiki Brain MVP.
+
 ## Original product vision
 
 Atellier Studio is a private, local-first AI operating system for daily work and mini-agency style operations.
@@ -193,7 +206,9 @@ Avoid:
 
 ### 1. README/current-state drift
 
-The README still describes the project as Milestone 0 / Operational Spine, but the codebase has moved beyond that.
+Status: initial cleanup started on 2026-05-05.
+
+The README previously described the project as Milestone 0 / Operational Spine, but the codebase had moved beyond that.
 
 Current stage is closer to:
 
@@ -207,11 +222,11 @@ Next stage should be:
 Wiki Brain + Codex Worker + Cost Safety + MCP later
 ```
 
-Recommended action:
+Recommended ongoing action:
 
-- update `README.md` to reflect the current state
-- avoid saying Pixel UI is purely future if it already exists
-- clarify that MCP and Codex Worker are still pending
+- keep `README.md`, `CODEX_MEMORY.md`, and roadmap docs aligned with the current implementation
+- avoid saying Pixel UI is purely future because it already exists
+- continue clarifying that MCP and Codex Worker are still pending
 
 ### 2. CODEX_MEMORY.md is becoming too large
 
@@ -377,9 +392,9 @@ Use allowlists and avoid broad destructive permissions.
 
 ## Recommended immediate next tasks for Codex
 
-### Task 1 — Update documentation to current state
+### Task 1 — Keep documentation current
 
-Update:
+Initial cleanup was started on 2026-05-05. Continue keeping these aligned:
 
 - `README.md`
 - `CODEX_MEMORY.md`

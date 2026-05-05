@@ -1,36 +1,50 @@
 # Roadmap
 
-## Milestone 0: Operational Spine
+## Completed foundation: Operational Spine
 
 - Local MongoDB
 - Fastify API
 - Agents, tasks, runs, run logs
 - Skill-triggered orchestration runs
 - Wiki index/log readiness
+- Deliverable generation, preview, promotion, unlink, and review states
 - Dashboard
 - Minimal tests
+- Pixel office visualization layer
+- Tailwind CSS v4 dashboard/shell migration
 
-## Milestone 1: Wiki Brain
+## Next 1: Executor/model safety
 
+- Visible executor mode and model
+- Model profile language: cheap, standard, deep
+- Clear warnings before OpenAI-backed runs
+- Easy mock-mode path
+
+## Next 2: Wiki Brain
+
+- Deterministic ingest/query/lint routes
 - Source summaries
 - Project and client pages
-- Wiki ingest, query, and lint flows
+- Index/log maintenance
+- Contradiction notes and task proposals
 
-## Milestone 2: Codex Worker
+## Next 3: Codex Worker design
 
-- Run type for Codex execution
-- Safe command wrapper
-- Stored output and QA review
+- Design doc before implementation
+- Safe command wrapper and approval model
+- Stored output, run logs, and QA review
+- No real Codex calls in tests
 
-## Milestone 3: Agent Roles
+## Next 4: Orchestration reliability
 
 - Intake, wiki curator, PM, builder, and QA workflows
 - Editable orchestration templates and richer parent/child run views
 
-## Milestone 4: Pixel Atelier
+## Later: Tailwind/Pixel polish
 
-- Future visualization layer for agent status and rooms
+- Finish Office/Mobile Tailwind migration when needed by real features or regressions
+- Cross-room pathfinding and per-agent sprites stay low priority
 
-## Milestone 5: MCP Layer
+## Later: MCP Layer
 
 - Tool registry, allowlist, and approval gates

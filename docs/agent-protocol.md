@@ -1,6 +1,6 @@
 # Agent Protocol
 
-Agents in Milestone 0 are operational records, not autonomous workers.
+Agents are operational records with controlled execution history. They are not broad autonomous workers.
 
 ## Current responsibilities
 
@@ -27,4 +27,4 @@ These runs use the existing local agent/run spine. They are not yet full Codex w
 - Execute builder work.
 - Review and lint outputs.
 
-Do not implement MCP, Codex worker behavior, cloud execution, or pixel UI in Milestone 0.
+Do not implement MCP, broad Codex worker behavior, cloud execution, or wide autonomy until Wiki Brain, model safety, and review controls are stable. Pixel office exists as a visualization layer; do not prioritize pixel polish over memory and execution quality.

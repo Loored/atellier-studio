@@ -26,6 +26,9 @@ export function Dashboard() {
     recentRunCount,
     pendingReviewRunCount,
     wikiLogReady,
+    executorMode,
+    executorModel,
+    modelProfile,
     isRefreshingDashboard,
   } = useDashboard();
 
@@ -39,18 +42,37 @@ export function Dashboard() {
             Atellier Studio
           </h1>
         </div>
-        <div
-          className="inline-flex items-center gap-1.5 min-h-8 border border-[var(--border-card)] rounded-lg px-3 text-ink-muted bg-[var(--bg-card)] text-[0.82rem]"
-          aria-live="polite"
-        >
-          {isRefreshingDashboard ? (
-            <Loader2 size={16} className="spin" />
-          ) : (
-            <CheckCircle2 size={16} />
-          )}
-          <span>{isRefreshingDashboard ? "Syncing" : "Ready"}</span>
+        <div className="flex items-center gap-2">
+          <div
+            className={`inline-flex items-center gap-1.5 min-h-8 border rounded-lg px-3 text-[0.8rem] ${
+              executorMode === "openai"
+                ? "border-orange/35 text-orange bg-orange/10"
+                : "border-teal/35 text-teal bg-teal/10"
+            }`}
+            aria-label="Executor runtime"
+          >
+            <span className="font-bold uppercase tracking-[0.08em]">{executorMode}</span>
+            <span className="text-ink-muted">({modelProfile})</span>
+            <span className="text-ink">{executorModel}</span>
+          </div>
+          <div
+            className="inline-flex items-center gap-1.5 min-h-8 border border-[var(--border-card)] rounded-lg px-3 text-ink-muted bg-[var(--bg-card)] text-[0.82rem]"
+            aria-live="polite"
+          >
+            {isRefreshingDashboard ? (
+              <Loader2 size={16} className="spin" />
+            ) : (
+              <CheckCircle2 size={16} />
+            )}
+            <span>{isRefreshingDashboard ? "Syncing" : "Ready"}</span>
+          </div>
         </div>
       </div>
+      {executorMode === "openai" ? (
+        <div className="mb-4 border border-orange/30 bg-orange/10 rounded-[var(--panel-radius)] px-3 py-2 text-[0.82rem] text-orange">
+          OpenAI execution is active. Review goals, scope, and approval-sensitive actions before running.
+        </div>
+      ) : null}
 
       {/* Metrics */}
       <section

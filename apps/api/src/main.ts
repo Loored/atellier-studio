@@ -3,6 +3,7 @@ import { buildServer } from "./server";
 import { connectMongo } from "./db/mongo";
 import type { StorageMode } from "./services/service-utils";
 import type { AgentExecutorMode } from "./services/agent-executor.service";
+import type { ModelProfile } from "@atellier/shared";
 import type { AddressInfo } from "node:net";
 
 const port = Number(process.env.API_PORT ?? 4000);
@@ -19,6 +20,11 @@ const agentExecutorMode: AgentExecutorMode = forceMockExecutor
     : "mock";
 const maxHandoffDepth = Number(process.env.AGENT_MAX_HANDOFF_DEPTH ?? 1);
 const executionTimeoutMs = Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 45_000);
+const modelProfile: ModelProfile = process.env.OPENAI_MODEL_PROFILE === "cheap"
+  ? "cheap"
+  : process.env.OPENAI_MODEL_PROFILE === "deep"
+    ? "deep"
+    : "standard";
 
 type HealthPayload = {
   status?: string;
@@ -66,6 +72,7 @@ async function main(): Promise<void> {
     agentExecutorMode,
     openaiApiKey: process.env.OPENAI_API_KEY,
     openaiModel: process.env.OPENAI_MODEL,
+    openaiModelProfile: modelProfile,
     maxHandoffDepth,
     executionTimeoutMs,
   });
