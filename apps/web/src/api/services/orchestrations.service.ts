@@ -1,8 +1,8 @@
 import type {
-  OrchestrationSkillId,
   OrchestrationSkillSummary,
-  SkillOrchestrationResult,
+  OrchestrationStatusResult,
   StartSkillOrchestrationInput,
+  StartSkillOrchestrationResponse,
 } from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
@@ -12,22 +12,16 @@ export const orchestrationsService = {
     return response.data;
   },
 
-  async startSkillRun(input: StartSkillOrchestrationInput): Promise<SkillOrchestrationResult> {
-    const response = await httpClient.post<SkillOrchestrationResult>(
+  async startSkillRun(input: StartSkillOrchestrationInput): Promise<StartSkillOrchestrationResponse> {
+    const response = await httpClient.post<StartSkillOrchestrationResponse>(
       `/orchestrations/skills/${input.skillId}/run`,
-      {
-        goal: input.goal,
-        context: input.context,
-        taskId: input.taskId,
-      },
+      { goal: input.goal, context: input.context, taskId: input.taskId },
     );
     return response.data;
   },
-};
 
-export type StartSkillRunVariables = {
-  skillId: OrchestrationSkillId;
-  goal: string;
-  context?: string;
-  taskId?: string;
+  async getStatus(runId: string): Promise<OrchestrationStatusResult> {
+    const response = await httpClient.get<OrchestrationStatusResult>(`/orchestrations/${runId}/status`);
+    return response.data;
+  },
 };
