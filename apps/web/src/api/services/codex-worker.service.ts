@@ -6,7 +6,20 @@ type CodexWorkerView = {
   mode: CodexWorkerMode;
   profile: CodexWorkerProfile;
   goal: string;
-  steps: Array<{ id: string; summary: string; status: string; needsApproval: boolean }>;
+  steps: Array<{
+    id: string;
+    summary: string;
+    status: string;
+    needsApproval: boolean;
+    riskLevel: "low" | "medium" | "high";
+    command: string;
+    startedAt?: string;
+    finishedAt?: string;
+    exitCode?: number;
+    output?: string;
+    stdoutPath?: string;
+    stderrPath?: string;
+  }>;
 };
 
 export const codexWorkerService = {

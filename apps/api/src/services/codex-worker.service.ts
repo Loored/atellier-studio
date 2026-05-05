@@ -92,9 +92,27 @@ export class CodexWorkerService {
     if (step.needsApproval && step.status !== "approved") return { error: "Step requires approval before execution." };
     const startedAt = new Date().toISOString();
     const finishedAt = new Date().toISOString();
+    const datePrefix = startedAt.slice(0, 10);
+    const artifactBaseName = `${datePrefix}-codex-worker-${id}-step-${idx + 1}-${step.id}`;
+    const stdoutPath = `runs/artifacts/${artifactBaseName}.stdout.log`;
+    const stderrPath = `runs/artifacts/${artifactBaseName}.stderr.log`;
+    const stdoutAbsolute = path.join(this.atelierRoot, stdoutPath);
+    const stderrAbsolute = path.join(this.atelierRoot, stderrPath);
+    await mkdir(path.dirname(stdoutAbsolute), { recursive: true });
+    await writeFile(stdoutAbsolute, `Fake executor completed step: ${step.summary}\nCommand: ${step.command}\n`, "utf8");
+    await writeFile(stderrAbsolute, "", "utf8");
     const updated = worker.steps.map((s, i) =>
       i === idx
-        ? { ...s, status: "completed" as const, startedAt, finishedAt, exitCode: 0, output: "Fake executor completed step." }
+        ? {
+            ...s,
+            status: "completed" as const,
+            startedAt,
+            finishedAt,
+            exitCode: 0,
+            output: "Fake executor completed step.",
+            stdoutPath,
+            stderrPath,
+          }
         : s,
     );
     await this.runs.appendLog(id, { level: "info", message: `Codex worker executed step: ${step.summary}` });
@@ -118,7 +136,16 @@ export class CodexWorkerService {
     }
     const steps = worker.steps.map((s) =>
       s.id === stepId
-        ? { ...s, status: s.needsApproval ? ("approved" as const) : ("pending" as const), startedAt: undefined, finishedAt: undefined, exitCode: undefined, output: undefined }
+        ? {
+            ...s,
+            status: s.needsApproval ? ("approved" as const) : ("pending" as const),
+            startedAt: undefined,
+            finishedAt: undefined,
+            exitCode: undefined,
+            output: undefined,
+            stdoutPath: undefined,
+            stderrPath: undefined,
+          }
         : s,
     );
     await this.runs.appendLog(id, { level: "info", message: `Codex worker retried step: ${step.summary}` });
@@ -165,7 +192,13 @@ export class CodexWorkerService {
       "",
       "## Steps",
       "",
-      ...worker.steps.map((s) => `- ${s.summary} [${s.status}]`),
+      ...worker.steps.flatMap((s) => {
+        const lines = [`- ${s.summary} [${s.status}]`];
+        if (s.exitCode !== undefined) lines.push(`  - exitCode: ${s.exitCode}`);
+        if (s.stdoutPath) lines.push(`  - stdout: ${s.stdoutPath}`);
+        if (s.stderrPath) lines.push(`  - stderr: ${s.stderrPath}`);
+        return lines;
+      }),
       "",
       "## Evidence",
       "",

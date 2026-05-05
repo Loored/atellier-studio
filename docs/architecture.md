@@ -47,8 +47,7 @@ The next architecture work should follow the Karpathy-style agentic system patte
 
 ## Near-term priorities
 
-1. Executor/model safety visibility.
-2. Deterministic Wiki Brain MVP.
-3. Codex Worker design doc before implementation.
-4. Orchestration reliability if templates grow.
-5. MCP after the above is stable.
+1. Codex Worker evidence pass (per-step output and finalize evidence surfaces).
+2. Wiki Brain v2 (safe write/update routes and reusable memory capture).
+3. Orchestration reliability and template modularization.
+4. MCP after the above is stable.

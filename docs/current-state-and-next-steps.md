@@ -312,16 +312,21 @@ atelier/wiki/workflows/*.md                     → human-readable workflow memo
 
 Do not over-engineer this now, but avoid expanding a single huge service file indefinitely.
 
-### 6. Wiki Brain is still incomplete
+### 6. Wiki Brain MVP is implemented, but v2 is pending
 
-The LLM Wiki principle is documented, but the product still needs stronger first-class wiki operations.
-
-Recommended next Wiki Brain capabilities:
+The LLM Wiki principle is now operational through deterministic routes:
 
 ```txt
 POST /wiki/ingest
 POST /wiki/query
 POST /wiki/lint
+```
+
+The next gap is write-path depth and reusable memory capture.
+
+Recommended next Wiki Brain capabilities:
+
+```txt
 GET  /wiki/index
 GET  /wiki/page
 PATCH or POST /wiki/page with path safety
@@ -334,13 +339,21 @@ Important behavior:
 - update index
 - update log
 - create/update related pages
-- detect contradictions
+- detect contradictions and stale links
 - propose tasks only when source implies work
 - save reusable answers/deliverables back into wiki
 
-### 7. Codex Worker is still pending
+### 7. Codex Worker control-plane v1 is implemented
 
-Atellier currently has Codex rules, skills, and CLI scripts, but it does not yet have a controlled in-app Codex Worker.
+Atellier now has a controlled in-app Codex Worker control-plane with:
+
+- create/plan/approve-step/execute-next/cancel/finalize routes
+- transition guardrails and blocked-state errors
+- dashboard control panel with actionable blocked reasons
+- durable finalize run logs + wiki log event append
+- focused API and web tests
+
+The pending gap is execution evidence depth and real command adapter integration.
 
 The intended architecture remains:
 
@@ -351,7 +364,7 @@ Atellier UI/Orchestrator → Codex Worker → code changes/logs → QA/review �
 Recommended future API:
 
 ```txt
-POST /codex/run
+POST /codex/runs
 GET  /codex/runs/:id
 ```
 
@@ -406,9 +419,9 @@ Goal:
 - make the next roadmap obvious
 - reduce context drift
 
-### Task 2 — Add executor/model safety visibility
+### Task 2 — Mark executor/model safety visibility as done and maintain it
 
-Add or improve:
+Completed behavior now includes:
 
 - `/health` fields for executor mode and model
 - UI badge showing executor mode/model
@@ -418,12 +431,11 @@ Add or improve:
 
 Goal:
 
-- avoid accidental quota burn
-- make real-mode obvious to the operator
+- keep accidental quota burn risk visible as new entry points are added
 
-### Task 3 — Build Wiki Brain MVP
+### Task 3 — Extend Wiki Brain from MVP to v2
 
-Implement:
+MVP implementation is done for:
 
 ```txt
 POST /wiki/ingest
@@ -431,11 +443,11 @@ POST /wiki/query
 POST /wiki/lint
 ```
 
-Initial version may be deterministic/non-LLM.
+Next extension should target safe wiki write/update routes and reusable memory writeback.
 
 Goal:
 
-- make the LLM Wiki principle operational, not only documented
+- make wiki memory compound through safe updates, not only ingest/query
 
 ### Task 4 — Refactor orchestration templates if they grow
 
@@ -443,24 +455,20 @@ If adding more orchestration workflows, move templates into separate files.
 
 Do not expand `SkillOrchestrationService` into a giant God service.
 
-### Task 5 — Plan Codex Worker, do not rush implementation
+### Task 5 — Strengthen Codex Worker evidence pass before real executor integration
 
-Before implementing Codex Worker, write a design doc:
+Codex Worker design doc and v1 control-plane are already in place:
 
 ```txt
-docs/architecture/codex-worker.md
+docs/codex-worker.md
 ```
 
-It should cover:
+Next iteration should focus on:
 
-- command execution model
-- sandbox/approval settings
-- model profile
-- logging
-- run lifecycle
-- safety boundaries
-- tests/mocks
-- UI controls
+- richer per-step output evidence in run artifacts
+- clearer finalize payload review in UI
+- strong approval/audit metadata across step transitions
+- tests for evidence rendering and finalize evidence behavior
 
 ## Recommended Codex prompt for the next iteration
 

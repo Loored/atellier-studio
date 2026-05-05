@@ -950,7 +950,26 @@ describe("operational spine routes", () => {
       method: "GET",
       url: `/codex/runs/${run.id}`,
     });
-    const view = viewResponse.json<{ steps: Array<{ id: string; needsApproval: boolean }> }>();
+    const view = viewResponse.json<{
+      steps: Array<{
+        id: string;
+        needsApproval: boolean;
+        status: string;
+        stdoutPath?: string;
+        stderrPath?: string;
+      }>;
+    }>();
+    const completedStep = view.steps.find((step) => step.status === "completed");
+    expect(completedStep?.stdoutPath).toBeDefined();
+    expect(completedStep?.stderrPath).toBeDefined();
+    if (completedStep?.stdoutPath) {
+      const stdoutPage = await server.inject({
+        method: "GET",
+        url: `/wiki/page?path=${encodeURIComponent(completedStep.stdoutPath)}`,
+      });
+      expect(stdoutPage.statusCode).toBe(200);
+      expect(stdoutPage.json<WikiPageResponse>().content).toContain("Fake executor completed step");
+    }
     const protectedStep = view.steps.find((step) => step.needsApproval);
     expect(protectedStep).toBeDefined();
 
