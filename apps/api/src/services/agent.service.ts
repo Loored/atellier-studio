@@ -59,13 +59,18 @@ export class AgentService {
 
   async updateStatus(id: string, input: UpdateAgentStatusInput): Promise<Agent | null> {
     if (this.storageMode === "mongo") {
+      const setFields = cleanUndefined({
+        status: input.status,
+        currentTaskId: input.currentTaskId,
+        lastRunId: input.lastRunId,
+        ...(input.currentStep !== null && input.currentStep !== undefined
+          ? { currentStep: input.currentStep }
+          : {}),
+      });
+      const unsetFields = input.currentStep === null ? { currentStep: "" } : {};
       const agent = await AgentModel.findByIdAndUpdate(
         id,
-        cleanUndefined({
-          status: input.status,
-          currentTaskId: input.currentTaskId,
-          lastRunId: input.lastRunId,
-        }),
+        { $set: setFields, ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}) },
         { new: true },
       );
       return agent ? toJsonRecord<Agent>(agent) : null;
@@ -85,6 +90,11 @@ export class AgentService {
       }),
       updatedAt: toIso(new Date()),
     };
+    if (input.currentStep === null) {
+      delete next.currentStep;
+    } else if (input.currentStep !== undefined) {
+      next.currentStep = input.currentStep;
+    }
     this.records.set(id, next);
     return next;
   }

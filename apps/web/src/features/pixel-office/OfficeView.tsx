@@ -9,7 +9,7 @@ import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
 import { AgentDetailPanel } from "./AgentDetailPanel";
 
 export function OfficeView() {
-  const { data: agents = [], isLoadingWithoutCache } = useAgentsApi();
+  const { data: agents = [], isLoadingWithoutCache } = useAgentsApi({ livePolling: true });
   const createAgent = useCreateAgentApi();
   const characters = agentsToPixelCharacters(agents);
 

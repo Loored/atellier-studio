@@ -4,9 +4,13 @@ import type {
   OrchestrationSkillId,
   OrchestrationSkillSummary,
   OrchestrationSkillStepSummary,
+  OrchestrationStatusResult,
+  OrchestrationStepStatusEntry,
+  Run,
   SkillOrchestrationResult,
   SkillOrchestrationStepResult,
   StartSkillOrchestrationInput,
+  StartSkillOrchestrationResponse,
 } from "@atellier/shared";
 import { AgentRunService } from "./agent-run.service";
 import { AgentService } from "./agent.service";
@@ -177,12 +181,86 @@ export class SkillOrchestrationService {
     return this.listSkills().find((skill) => skill.id === id) ?? null;
   }
 
+  async startBackground(input: StartSkillOrchestrationInput): Promise<StartSkillOrchestrationResponse> {
+    const template = this.requireTemplate(input.skillId);
+    const orchestrationRun = await this.createOrchestrationRun(input, template);
+    void this.executeSteps(orchestrationRun, template, input).catch(() => {
+      // error already logged and run marked failed inside executeSteps
+    });
+    return { runId: orchestrationRun.id };
+  }
+
   async start(input: StartSkillOrchestrationInput): Promise<SkillOrchestrationResult> {
-    const template = SKILL_TEMPLATES.find((candidate) => candidate.id === input.skillId);
-    if (!template) {
-      throw new Error(`Unknown orchestration skill: ${input.skillId}`);
+    const template = this.requireTemplate(input.skillId);
+    const orchestrationRun = await this.createOrchestrationRun(input, template);
+    return this.executeSteps(orchestrationRun, template, input);
+  }
+
+  async getStatus(orchestrationRunId: string): Promise<OrchestrationStatusResult | null> {
+    const orchRun = await this.runs.getById(orchestrationRunId);
+    if (!orchRun) {
+      return null;
     }
 
+    const orchInput = orchRun.input as { skillId?: string; goal?: string } | undefined;
+    const skillId = orchInput?.skillId as OrchestrationSkillId | undefined;
+    const template = skillId ? SKILL_TEMPLATES.find((t) => t.id === skillId) : undefined;
+    if (!template || !skillId) {
+      return null;
+    }
+
+    const stepRuns = await this.runs.listByOrchestrationRunId(orchestrationRunId);
+    const agents = await this.agents.list();
+
+    const steps: OrchestrationStepStatusEntry[] = template.steps.map((step) => {
+      const stepRun = stepRuns.find((r) => {
+        const ri = r.input as Record<string, unknown> | undefined;
+        return ri?.orchestrationStepLabel === step.label;
+      });
+      const agent = agents.find((a) => a.name.toLowerCase() === step.agentName.toLowerCase());
+      const status: OrchestrationStepStatusEntry["status"] = stepRun
+        ? (stepRun.status as OrchestrationStepStatusEntry["status"])
+        : "pending";
+      return {
+        stepId: step.id,
+        label: step.label,
+        phase: step.phase,
+        agentRole: step.agentRole,
+        agentName: step.agentName,
+        agentId: agent?.id,
+        runId: stepRun?.id,
+        status,
+        isActive: status === "running",
+      };
+    });
+
+    const activeStep = steps.find((s) => s.isActive) ?? null;
+    const activeIndex = activeStep ? steps.indexOf(activeStep) : -1;
+    const nextStep = activeIndex >= 0 ? (steps[activeIndex + 1] ?? null) : null;
+
+    return {
+      orchestrationRunId,
+      skillId,
+      goal: orchInput?.goal ?? "",
+      status: orchRun.status,
+      steps,
+      activeStep,
+      nextStep,
+    };
+  }
+
+  private requireTemplate(skillId: OrchestrationSkillId): SkillTemplate {
+    const template = SKILL_TEMPLATES.find((candidate) => candidate.id === skillId);
+    if (!template) {
+      throw new Error(`Unknown orchestration skill: ${skillId}`);
+    }
+    return template;
+  }
+
+  private async createOrchestrationRun(
+    input: StartSkillOrchestrationInput,
+    template: SkillTemplate,
+  ): Promise<Run> {
     const orchestrationRun = await this.runs.create({
       type: "orchestration",
       status: "running",
@@ -193,14 +271,20 @@ export class SkillOrchestrationService {
         context: input.context,
       },
     });
-
-    const stepResults: SkillOrchestrationStepResult[] = [];
-    const previousOutputs: string[] = [];
-
     await this.runs.appendLog(orchestrationRun.id, {
       level: "info",
       message: `Skill triggered: ${template.name}.`,
     });
+    return orchestrationRun;
+  }
+
+  private async executeSteps(
+    orchestrationRun: Run,
+    template: SkillTemplate,
+    input: StartSkillOrchestrationInput,
+  ): Promise<SkillOrchestrationResult> {
+    const stepResults: SkillOrchestrationStepResult[] = [];
+    const previousOutputs: string[] = [];
 
     try {
       for (const step of template.steps) {
@@ -210,10 +294,17 @@ export class SkillOrchestrationService {
           message: `Starting ${step.label} with ${agent.name}.`,
         });
 
+        const nextStep = template.steps[template.steps.indexOf(step) + 1];
         const result = await this.agentRuns.run(agent.id, {
           instruction: this.buildStepInstruction(template, step, input.goal),
           context: this.buildStepContext(orchestrationRun.id, input.context, previousOutputs),
           recordDeliverable: false,
+          orchestrationStep: {
+            orchestrationRunId: orchestrationRun.id,
+            label: step.label,
+            phase: step.phase,
+            nextAgentName: nextStep?.agentName,
+          },
         });
 
         if (!result) {

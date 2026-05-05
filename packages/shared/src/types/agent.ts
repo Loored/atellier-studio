@@ -26,6 +26,13 @@ export type AgentAvatar = {
   y?: number;
 };
 
+export type AgentCurrentStep = {
+  label: string;
+  phase: string;
+  orchestrationRunId: string;
+  nextAgentName?: string;
+};
+
 export type Agent = {
   id: string;
   name: string;
@@ -34,6 +41,7 @@ export type Agent = {
   instructions?: string;
   currentTaskId?: string;
   lastRunId?: string;
+  currentStep?: AgentCurrentStep;
   avatar?: AgentAvatar;
   createdAt: string;
   updatedAt: string;
@@ -53,6 +61,7 @@ export type UpdateAgentStatusInput = {
   status: AgentStatus;
   currentTaskId?: string;
   lastRunId?: string;
+  currentStep?: AgentCurrentStep | null;
 };
 
 export type UpdateAgentInstructionsInput = {
