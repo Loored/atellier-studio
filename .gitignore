@@ -147,6 +147,20 @@ vite.config.ts.timestamp-*
 .DS_Store
 Thumbs.db
 
+# Local session tooling artifacts
+.claude/
+.refs/
+
+# Local UI review screenshots (root-level only)
+/agents-check.png
+/ui-check-*.png
+/dashboard-*.png
+/office-*.png
+/review-*.png
+
+# Local auto-generated deliverables (ObjectId-prefixed), keep curated wiki files tracked
+/atelier/wiki/deliverables/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*.md
+
 # Editor
 .vscode/
 !.vscode/settings.json

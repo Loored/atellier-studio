@@ -42,6 +42,13 @@ Long history and setup details live in docs so this file stays small.
 
 See `docs/operations/local-setup.md` for install commands and solved setup pitfalls.
 
+## Local Hygiene Rules
+
+- `.gitignore` now excludes local-only session folders: `.claude/` and `.refs/`.
+- Root-level UI review screenshots are ignored (`agents-check.png`, `ui-check-*`, `dashboard-*`, `office-*`, `review-*`).
+- Auto-generated deliverables in `atelier/wiki/deliverables/` are ignored only when filename starts with a 24-hex ObjectId prefix (`<24hex>-*.md`).
+- Curated wiki memory remains tracked: `atelier/wiki/deliverables/index.md`, `atelier/wiki/log.md`, and non-ObjectId deliverables.
+
 ## Current Architecture Constraints
 
 - Frontend API chain must remain: service function -> API hook -> feature hook/coordinator -> visual component.
