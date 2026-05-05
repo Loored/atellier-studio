@@ -56,7 +56,7 @@ export class WikiService {
   async ensureWiki(): Promise<void> {
     await mkdir(this.wikiRoot, { recursive: true });
     await Promise.all(
-      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "deliverables"].map((segment) =>
+      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "sources", "deliverables"].map((segment) =>
         mkdir(path.join(this.wikiRoot, segment), { recursive: true }),
       ),
     );
@@ -176,6 +176,7 @@ export class WikiService {
       "",
     ].join("\n");
     await this.writePage(summaryPath, summaryBody);
+    await this.upsertSourceIndexEntry(summaryPath, sourceType, datePrefix);
 
     await this.appendLog({
       eventType: "ingest",
@@ -206,29 +207,40 @@ export class WikiService {
     const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
     const sourceType = input.sourceType;
     const files = await this.listMarkdownFiles(path.join(this.atelierRootResolved, "wiki"));
-    const matches: WikiQueryMatch[] = [];
+    const rankedMatches: Array<WikiQueryMatch & { score: number }> = [];
     const queryLower = query.toLowerCase();
 
     for (const filePath of files) {
-      if (matches.length >= limit) {
-        break;
-      }
       const content = await readFile(filePath, "utf8");
       if (sourceType && !content.includes(`- Source type: ${sourceType}`)) {
         continue;
       }
-      const index = content.toLowerCase().indexOf(queryLower);
-      if (index < 0) {
+      const contentLower = content.toLowerCase();
+      const firstMatchIndex = contentLower.indexOf(queryLower);
+      if (firstMatchIndex < 0) {
         continue;
       }
-      const snippetStart = Math.max(0, index - 60);
-      const snippetEnd = Math.min(content.length, index + query.length + 60);
+      const snippetStart = Math.max(0, firstMatchIndex - 60);
+      const snippetEnd = Math.min(content.length, firstMatchIndex + query.length + 60);
       const snippet = content.slice(snippetStart, snippetEnd).replace(/\s+/g, " ").trim();
-      matches.push({
+      const titleLine = content.split("\n", 1)[0]?.toLowerCase() ?? "";
+      const occurrenceCount = this.countOccurrences(contentLower, queryLower);
+      const titleBonus = titleLine.includes(queryLower) ? 3 : 0;
+      rankedMatches.push({
         path: this.toRelativeAtelierPath(filePath),
         snippet,
+        score: occurrenceCount + titleBonus,
       });
     }
+    const matches = rankedMatches
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return a.path.localeCompare(b.path);
+      })
+      .slice(0, limit)
+      .map(({ path, snippet }) => ({ path, snippet }));
 
     await this.appendLog({
       eventType: "query",
@@ -251,6 +263,7 @@ export class WikiService {
     const issues: WikiLintIssue[] = [];
     const indexContent = await readFile(this.indexPath, "utf8");
     const linkedPaths = Array.from(indexContent.matchAll(/\]\(\.\/([^)]+)\)/g)).map((m) => m[1]);
+    const duplicateLinkedPaths = this.findDuplicates(linkedPaths);
 
     for (const linkedPath of linkedPaths) {
       const resolved = path.resolve(this.wikiRoot, linkedPath);
@@ -261,6 +274,41 @@ export class WikiService {
           code: "missing_page",
           path: `wiki/${linkedPath.replace(/\\/g, "/")}`,
           message: "Linked page from wiki index does not exist.",
+        });
+      }
+    }
+
+    for (const duplicatePath of duplicateLinkedPaths) {
+      issues.push({
+        code: "stale_index_entry",
+        path: `wiki/${duplicatePath.replace(/\\/g, "/")}`,
+        message: "Wiki index contains duplicate entries for the same path.",
+      });
+    }
+
+    const sourceFiles = await this.listMarkdownFiles(path.join(this.wikiRoot, "sources"));
+    for (const sourceFile of sourceFiles) {
+      const sourceContent = await readFile(sourceFile, "utf8");
+      const sourceRelativePath = this.toRelativeAtelierPath(sourceFile);
+      const rawPath = this.extractMetadata(sourceContent, "Raw path");
+
+      if (!rawPath) {
+        issues.push({
+          code: "stale_index_entry",
+          path: sourceRelativePath,
+          message: "Source summary is missing Raw path metadata.",
+        });
+        continue;
+      }
+
+      try {
+        const { resolved } = this.resolveAtelierPath(rawPath);
+        await stat(resolved);
+      } catch {
+        issues.push({
+          code: "broken_link",
+          path: sourceRelativePath,
+          message: `Raw source reference is missing: ${rawPath}`,
         });
       }
     }
@@ -396,6 +444,72 @@ export class WikiService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
     return base || "untitled";
+  }
+
+  private async upsertSourceIndexEntry(summaryPath: string, sourceType: string, date: string): Promise<void> {
+    const indexContent = await readFile(this.indexPath, "utf8");
+    const linkPath = `./${summaryPath.replace(/^wiki\//, "")}`;
+    const summaryLabel = summaryPath.replace(/^wiki\//, "");
+    const row = `| [${summaryLabel}](${linkPath}) | Source summary generated from deterministic ingest. | sources | ${date} | 1 |`;
+
+    const lines = indexContent.split("\n");
+    const headerIndex = lines.findIndex((line) => line.trim() === "| Path | Summary | Category | Last updated | Source count |");
+    if (headerIndex < 0 || headerIndex + 1 >= lines.length) {
+      return;
+    }
+
+    const firstRowIndex = headerIndex + 2;
+    let tableEndIndex = lines.findIndex((line, index) => index >= firstRowIndex && line.trim() === "");
+    if (tableEndIndex < 0) {
+      tableEndIndex = lines.length;
+    }
+
+    const sourceRowMatcher = new RegExp(`\\]\\(${this.escapeRegExp(linkPath)}\\)`);
+    const tableRows = lines.slice(firstRowIndex, tableEndIndex);
+    const existingRowIndex = tableRows.findIndex((tableRow) => sourceRowMatcher.test(tableRow));
+    if (existingRowIndex >= 0) {
+      tableRows[existingRowIndex] = row.replace("| sources |", `| ${sourceType} |`);
+    } else {
+      tableRows.push(row.replace("| sources |", `| ${sourceType} |`));
+    }
+
+    const updated = [
+      ...lines.slice(0, firstRowIndex),
+      ...tableRows,
+      ...lines.slice(tableEndIndex),
+    ].join("\n");
+
+    await writeFile(this.indexPath, updated, "utf8");
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  private countOccurrences(content: string, query: string): number {
+    if (!query) return 0;
+    let count = 0;
+    let fromIndex = 0;
+    while (fromIndex < content.length) {
+      const index = content.indexOf(query, fromIndex);
+      if (index < 0) break;
+      count += 1;
+      fromIndex = index + query.length;
+    }
+    return count;
+  }
+
+  private findDuplicates(values: string[]): string[] {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const value of values) {
+      if (seen.has(value)) {
+        duplicates.add(value);
+      } else {
+        seen.add(value);
+      }
+    }
+    return Array.from(duplicates).sort((a, b) => a.localeCompare(b));
   }
 
   private async listMarkdownFiles(root: string): Promise<string[]> {
