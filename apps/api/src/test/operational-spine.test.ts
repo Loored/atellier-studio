@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -642,6 +642,28 @@ describe("operational spine routes", () => {
     expect(summaryPageResponse.json<WikiPageResponse>().content).toContain("## Summary");
   });
 
+  it("updates wiki index with source summary rows on ingest", async () => {
+    const ingestResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Weekly sync notes",
+        content: "Action item: implement deterministic wiki indexing.",
+        sourceType: "note",
+      },
+    });
+    expect(ingestResponse.statusCode).toBe(201);
+
+    const indexResponse = await server.inject({
+      method: "GET",
+      url: "/wiki/index",
+    });
+    expect(indexResponse.statusCode).toBe(200);
+    const indexContent = indexResponse.json<WikiPageResponse>().content;
+    expect(indexContent).toContain("sources/");
+    expect(indexContent).toContain("Source summary generated from deterministic ingest.");
+  });
+
   it("queries wiki content deterministically", async () => {
     await server.inject({
       method: "POST",
@@ -670,6 +692,43 @@ describe("operational spine routes", () => {
     expect(queryResult.matches.some((match) => match.path.startsWith("wiki/"))).toBe(true);
   });
 
+  it("ranks wiki query matches deterministically by relevance and path", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Alpha deterministic notes",
+        content: "deterministic deterministic deterministic pipeline details.",
+        sourceType: "note",
+      },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Beta deterministic notes",
+        content: "deterministic pipeline baseline.",
+        sourceType: "note",
+      },
+    });
+
+    const queryResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: {
+        query: "deterministic",
+        limit: 1,
+        sourceType: "note",
+      },
+    });
+
+    expect(queryResponse.statusCode).toBe(200);
+    const queryResult = queryResponse.json<{ matches: Array<{ path: string }> }>();
+    expect(queryResult.matches).toHaveLength(1);
+    expect(queryResult.matches[0]?.path).toContain("alpha-deterministic-notes");
+  });
+
   it("lints wiki pages and returns a deterministic report", async () => {
     const lintResponse = await server.inject({
       method: "POST",
@@ -681,6 +740,77 @@ describe("operational spine routes", () => {
     expect(typeof lint.ok).toBe("boolean");
     expect(Array.isArray(lint.issues)).toBe(true);
     expect(lint.checkedAt).toEqual(expect.any(String));
+  });
+
+  it("reports broken raw references in wiki source summaries", async () => {
+    const sourcePath = path.join(atelierRoot, "wiki", "sources", "broken-source.md");
+    await mkdir(path.dirname(sourcePath), { recursive: true });
+    await writeFile(
+      sourcePath,
+      [
+        "# Broken source",
+        "",
+        "## Source",
+        "",
+        "- Raw path: raw/ingest/does-not-exist.md",
+        "- Source type: note",
+        "",
+        "## Summary",
+        "",
+        "Missing raw file reference test.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const lintResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/lint",
+    });
+
+    expect(lintResponse.statusCode).toBe(200);
+    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string }> }>();
+    expect(
+      lint.issues.some(
+        (issue) =>
+          issue.code === "broken_link" &&
+          issue.path === "wiki/sources/broken-source.md" &&
+          issue.message.includes("Raw source reference is missing"),
+      ),
+    ).toBe(true);
+  });
+
+  it("reports duplicate wiki index entries", async () => {
+    const indexPath = path.join(atelierRoot, "wiki", "index.md");
+    await writeFile(
+      indexPath,
+      [
+        "# Atellier Studio Wiki Index",
+        "",
+        "| Path | Summary | Category | Last updated | Source count |",
+        "| --- | --- | --- | --- | --- |",
+        "| [log.md](./log.md) | base log | operations | 2026-05-05 | 0 |",
+        "| [log.md](./log.md) | duplicate row | operations | 2026-05-05 | 0 |",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const lintResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/lint",
+    });
+
+    expect(lintResponse.statusCode).toBe(200);
+    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string }> }>();
+    expect(
+      lint.issues.some(
+        (issue) =>
+          issue.code === "stale_index_entry" &&
+          issue.path === "wiki/log.md" &&
+          issue.message.includes("duplicate entries"),
+      ),
+    ).toBe(true);
   });
 
   it("returns 400 for invalid wiki ingest payload", async () => {
