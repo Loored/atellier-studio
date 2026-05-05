@@ -30,13 +30,19 @@ export function Dashboard() {
   } = useDashboard();
 
   return (
-    <div className="dashboard-content">
-      <div className="dashboard-topbar">
+    <div className="p-6 px-7 max-w-[1200px] h-full overflow-y-auto">
+      {/* Topbar */}
+      <div className="flex items-center justify-between gap-4 pb-5">
         <div>
-          <p className="eyebrow">Dev</p>
-          <h1 className="dashboard-title">Atellier Studio</h1>
+          <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Dev</p>
+          <h1 className="text-[clamp(1.8rem,2rem+1vw,2.8rem)] font-extrabold tracking-[-0.03em] text-ink leading-none">
+            Atellier Studio
+          </h1>
         </div>
-        <div className="topbar-status" aria-live="polite">
+        <div
+          className="inline-flex items-center gap-1.5 min-h-8 border border-[var(--border-card)] rounded-lg px-3 text-ink-muted bg-[var(--bg-card)] text-[0.82rem]"
+          aria-live="polite"
+        >
           {isRefreshingDashboard ? (
             <Loader2 size={16} className="spin" />
           ) : (
@@ -46,45 +52,35 @@ export function Dashboard() {
         </div>
       </div>
 
-      <section className="metric-row" aria-label="Workspace status">
-        <div className="metric">
-          <Users size={18} />
-          <span>{agentCount}</span>
-          <small>Agents</small>
-        </div>
-        <div className="metric">
-          <Bell size={18} />
-          <span>{needsHumanAgentCount}</span>
-          <small>Needs human</small>
-        </div>
-        <div className="metric">
-          <AlertTriangle size={18} />
-          <span>{blockedAgentCount}</span>
-          <small>Blocked</small>
-        </div>
-        <div className="metric">
-          <ListTodo size={18} />
-          <span>{activeTaskCount}</span>
-          <small>Active tasks</small>
-        </div>
-        <div className="metric">
-          <History size={18} />
-          <span>{recentRunCount}</span>
-          <small>Recent runs</small>
-        </div>
-        <div className="metric">
-          <Clock size={18} />
-          <span>{pendingReviewRunCount}</span>
-          <small>Pending review</small>
-        </div>
-        <div className="metric">
-          <BookOpen size={18} />
-          <span>{wikiLogReady ? "On" : "Off"}</span>
-          <small>Wiki log</small>
-        </div>
+      {/* Metrics */}
+      <section
+        className="grid grid-cols-7 gap-3 mb-4"
+        aria-label="Workspace status"
+      >
+        {(
+          [
+            { icon: Users,         value: agentCount,            label: "Agents" },
+            { icon: Bell,          value: needsHumanAgentCount,  label: "Needs human" },
+            { icon: AlertTriangle, value: blockedAgentCount,     label: "Blocked" },
+            { icon: ListTodo,      value: activeTaskCount,       label: "Active tasks" },
+            { icon: History,       value: recentRunCount,        label: "Recent runs" },
+            { icon: Clock,         value: pendingReviewRunCount, label: "Pending review" },
+            { icon: BookOpen,      value: wikiLogReady ? "On" : "Off", label: "Wiki log" },
+          ] as const
+        ).map(({ icon: Icon, value, label }) => (
+          <div
+            key={label}
+            className="grid grid-cols-[auto_1fr] [grid-template-areas:'icon_value''icon_label'] items-center gap-x-3 min-h-[72px] border border-[var(--border-card)] rounded-[var(--panel-radius)] px-4 py-3.5 bg-[var(--bg-card)] transition-[border-color,box-shadow] duration-200 hover:border-purple/28 hover:shadow-[0_0_16px_rgba(139,92,246,0.06)]"
+          >
+            <Icon size={18} className="[grid-area:icon] text-purple" />
+            <span className="[grid-area:value] text-[1.4rem] font-extrabold text-ink">{value}</span>
+            <small className="[grid-area:label] text-ink-muted text-[0.78rem]">{label}</small>
+          </div>
+        ))}
       </section>
 
-      <div className="dashboard-grid">
+      {/* Panel grid */}
+      <div className="grid items-start grid-cols-12 gap-3.5">
         <AgentsPanel />
         <SkillOrchestrationPanel />
         <RunsTimeline />

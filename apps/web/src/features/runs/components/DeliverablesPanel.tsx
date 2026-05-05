@@ -27,59 +27,73 @@ export function DeliverablesPanel() {
   );
 
   return (
-    <section className="panel panel-compact">
-      <div className="panel-header">
+    <section className="col-span-6 min-w-0 border border-[var(--border-card)] rounded-[var(--panel-radius)] p-4 bg-[var(--bg-card)] shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-3.5">
         <div>
-          <p className="eyebrow">Outputs</p>
-          <h2>Deliverables</h2>
+          <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Outputs</p>
+          <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Deliverables</h2>
         </div>
-        <span className="panel-chip">{deliverableRuns.length} saved</span>
+        <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
+          {deliverableRuns.length} saved
+        </span>
       </div>
-      <div className="deliverable-filters">
+
+      {/* Filters */}
+      <div className="inline-flex gap-2 mb-2.5">
         <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}>
           <option value="all">All types</option>
           {RUN_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
+            <option key={type} value={type}>{type}</option>
           ))}
         </select>
         <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as typeof reviewFilter)}>
           <option value="all">All reviews</option>
           {RUN_REVIEW_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
+            <option key={status} value={status}>{status}</option>
           ))}
         </select>
       </div>
 
-      {isLoadingWithoutCache ? <p className="empty-state">Loading deliverables</p> : null}
+      {isLoadingWithoutCache ? (
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          Loading deliverables
+        </p>
+      ) : null}
       {!isLoadingWithoutCache && deliverableRuns.length === 0 ? (
-        <p className="empty-state">No deliverables linked yet</p>
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          No deliverables linked yet
+        </p>
       ) : null}
       {!isLoadingWithoutCache && deliverableRuns.length > 0 && filteredDeliverableRuns.length === 0 ? (
-        <p className="empty-state">No deliverables match current filters</p>
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          No deliverables match current filters
+        </p>
       ) : null}
 
-      <ul className="item-list">
+      <ul className="grid gap-2 list-none m-0 p-0 max-h-[340px] overflow-auto">
         {filteredDeliverableRuns.map((run) => (
-          <li className="item-card run-item" key={run.id}>
-            <div className="run-summary">
-              <FileText size={18} />
+          <li
+            key={run.id}
+            className="grid border border-[var(--border-card)] rounded-lg px-3 py-2.5 bg-white/[0.02] transition-[border-color,background] hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22]"
+          >
+            <div className="grid grid-cols-[auto_1fr] items-center gap-2.5">
+              <FileText size={18} className="text-ink-faint" />
               <div>
-                <strong>{run.type}</strong>
-                <span className="item-meta">
+                <strong className="block text-[0.88rem] font-semibold text-ink mb-0.5">{run.type}</strong>
+                <span className="flex items-center flex-wrap gap-1.5 text-ink-muted text-[0.78rem]">
                   <small className={`status-badge status-badge-${run.status}`}>{run.status}</small>
                   {run.reviewStatus ? (
-                    <small className={`status-badge status-badge-review-${run.reviewStatus}`}>{run.reviewStatus}</small>
+                    <small className={`status-badge status-badge-review-${run.reviewStatus}`}>
+                      {run.reviewStatus}
+                    </small>
                   ) : null}
                 </span>
               </div>
             </div>
             <button
               type="button"
-              className="deliverable-path-button"
+              className="justify-start w-full text-left border-[var(--border-card)] bg-[var(--bg-input)] text-ink-muted px-2.5 overflow-hidden text-ellipsis whitespace-nowrap mt-2"
               onClick={() => setSelectedDeliverablePath(run.deliverablePath ?? null)}
             >
               {run.deliverablePath}
@@ -89,12 +103,18 @@ export function DeliverablesPanel() {
       </ul>
 
       {selectedDeliverablePath ? (
-        <div className="deliverable-preview">
-          <p className="eyebrow">Preview</p>
-          <strong>{selectedDeliverablePath}</strong>
-          {isLoadingDeliverable ? <p className="empty-state">Loading deliverable</p> : null}
+        <div className="mt-3 grid gap-2">
+          <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Preview</p>
+          <strong className="text-ink text-[0.88rem]">{selectedDeliverablePath}</strong>
+          {isLoadingDeliverable ? (
+            <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+              Loading deliverable
+            </p>
+          ) : null}
           {!isLoadingDeliverable ? (
-            <pre className="wiki-log">{selectedDeliverable?.content ?? "Deliverable not available."}</pre>
+            <pre className="min-h-[120px] max-h-[240px] overflow-auto border border-[var(--border-card)] rounded-lg p-3 text-ink-muted bg-black/25 whitespace-pre-wrap text-[0.78rem] font-mono leading-relaxed m-0">
+              {selectedDeliverable?.content ?? "Deliverable not available."}
+            </pre>
           ) : null}
         </div>
       ) : null}

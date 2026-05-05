@@ -29,20 +29,23 @@ export function RunsTimeline() {
   } = useRunsTimeline();
 
   return (
-    <section className="panel panel-compact">
-      <div className="panel-header">
+    <section className="col-span-6 min-w-0 border border-[var(--border-card)] rounded-[var(--panel-radius)] p-4 bg-[var(--bg-card)] shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-3.5">
         <div>
-          <p className="eyebrow">Timeline</p>
-          <h2>Recent Runs</h2>
+          <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Timeline</p>
+          <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Recent Runs</h2>
         </div>
-        <div className="panel-actions">
-          <span className="panel-chip">{runList.filter((run) => run.status === "running").length} running</span>
-          <button className="icon-button" type="button" onClick={startManualRun} disabled={isCreatingRun} title="Start run">
+        <div className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
+            {runList.filter((run) => run.status === "running").length} running
+          </span>
+          <button className="whitespace-nowrap" type="button" onClick={startManualRun} disabled={isCreatingRun} title="Start run">
             <Play size={18} />
             <span>Start</span>
           </button>
         </div>
-        <div className="run-filters">
+        <div className="inline-flex gap-2">
           <select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value as typeof agentFilter)}>
             <option value="all">All agents</option>
             <option value="needs-human">Needs human</option>
@@ -51,48 +54,72 @@ export function RunsTimeline() {
           <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as typeof reviewFilter)}>
             <option value="all">All reviews</option>
             {RUN_REVIEW_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
+              <option key={status} value={status}>{status}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {isLoadingRunsWithoutCache ? <p className="empty-state">Loading runs</p> : null}
-      {!isLoadingRunsWithoutCache && runList.length === 0 ? <p className="empty-state">No runs yet</p> : null}
+      {isLoadingRunsWithoutCache ? (
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          Loading runs
+        </p>
+      ) : null}
+      {!isLoadingRunsWithoutCache && runList.length === 0 ? (
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          No runs yet
+        </p>
+      ) : null}
       {!isLoadingRunsWithoutCache && runList.length > 0 && filteredRunList.length === 0 ? (
-        <p className="empty-state">No runs match current filters</p>
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          No runs match current filters
+        </p>
       ) : null}
 
-      <ul className="item-list">
+      <ul className="grid gap-2 list-none m-0 p-0 max-h-[340px] overflow-auto">
         {filteredRunList.map((run) => {
           const pendingLogMessage = runLogMessages[run.id]?.trim() ?? "";
           const latestLog = run.logs.at(-1);
+          const isRunning = run.status === "running";
 
           return (
-            <li className="item-card run-item" data-status={run.status} key={run.id}>
-              <div className="run-summary">
-                <TimerReset size={18} />
+            <li
+              key={run.id}
+              className={`grid min-h-14 border rounded-lg px-3 py-2.5 transition-[border-color,background] ${
+                isRunning
+                  ? "border-teal/[0.22] bg-teal/[0.03]"
+                  : "border-[var(--border-card)] bg-white/[0.02] hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22]"
+              }`}
+            >
+              {/* Run summary */}
+              <div className="grid grid-cols-[auto_1fr] items-center gap-2.5">
+                <TimerReset size={18} className="text-ink-faint" />
                 <div>
-                  <strong>{run.type}</strong>
-                  <span className="item-meta">
+                  <strong className="block text-[0.88rem] font-semibold text-ink mb-0.5">{run.type}</strong>
+                  <span className="flex items-center flex-wrap gap-1.5 text-ink-muted text-[0.78rem]">
                     <small className={`status-badge status-badge-${run.status}`}>{run.status}</small>
                     {run.reviewStatus ? (
-                      <small className={`status-badge status-badge-review-${run.reviewStatus}`}>{run.reviewStatus}</small>
+                      <small className={`status-badge status-badge-review-${run.reviewStatus}`}>
+                        {run.reviewStatus}
+                      </small>
                     ) : null}
                     <span>{run.logs.length} logs</span>
                   </span>
                 </div>
               </div>
+
               {latestLog ? (
-                <p className="run-latest-log">
+                <p className="mt-2 text-[0.72rem] text-ink-muted overflow-wrap-anywhere">
                   {latestLog.level}: {latestLog.message}
                 </p>
               ) : null}
+
               {run.status !== "completed" ? (
-                <div className="run-actions">
-                  <form className="run-log-form" onSubmit={(event) => handleAppendRunLog(event, run.id)}>
+                <div className="grid grid-cols-[1fr_auto] gap-2 mt-2.5">
+                  <form
+                    className="grid grid-cols-[1fr_auto] gap-1.5"
+                    onSubmit={(event) => handleAppendRunLog(event, run.id)}
+                  >
                     <input
                       aria-label={`Run log message for ${run.type} run`}
                       maxLength={RUN_LOG_MESSAGE_MAX_LENGTH}
@@ -122,8 +149,9 @@ export function RunsTimeline() {
                   </button>
                 </div>
               ) : null}
+
               {run.status === "completed" ? (
-                <div className="run-review-actions">
+                <div className="inline-flex flex-wrap gap-1.5 mt-2.5">
                   {!run.deliverablePath ? (
                     <button
                       type="button"
