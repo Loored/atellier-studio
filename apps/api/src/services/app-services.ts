@@ -12,6 +12,7 @@ import { SkillOrchestrationService } from "./skill-orchestration.service";
 import { TaskService } from "./task.service";
 import { WikiService } from "./wiki.service";
 import { type StorageMode } from "./service-utils";
+import { CodexWorkerService } from "./codex-worker.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -21,6 +22,7 @@ export type AppServices = {
   runs: RunService;
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
+  codexWorkers: CodexWorkerService;
 };
 
 export type CreateAppServicesOptions = {
@@ -44,7 +46,8 @@ export function resolveAtellierRoot(input?: string): string {
 
 export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
   const storageMode = options.storageMode ?? "mongo";
-  const wiki = new WikiService(resolveAtellierRoot(options.atelierRoot));
+  const atelierRootResolved = resolveAtellierRoot(options.atelierRoot);
+  const wiki = new WikiService(atelierRootResolved);
   const agents = new AgentService(storageMode);
   const runs = new RunService(storageMode, wiki);
   const messages = new MessageService(storageMode);
@@ -72,5 +75,6 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
     runs,
     skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs),
     wiki,
+    codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
   };
 }

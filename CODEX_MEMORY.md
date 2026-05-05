@@ -59,10 +59,13 @@ See `docs/operations/local-setup.md` for install commands and solved setup pitfa
 - Tailwind CSS v4 is installed in `apps/web`; there is no `tailwind.config.js`.
 - Tailwind v4 tokens live in `apps/web/src/styles.css` under `@theme`.
 - Use `apps/web/src/lib/cn.ts` for conditional classes.
+- **Critical:** the global `button {}` and `input, select {}` rules in `styles.css` MUST stay inside `@layer base {}`. If moved outside, they override Tailwind utilities and break all inline class overrides on button/input elements.
 - The app is in a hybrid CSS state:
   - migrated: shell, sidebar, dashboard, agent/task/wiki/run/deliverable/orchestration panels
-  - not migrated: `OfficeView.tsx`, `AgentDetailPanel.tsx`, `MobileView.tsx`
-- Keep old `.office-*`, `.agent-float-*`, `.mobile-*`, and dynamic status classes until those components are migrated.
+  - migrated: `OfficeView.tsx`, `AgentSidePanel.tsx` — rebuilt with Tailwind in 2026-05-05 session
+  - not migrated: `MobileView.tsx` — deferred
+- `AgentDetailPanel.tsx` has been superseded by `AgentSidePanel.tsx` (fixed right column, Tailwind). The old floating panel is no longer used.
+- Keep `.status-badge`, `.status-badge-*`, `.spin`, `.status-dot--live`, `.agent-float-*`, `.mobile-*`, `.office-*` as CSS classes (dynamic interpolation or legacy).
 - Claude's Tailwind handoff is in `docs/session-2026-05-05-tailwind-migration.md`.
 
 ## Agentic Design Principles
@@ -89,6 +92,18 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, multiplayer, or broad MCP.
 
 ## Recent Operational Notes
+
+### 2026-05-05 - Full UI redesign + Office pixel engine
+
+- Sidebar expanded from 64px icon-only to 220px icon+label rows. `--sidebar-w` updated.
+- AppShell header now shows executor mode/model/profile pulled from `useHealthApi` — executor visibility (Priority 1) partially addressed.
+- Dashboard: flat grouped KPI row replacing nested bordered sections. `MetricCard` always a `div` (never `button`).
+- Review view: 5 status tabs + search + inline actions + right `WikiPanel` column.
+- `OfficeView.tsx` restructured: fixed `AgentSidePanel` (340px) replaces floating overlays; status legend overlay; filter chips.
+- `AgentSidePanel.tsx` (new): Current Task + progress bar + HANDOFFS/ACTIVITY tabs + terminal + instructions + message composer.
+- Pixel canvas bug fixed: idle wander oscillation kept `isMoving=true` forever → sprites walked in place. Removed wander.
+- Renderer: dark nameplates with status dot + color-coded glow, action bubbles above sprites (status + step + handoff target + loading dots), destination markers (dashed line + pulsing ring), two-pass connection lines (soft purple mesh for all working agents + bright teal arrows for explicit handoffs).
+- Full daily summary: `atelier/runs/2026-05-05-daily-summary.md`.
 
 ### 2026-05-05 - Tailwind migration by Claude
 
@@ -118,6 +133,7 @@ Run the smallest relevant subset for documentation-only changes.
 
 ## Pitfalls Already Solved
 
+- **`button {}` outside `@layer base` overrides all Tailwind utilities on button elements** — always keep base element rules inside `@layer base` in `styles.css`. Symptom: sidebar nav, metric cards, or any button with Tailwind color/border classes looks purple/glowing regardless of what classes are applied.
 - `pnpm` was unavailable until Corepack was enabled and `pnpm@9.15.4` prepared.
 - Corepack resolving `pnpm/latest` can fail; prefer the pinned package manager version.
 - Vite 6 and Vitest 2 produced conflicting Vite types. Web uses Vite 5.4.x for now.

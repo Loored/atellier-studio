@@ -10,6 +10,7 @@ import { orchestrationsRoutes } from "./routes/orchestrations.routes";
 import { runsRoutes } from "./routes/runs.routes";
 import { tasksRoutes } from "./routes/tasks.routes";
 import { wikiRoutes } from "./routes/wiki.routes";
+import { codexRoutes } from "./routes/codex.routes";
 
 export type BuildServerOptions = {
   storageMode?: StorageMode;
@@ -53,6 +54,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await fastify.register(async (instance) => tasksRoutes(instance, services));
   await fastify.register(async (instance) => runsRoutes(instance, services));
   await fastify.register(async (instance) => wikiRoutes(instance, services));
+  await fastify.register(async (instance) => codexRoutes(instance, services));
 
   return fastify;
 }

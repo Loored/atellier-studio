@@ -22,6 +22,9 @@ export function useDashboard() {
     executorMode: healthStatus?.executorMode ?? "mock",
     executorModel: healthStatus?.executorModel ?? "gpt-4.1-mini",
     modelProfile: healthStatus?.modelProfile ?? "standard",
+    attentionAgents: agentList.filter(
+      (a) => a.status === "needs-human" || a.status === "blocked",
+    ),
     isRefreshingDashboard:
       isFetchingAgents || isFetchingTasks || isFetchingRuns || isFetchingWikiLog || isFetchingHealth,
   };

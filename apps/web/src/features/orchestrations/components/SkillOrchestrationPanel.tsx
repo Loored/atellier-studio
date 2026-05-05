@@ -119,7 +119,8 @@ export function SkillOrchestrationPanel() {
                   <li
                     key={step.stepId}
                     className={cn(
-                      "grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5 transition-[border-color]",
+                      "grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5 transition-[border-color,background-color,box-shadow]",
+                      step.status === "running" ? "orchestration-step-active" : "",
                       STEP_CLASS[step.status]
                     )}
                   >
@@ -201,7 +202,8 @@ export function SkillOrchestrationPanel() {
           )}
 
           {isLoadingOrchestrationSkillsWithoutCache && (
-            <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+            <p className="m-0 flex items-center gap-2 border border-[var(--border-card)] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+              <Loader2 size={14} className="spin text-purple flex-shrink-0" />
               Loading skills…
             </p>
           )}

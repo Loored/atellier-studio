@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { RUN_REVIEW_STATUSES, RUN_TYPES, type RunReviewStatus, type RunType } from "@atellier/shared";
 import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
 import { useWikiPageApi } from "../../../api/hooks/wiki/useWikiApi";
@@ -29,18 +29,20 @@ export function DeliverablesPanel() {
   return (
     <section className="col-span-6 min-w-0 border border-[var(--border-card)] rounded-[var(--panel-radius)] p-4 bg-[var(--bg-card)] shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-3.5">
-        <div>
+      <div className="mb-3.5">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div>
           <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Outputs</p>
           <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Deliverables</h2>
+          </div>
+          <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
+            {deliverableRuns.length} saved
+          </span>
         </div>
-        <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
-          {deliverableRuns.length} saved
-        </span>
       </div>
 
       {/* Filters */}
-      <div className="inline-flex gap-2 mb-2.5">
+      <div className="grid grid-cols-2 gap-2 mb-2.5">
         <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}>
           <option value="all">All types</option>
           {RUN_TYPES.map((type) => (
@@ -56,7 +58,8 @@ export function DeliverablesPanel() {
       </div>
 
       {isLoadingWithoutCache ? (
-        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+        <p className="m-0 flex items-center gap-2 border border-[var(--border-card)] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          <Loader2 size={14} className="spin text-purple flex-shrink-0" />
           Loading deliverables
         </p>
       ) : null}
@@ -71,11 +74,15 @@ export function DeliverablesPanel() {
         </p>
       ) : null}
 
-      <ul className="grid gap-2 list-none m-0 p-0 max-h-[340px] overflow-auto">
+      <ul className="grid gap-2 list-none m-0 p-0 max-h-[44vh] overflow-auto">
         {filteredDeliverableRuns.map((run) => (
           <li
             key={run.id}
-            className="grid border border-[var(--border-card)] rounded-lg px-3 py-2.5 bg-white/[0.02] transition-[border-color,background] hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22]"
+            className={`grid border rounded-lg px-3 py-2.5 transition-[border-color,background,box-shadow] hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22] ${
+              selectedDeliverablePath === run.deliverablePath
+                ? "border-teal/45 bg-teal/[0.06] shadow-[0_0_0_1px_rgba(16,242,170,0.18)]"
+                : "border-[var(--border-card)] bg-white/[0.02]"
+            }`}
           >
             <div className="grid grid-cols-[auto_1fr] items-center gap-2.5">
               <FileText size={18} className="text-ink-faint" />
@@ -93,7 +100,12 @@ export function DeliverablesPanel() {
             </div>
             <button
               type="button"
-              className="justify-start w-full text-left border-[var(--border-card)] bg-[var(--bg-input)] text-ink-muted px-2.5 overflow-hidden text-ellipsis whitespace-nowrap mt-2"
+              title={run.deliverablePath ?? ""}
+              className={`justify-start w-full text-left border px-2.5 overflow-hidden text-ellipsis whitespace-nowrap mt-2 ${
+                selectedDeliverablePath === run.deliverablePath
+                  ? "border-teal/35 text-teal bg-teal/[0.08]"
+                  : "border-[var(--border-card)] bg-[var(--bg-input)] text-ink-muted"
+              }`}
               onClick={() => setSelectedDeliverablePath(run.deliverablePath ?? null)}
             >
               {run.deliverablePath}
@@ -112,7 +124,7 @@ export function DeliverablesPanel() {
             </p>
           ) : null}
           {!isLoadingDeliverable ? (
-            <pre className="min-h-[120px] max-h-[240px] overflow-auto border border-[var(--border-card)] rounded-lg p-3 text-ink-muted bg-black/25 whitespace-pre-wrap text-[0.78rem] font-mono leading-relaxed m-0">
+            <pre className="min-h-[120px] max-h-[26vh] overflow-auto border border-[var(--border-card)] rounded-lg p-3 text-ink-muted bg-black/25 whitespace-pre-wrap text-[0.78rem] font-mono leading-relaxed m-0">
               {selectedDeliverable?.content ?? "Deliverable not available."}
             </pre>
           ) : null}

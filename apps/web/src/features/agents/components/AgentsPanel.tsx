@@ -1,4 +1,4 @@
-import { Plus, UserRoundCog } from "lucide-react";
+import { Loader2, Plus, UserRoundCog } from "lucide-react";
 import { useAgentsPanel } from "../hooks/useAgentsPanel";
 
 export function AgentsPanel() {
@@ -53,7 +53,8 @@ export function AgentsPanel() {
       </div>
 
       {isLoadingAgentsWithoutCache ? (
-        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+        <p className="m-0 flex items-center gap-2 border border-[var(--border-card)] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          <Loader2 size={14} className="spin text-purple flex-shrink-0" />
           Loading agents
         </p>
       ) : null}
@@ -64,11 +65,17 @@ export function AgentsPanel() {
       ) : null}
 
       {/* List — max-height for compact panel */}
-      <ul className="grid gap-2 list-none m-0 p-0 max-h-[340px] overflow-auto">
+      <ul className="grid gap-2 list-none m-0 p-0 max-h-[44vh] overflow-auto">
         {agentList.map((agent) => (
           <li
             key={agent.id}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 min-h-14 border border-[var(--border-card)] rounded-lg px-3 py-2.5 bg-white/[0.02] transition-[border-color,background] hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22]"
+            className={`grid grid-cols-[auto_1fr_auto] items-center gap-2.5 min-h-14 border border-[var(--border-card)] rounded-lg px-3 py-2.5 bg-white/[0.02] transition-[border-color,background] ${
+              agent.status === "needs-human"
+                ? "agent-item--needs-human"
+                : agent.status === "blocked"
+                  ? "agent-item--blocked"
+                  : "hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22]"
+            }`}
           >
             <UserRoundCog size={20} className="text-ink-faint" />
             <div>
