@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AGENT_STATUSES, type AgentRunStreamEvent } from "@atellier/shared";
 import type { Agent } from "@atellier/shared";
 import {
   useAgentMessagesApi,
   useAgentsApi,
   useRunAgentStreamApi,
+  useUpdateAgentInstructionsApi,
   useUpdateAgentStatusApi,
 } from "../../../api/hooks/agents/useAgentsApi";
 
@@ -25,8 +26,10 @@ export function useAgentDetailPanel(agent: Agent) {
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
   const [streamingResponse, setStreamingResponse] = useState("");
   const [streamingStatus, setStreamingStatus] = useState<"idle" | "queued" | "running" | "finalizing">("idle");
+  const [instructionsDraft, setInstructionsDraft] = useState(agent.instructions ?? "");
   const runAgentStream = useRunAgentStreamApi();
   const updateAgentStatus = useUpdateAgentStatusApi();
+  const updateAgentInstructions = useUpdateAgentInstructionsApi();
   const { data: agentList = [] } = useAgentsApi();
   const handoffCandidateList = agentList.filter((candidate) => candidate.id !== agent.id);
   const {
@@ -34,6 +37,10 @@ export function useAgentDetailPanel(agent: Agent) {
     isFetching: isFetchingMessages,
     isLoadingWithoutCache: isLoadingMessagesWithoutCache,
   } = useAgentMessagesApi(agent.id);
+
+  useEffect(() => {
+    setInstructionsDraft(agent.instructions ?? "");
+  }, [agent.id, agent.instructions]);
 
   function pushTerminalLine(text: string, tone: TerminalLineTone = "info") {
     setTerminalLines((current) => [
@@ -167,6 +174,23 @@ export function useAgentDetailPanel(agent: Agent) {
     );
   }
 
+  function handleSaveInstructions() {
+    updateAgentInstructions.mutate(
+      {
+        agentId: agent.id,
+        input: { instructions: instructionsDraft.trim() },
+      },
+      {
+        onSuccess: () => {
+          pushTerminalLine("agent instructions updated", "success");
+        },
+        onError: (error) => {
+          pushTerminalLine(`instructions update error: ${error.message}`, "error");
+        },
+      },
+    );
+  }
+
   function handleRunTerminalCommand() {
     const raw = terminalCommand.trim();
     if (!raw) {
@@ -271,15 +295,19 @@ export function useAgentDetailPanel(agent: Agent) {
     messageList,
     streamingResponse,
     streamingStatus,
+    instructionsDraft,
     isFetchingMessages,
     isLoadingMessagesWithoutCache,
     streamErrorMessage: runAgentStream.error?.message,
     isRunningInstruction: runAgentStream.isPending,
     isUpdatingAgentStatus: updateAgentStatus.isPending,
+    isUpdatingInstructions: updateAgentInstructions.isPending,
     setHandoffAgentId,
     setHandoffInstruction,
     setInstruction,
+    setInstructionsDraft,
     setTerminalCommand,
+    handleSaveInstructions,
     handleResumeAgent,
     handleRunTerminalCommand,
     handleSendInstruction,

@@ -2,11 +2,13 @@ import type { FastifyInstance } from "fastify";
 import {
   RUN_LOG_LEVELS,
   RUN_LOG_MESSAGE_MAX_LENGTH,
+  RUN_REVIEW_STATUSES,
   RUN_STATUSES,
   RUN_TYPES,
   type AppendRunLogInput,
   type CompleteRunInput,
   type CreateRunInput,
+  type UpdateRunReviewInput,
 } from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
 import {
@@ -84,12 +86,59 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
       return badRequest(reply, "Run id is invalid.");
     }
     const body = bodyRecord(request.body) ?? {};
+    const reviewStatus = optionalStringField(body, "reviewStatus");
+    if (reviewStatus !== undefined && !isOneOf(reviewStatus, RUN_REVIEW_STATUSES)) {
+      return badRequest(reply, "Run review status is invalid.");
+    }
     const input: CompleteRunInput = {
       output: body.output,
       summary: optionalStringField(body, "summary"),
+      reviewStatus,
+      deliverablePath: optionalStringField(body, "deliverablePath"),
     };
 
     const run = await services.runs.complete(id, input);
+    return run ?? notFound(reply, "Run not found.");
+  });
+
+  fastify.patch("/runs/:id/review", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+    if (!isOneOf(body.reviewStatus, RUN_REVIEW_STATUSES)) {
+      return badRequest(reply, "Run review status is invalid.");
+    }
+
+    const input: UpdateRunReviewInput = {
+      reviewStatus: body.reviewStatus,
+    };
+
+    const run = await services.runs.updateReviewStatus(id, input.reviewStatus);
+    return run ?? notFound(reply, "Run not found.");
+  });
+
+  fastify.patch("/runs/:id/promote-deliverable", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+
+    const run = await services.runs.promoteDeliverable(id);
+    return run ?? notFound(reply, "Run not found.");
+  });
+
+  fastify.patch("/runs/:id/unlink-deliverable", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+
+    const run = await services.runs.unlinkDeliverable(id);
     return run ?? notFound(reply, "Run not found.");
   });
 }

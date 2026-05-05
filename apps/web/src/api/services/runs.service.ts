@@ -1,4 +1,10 @@
-import type { AppendRunLogInput, CompleteRunInput, CreateRunInput, Run } from "@atellier/shared";
+import type {
+  AppendRunLogInput,
+  CompleteRunInput,
+  CreateRunInput,
+  Run,
+  UpdateRunReviewInput,
+} from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
 export const runsService = {
@@ -19,6 +25,21 @@ export const runsService = {
 
   async complete(runId: string, input: CompleteRunInput): Promise<Run> {
     const response = await httpClient.patch<Run>(`/runs/${runId}/complete`, input);
+    return response.data;
+  },
+
+  async updateReview(runId: string, input: UpdateRunReviewInput): Promise<Run> {
+    const response = await httpClient.patch<Run>(`/runs/${runId}/review`, input);
+    return response.data;
+  },
+
+  async promoteDeliverable(runId: string): Promise<Run> {
+    const response = await httpClient.patch<Run>(`/runs/${runId}/promote-deliverable`);
+    return response.data;
+  },
+
+  async unlinkDeliverable(runId: string): Promise<Run> {
+    const response = await httpClient.patch<Run>(`/runs/${runId}/unlink-deliverable`);
     return response.data;
   },
 };

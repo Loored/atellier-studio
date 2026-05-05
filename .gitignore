@@ -140,6 +140,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
+# Local browser automation artifacts
+.playwright-mcp/
+
 # OS files
 .DS_Store
 Thumbs.db

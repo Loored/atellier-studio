@@ -4,7 +4,7 @@ import { AGENT_ROLES } from "@atellier/shared";
 import type { AgentRole, Agent } from "@atellier/shared";
 import { useAgentsApi, useCreateAgentApi } from "../../api/hooks/agents/useAgentsApi";
 import { agentsToPixelCharacters } from "./hooks/usePixelOffice";
-import { useOrchestrationSim } from "./hooks/useOrchestrationSim";
+import { useOrchestrationLive } from "./hooks/useOrchestrationLive";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
 import { AgentDetailPanel } from "./AgentDetailPanel";
 
@@ -18,7 +18,7 @@ export function OfficeView() {
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([]);
   const [orchestrationEnabled, setOrchestrationEnabled] = useState(false);
 
-  useOrchestrationSim(agents, orchestrationEnabled);
+  useOrchestrationLive(agents, orchestrationEnabled);
 
   const handleCreate = () => {
     const trimmed = name.trim();
@@ -81,8 +81,8 @@ export function OfficeView() {
       <nav className="office-bottom-bar">
         <button
           className={`obb-item ${orchestrationEnabled ? "obb-item--gas" : ""}`}
-          onClick={() => setOrchestrationEnabled(e => !e)}
-          title="Toggle orchestration simulation"
+          onClick={() => setOrchestrationEnabled((current) => !current)}
+          title="Toggle real orchestration"
         >
           <Zap size={13} />
           {orchestrationEnabled ? "ORQUESTACIÓN" : "PAUSADO"}

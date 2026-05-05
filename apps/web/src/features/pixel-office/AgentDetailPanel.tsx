@@ -52,14 +52,18 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
     messageList,
     streamingResponse,
     streamingStatus,
+    instructionsDraft,
     streamErrorMessage,
     isLoadingMessagesWithoutCache,
     isRunningInstruction,
     isUpdatingAgentStatus,
+    isUpdatingInstructions,
     setHandoffAgentId,
     setHandoffInstruction,
     setInstruction,
+    setInstructionsDraft,
     setTerminalCommand,
+    handleSaveInstructions,
     handleResumeAgent,
     handleRunTerminalCommand,
     handleSendInstruction,
@@ -203,6 +207,22 @@ export function AgentDetailPanel({ agent, agentIndex, onClose, side = "left" }: 
             ? `Tarea activa: ${agent.currentTaskId}`
             : `${ROLE_DESCRIPTIONS[agent.role] ?? agent.role}. Define las instrucciones para este agente.`}
         </p>
+        <div className="agent-float-instructions">
+          <textarea
+            className="agent-float-instructions-input"
+            placeholder="Instrucciones persistentes del agente"
+            value={instructionsDraft}
+            onChange={(event) => setInstructionsDraft(event.target.value)}
+            rows={3}
+          />
+          <button
+            className="agent-float-instructions-save"
+            onClick={handleSaveInstructions}
+            disabled={isUpdatingInstructions}
+          >
+            {isUpdatingInstructions ? "Guardando..." : "Guardar instrucciones"}
+          </button>
+        </div>
         <div className="agent-float-messages">
           {isLoadingMessagesWithoutCache ? (
             <p className="agent-float-msg-empty">Cargando mensajes…</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "./Sidebar";
 import { MobileView } from "./MobileView";
 import { Dashboard } from "../features/dashboard/Dashboard";
@@ -21,6 +21,28 @@ export function AppShell() {
   const [view, setView] = useState<View>("dashboard");
   const { data: agents = [] } = useAgentsApi();
   const isMobile = useIsMobile();
+  const previousWaitingIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const waitingAgents = agents.filter((agent) => agent.status === "needs-human");
+    const nextWaitingIds = new Set(waitingAgents.map((agent) => agent.id));
+    const newWaitingAgents = waitingAgents.filter((agent) => !previousWaitingIds.current.has(agent.id));
+
+    if (newWaitingAgents.length > 0 && typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        for (const agent of newWaitingAgents) {
+          new Notification(`Agent waiting: ${agent.name}`, {
+            body: "Needs human input to continue the run.",
+            tag: `agent-needs-human-${agent.id}`,
+          });
+        }
+      } else if (Notification.permission === "default") {
+        void Notification.requestPermission();
+      }
+    }
+
+    previousWaitingIds.current = nextWaitingIds;
+  }, [agents]);
 
   if (isMobile) {
     return <MobileView />;

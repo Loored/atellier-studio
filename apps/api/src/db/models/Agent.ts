@@ -16,6 +16,7 @@ const AgentSchema = new Schema<Agent>(
     name: { type: String, required: true, trim: true },
     role: { type: String, enum: AGENT_ROLES, required: true },
     status: { type: String, enum: AGENT_STATUSES, default: "idle", required: true },
+    instructions: String,
     currentTaskId: String,
     lastRunId: String,
     avatar: AgentAvatarSchema,

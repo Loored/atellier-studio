@@ -12,6 +12,13 @@ export const wikiService = {
     return response.data;
   },
 
+  async readPage(path: string): Promise<WikiPageResponse> {
+    const response = await httpClient.get<WikiPageResponse>("/wiki/page", {
+      params: { path },
+    });
+    return response.data;
+  },
+
   async appendLog(input: AppendWikiLogInput): Promise<AppendWikiLogResponse> {
     const response = await httpClient.post<AppendWikiLogResponse>("/wiki/append-log", input);
     return response.data;
