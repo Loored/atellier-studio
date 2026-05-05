@@ -3,10 +3,12 @@ import { Plus, Zap, Maximize2 } from "lucide-react";
 import { AGENT_ROLES } from "@atellier/shared";
 import type { AgentRole, Agent } from "@atellier/shared";
 import { useAgentsApi, useCreateAgentApi } from "../../api/hooks/agents/useAgentsApi";
+import { useHealthApi } from "../../api/hooks/system/useSystemApi";
 import { agentsToPixelCharacters } from "./hooks/usePixelOffice";
 import { useOrchestrationLive } from "./hooks/useOrchestrationLive";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
 import { AgentSidePanel } from "./AgentSidePanel";
+import { LiveProcessesPanel } from "./LiveProcessesPanel";
 import { cn } from "../../lib/cn";
 
 type StatusFilter = "all" | "running" | "waiting" | "inactive";
@@ -38,8 +40,12 @@ function getStatusFilter(agent: Agent): StatusFilter {
 
 export function OfficeView() {
   const { data: agents = [], isLoadingWithoutCache } = useAgentsApi({ livePolling: true });
+  const { data: healthStatus } = useHealthApi();
   const createAgent = useCreateAgentApi();
   const characters = agentsToPixelCharacters(agents);
+  const isOpenAiExecution = healthStatus?.executorMode === "openai";
+  const executorModel = healthStatus?.executorModel ?? "unknown";
+  const modelProfile = healthStatus?.modelProfile ?? "standard";
 
   const [name, setName]                   = useState("");
   const [role, setRole]                   = useState<AgentRole>("builder");
@@ -76,6 +82,16 @@ export function OfficeView() {
     if (statusFilter !== "all" && getStatusFilter(agent) !== statusFilter) return;
     setSelectedAgent((prev) => prev?.id === charId ? null : agent);
   };
+
+  function toggleLiveOrchestration() {
+    if (!orchestrationEnabled && isOpenAiExecution) {
+      const confirmed = window.confirm(
+        `OpenAI execution is active (${executorModel}, ${modelProfile}). Enabling Live mode will auto-run agents and may consume tokens. Continue?`,
+      );
+      if (!confirmed) return;
+    }
+    setOrchestrationEnabled((v) => !v);
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -139,7 +155,7 @@ export function OfficeView() {
             {/* Live toggle */}
             <button
               type="button"
-              onClick={() => setOrchestrationEnabled((v) => !v)}
+              onClick={toggleLiveOrchestration}
               className={cn(
                 "inline-flex items-center gap-1.5 h-8 border rounded-lg px-3 text-[0.78rem] font-semibold transition-all",
                 orchestrationEnabled
@@ -153,6 +169,11 @@ export function OfficeView() {
             </button>
           </div>
         </div>
+        {isOpenAiExecution ? (
+          <p className="mt-2 m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">
+            OpenAI execution is active ({modelProfile} · {executorModel}). Live mode auto-runs agents and may consume tokens continuously.
+          </p>
+        ) : null}
       </div>
 
       {/* ── Body: canvas + side panel ──────────────────────── */}
@@ -172,6 +193,9 @@ export function OfficeView() {
               />
             </div>
           )}
+
+          {/* Live processes panel — bottom-left */}
+          <LiveProcessesPanel agents={agents} />
 
           {/* Status legend overlay */}
           {showLegend && (

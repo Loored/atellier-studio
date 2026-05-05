@@ -31,6 +31,9 @@ export function ReviewView() {
     runLogMessages,
     agentFilter,
     reviewFilter,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     isCreatingRun,
     isLoadingRunsWithoutCache,
     isUpdatingRunReview,
@@ -152,6 +155,11 @@ export function ReviewView() {
             {displayList.length} / {runList.length}
           </span>
         </div>
+        {isOpenAiExecution && (
+          <p className="mb-4 m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">
+            OpenAI execution is active ({modelProfile} · {executorModel}). Starting manual runs may consume tokens.
+          </p>
+        )}
 
         {/* Tabs */}
         <div className="review-tabs">

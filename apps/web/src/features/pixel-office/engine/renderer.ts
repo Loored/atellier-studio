@@ -742,6 +742,7 @@ function drawCharacterSprite(
   const img = loadSprite(spritePath);
 
   // Animation frame
+  // "waiting" agents animate while walking to work zone, but not once they arrive.
   const isAnimating = char.isMoving || char.state === 'working';
   const frame = isAnimating ? Math.floor(tick / 6) % CHAR_FRAMES : 0;
 

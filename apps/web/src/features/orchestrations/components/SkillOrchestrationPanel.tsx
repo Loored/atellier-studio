@@ -48,6 +48,9 @@ export function SkillOrchestrationPanel() {
     context,
     mode,
     liveStatus,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration,
     orchestrationErrorMessage,
@@ -157,6 +160,11 @@ export function SkillOrchestrationPanel() {
         <>
           {/* Form */}
           <div className="grid gap-2 mb-3.5">
+            {isOpenAiExecution ? (
+              <p className="m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">
+                OpenAI execution is active ({modelProfile} · {executorModel}). Starting this orchestration may consume tokens.
+              </p>
+            ) : null}
             <select
               aria-label="Orchestration skill"
               value={selectedSkillId}

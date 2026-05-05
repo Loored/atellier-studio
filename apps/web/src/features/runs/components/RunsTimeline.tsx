@@ -10,6 +10,9 @@ export function RunsTimeline() {
     runLogMessages,
     agentFilter,
     reviewFilter,
+    isOpenAiExecution,
+    executorModel,
+    modelProfile,
     isCreatingRun,
     isAppendingRunLog,
     isCompletingRun,
@@ -60,6 +63,11 @@ export function RunsTimeline() {
             ))}
           </select>
         </div>
+        {isOpenAiExecution ? (
+          <p className="mt-2 m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">
+            OpenAI execution is active ({modelProfile} · {executorModel}). Starting manual runs may consume tokens.
+          </p>
+        ) : null}
       </div>
 
       {isLoadingRunsWithoutCache ? (
