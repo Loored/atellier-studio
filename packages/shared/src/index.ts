@@ -6,3 +6,4 @@ export * from "./types/task";
 export * from "./types/run";
 export * from "./types/wiki";
 export * from "./types/health";
+export * from "./types/codex-worker";
