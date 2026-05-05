@@ -5,6 +5,7 @@ import type {
   CreateAgentInput,
   RunAgentInput,
   RunAgentResult,
+  UpdateAgentInstructionsInput,
   UpdateAgentStatusInput,
 } from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
@@ -22,6 +23,11 @@ export const agentsService = {
 
   async updateStatus(agentId: string, input: UpdateAgentStatusInput): Promise<Agent> {
     const response = await httpClient.patch<Agent>(`/agents/${agentId}/status`, input);
+    return response.data;
+  },
+
+  async updateInstructions(agentId: string, input: UpdateAgentInstructionsInput): Promise<Agent> {
+    const response = await httpClient.patch<Agent>(`/agents/${agentId}/instructions`, input);
     return response.data;
   },
 

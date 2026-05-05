@@ -53,6 +53,7 @@ export function MobileView() {
   const [tab, setTab] = useState<MobileTab>("agentes");
   const { data: agents = [] } = useAgentsApi();
   const { data: tasks = [] } = useTasksApi();
+  const waitingAgentsCount = agents.filter((agent) => agent.status === "needs-human").length;
 
   return (
     <div className="mobile-shell">
@@ -173,6 +174,9 @@ export function MobileView() {
               className={`mobile-nav-item ${tab === t ? "mobile-nav-item--active" : ""}`}
               onClick={() => setTab(t)}
             >
+              {t === "actividad" && waitingAgentsCount > 0 ? (
+                <span className="mobile-nav-alert">{waitingAgentsCount}</span>
+              ) : null}
               <span className="mobile-nav-icon">{icons[t]}</span>
               <span className="mobile-nav-label">{labels[t]}</span>
             </button>

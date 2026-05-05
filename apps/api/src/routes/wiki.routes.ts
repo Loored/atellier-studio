@@ -17,6 +17,23 @@ const WIKI_EVENT_TYPES = [
 export async function wikiRoutes(fastify: FastifyInstance, services: AppServices): Promise<void> {
   fastify.get("/wiki/index", async () => services.wiki.readIndex());
   fastify.get("/wiki/log", async () => services.wiki.readLog());
+  fastify.get("/wiki/page", async (request, reply) => {
+    const query = request.query as { path?: string };
+    const wikiPath = typeof query.path === "string" ? query.path.trim() : "";
+    if (!wikiPath) {
+      return badRequest(reply, "Wiki page path is required.");
+    }
+
+    try {
+      return await services.wiki.readPage(wikiPath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        return reply.code(404).send({ error: "Wiki page not found." });
+      }
+      return badRequest(reply, error instanceof Error ? error.message : "Wiki page read failed.");
+    }
+  });
 
   fastify.post("/wiki/append-log", async (request, reply) => {
     const body = bodyRecord(request.body);

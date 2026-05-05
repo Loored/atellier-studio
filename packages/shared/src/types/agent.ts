@@ -2,6 +2,8 @@ export const AGENT_ROLES = ["intake", "wiki-curator", "pm", "builder", "qa", "de
 
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
+export const AGENT_INSTRUCTIONS_MAX_LENGTH = 4000;
+
 export const AGENT_STATUSES = [
   "idle",
   "reading",
@@ -29,6 +31,7 @@ export type Agent = {
   name: string;
   role: AgentRole;
   status: AgentStatus;
+  instructions?: string;
   currentTaskId?: string;
   lastRunId?: string;
   avatar?: AgentAvatar;
@@ -40,6 +43,7 @@ export type CreateAgentInput = {
   name: string;
   role: AgentRole;
   status?: AgentStatus;
+  instructions?: string;
   currentTaskId?: string;
   lastRunId?: string;
   avatar?: AgentAvatar;
@@ -49,4 +53,8 @@ export type UpdateAgentStatusInput = {
   status: AgentStatus;
   currentTaskId?: string;
   lastRunId?: string;
+};
+
+export type UpdateAgentInstructionsInput = {
+  instructions: string;
 };

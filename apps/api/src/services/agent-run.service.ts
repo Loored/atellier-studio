@@ -112,6 +112,7 @@ export class AgentRunService {
           response: execution.response,
           needsHuman: execution.needsHuman,
         },
+        suppressAutoDeliverable: input.recordDeliverable === false,
       });
 
       if (!completedRun) {

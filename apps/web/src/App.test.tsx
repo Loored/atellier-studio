@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -6,6 +7,10 @@ import { queryClient } from "./api/query/queryClient";
 
 const createTaskMock = vi.hoisted(() => vi.fn());
 const appendLogMock = vi.hoisted(() => vi.fn());
+const updateRunReviewMock = vi.hoisted(() => vi.fn());
+const promoteDeliverableMock = vi.hoisted(() => vi.fn());
+const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
+const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -53,10 +58,63 @@ vi.mock("./api/services/runs.service", () => ({
         createdAt: "2026-05-04T00:00:00.000Z",
         updatedAt: "2026-05-04T00:00:00.000Z",
       },
+      {
+        id: "run-2",
+        type: "review",
+        status: "completed",
+        reviewStatus: "pending",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
     ]),
     create: vi.fn(),
     appendLog: appendLogMock,
     complete: vi.fn(),
+    updateReview: updateRunReviewMock,
+    promoteDeliverable: promoteDeliverableMock,
+    unlinkDeliverable: unlinkDeliverableMock,
+  },
+}));
+
+vi.mock("./api/services/orchestrations.service", () => ({
+  orchestrationsService: {
+    listSkills: vi.fn().mockResolvedValue([
+      {
+        id: "atellier-build-loop",
+        name: "Atellier Build Loop",
+        description: "Coordinates planning, building, runtime validation, QA, fixing, and memory capture.",
+        steps: [
+          {
+            id: "scope",
+            label: "Scope the work",
+            phase: "plan",
+            agentRole: "pm",
+            agentName: "Pepe PM",
+            objective: "Turn the goal into a small execution plan.",
+          },
+          {
+            id: "qa",
+            label: "Test and report blockers",
+            phase: "qa",
+            agentRole: "qa",
+            agentName: "Jaco QA",
+            objective: "Review the result and report defects.",
+          },
+        ],
+      },
+    ]),
+    startSkillRun: startSkillOrchestrationMock,
   },
 }));
 
@@ -79,6 +137,10 @@ vi.mock("./api/services/wiki.service", () => ({
 
 describe("App", () => {
   beforeEach(() => {
+    Object.defineProperty(window, "confirm", {
+      writable: true,
+      value: vi.fn(() => true),
+    });
     vi.clearAllMocks();
     queryClient.clear();
     createTaskMock.mockResolvedValue({
@@ -103,6 +165,47 @@ describe("App", () => {
       ],
       createdAt: "2026-05-04T00:00:00.000Z",
       updatedAt: "2026-05-04T00:00:00.000Z",
+    });
+    updateRunReviewMock.mockResolvedValue({
+      id: "run-1",
+      type: "manual",
+      status: "completed",
+      reviewStatus: "approved",
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
+    });
+    promoteDeliverableMock.mockResolvedValue({
+      id: "run-2",
+      type: "review",
+      status: "completed",
+      reviewStatus: "pending",
+      deliverablePath: "wiki/deliverables/run-2.md",
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
+    });
+    unlinkDeliverableMock.mockResolvedValue({
+      id: "run-3",
+      type: "build",
+      status: "completed",
+      reviewStatus: "approved",
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
+    });
+    startSkillOrchestrationMock.mockResolvedValue({
+      skillId: "atellier-build-loop",
+      goal: "Build orchestration",
+      orchestrationRun: {
+        id: "run-4",
+        type: "orchestration",
+        status: "completed",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      steps: [],
     });
   });
 
@@ -142,6 +245,85 @@ describe("App", () => {
       expect(appendLogMock).toHaveBeenCalledWith("run-1", {
         level: "info",
         message: "Reviewed V3",
+      });
+    });
+  });
+
+  it("updates run review status from the runs timeline", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const approveButtons = await screen.findAllByRole("button", { name: /approve/i });
+    await user.click(approveButtons[0]);
+
+    await waitFor(() => {
+      expect(updateRunReviewMock).toHaveBeenCalledWith("run-2", {
+        reviewStatus: "approved",
+      });
+    });
+  });
+
+  it("promotes a completed run to deliverable from timeline", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const promoteButton = await screen.findByRole("button", { name: /promote/i });
+    await user.click(promoteButton);
+
+    await waitFor(() => {
+      expect(promoteDeliverableMock).toHaveBeenCalledWith("run-2");
+    });
+  });
+
+  it("unlinks a deliverable from a completed run", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const unlinkButton = await screen.findByRole("button", { name: /unlink/i });
+    await user.click(unlinkButton);
+
+    await waitFor(() => {
+      expect(unlinkDeliverableMock).toHaveBeenCalledWith("run-3");
+    });
+  });
+
+  it("filters deliverables by type and review", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const deliverablesHeading = await screen.findByRole("heading", { name: "Deliverables" });
+    const deliverablesPanel = deliverablesHeading.closest("section");
+    expect(deliverablesPanel).not.toBeNull();
+    const scoped = within(deliverablesPanel as HTMLElement);
+
+    const [allTypeSelect, allReviewSelect] = scoped.getAllByRole("combobox");
+
+    await user.selectOptions(allTypeSelect, "build");
+    await user.selectOptions(allReviewSelect, "approved");
+
+    expect(await screen.findByText("wiki/deliverables/run-3.md")).toBeInTheDocument();
+    expect(screen.queryByText("wiki/deliverables/run-2.md")).not.toBeInTheDocument();
+  });
+
+  it("starts a skill orchestration from the dashboard", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText("Atellier Build Loop");
+    const orchestrationHeading = await screen.findByRole("heading", { name: "Orchestration" });
+    const orchestrationPanel = orchestrationHeading.closest("section");
+    expect(orchestrationPanel).not.toBeNull();
+    const scoped = within(orchestrationPanel as HTMLElement);
+
+    await user.type(scoped.getByLabelText("Orchestration goal"), "Build orchestration");
+    await user.type(scoped.getByLabelText("Orchestration context"), "Use the existing run spine.");
+    await user.click(scoped.getByRole("button", { name: /start/i }));
+
+    await waitFor(() => {
+      expect(startSkillOrchestrationMock).toHaveBeenCalledWith({
+        skillId: "atellier-build-loop",
+        goal: "Build orchestration",
+        context: "Use the existing run spine.",
       });
     });
   });

@@ -1,4 +1,4 @@
-export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint"] as const;
+export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint", "orchestration"] as const;
 
 export type RunType = (typeof RUN_TYPES)[number];
 
@@ -9,6 +9,10 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 export const RUN_LOG_LEVELS = ["info", "warn", "error"] as const;
 
 export type RunLogLevel = (typeof RUN_LOG_LEVELS)[number];
+
+export const RUN_REVIEW_STATUSES = ["pending", "approved", "changes-requested"] as const;
+
+export type RunReviewStatus = (typeof RUN_REVIEW_STATUSES)[number];
 
 export const RUN_LOG_MESSAGE_MAX_LENGTH = 1000;
 
@@ -24,6 +28,8 @@ export type Run = {
   agentId?: string;
   type: RunType;
   status: RunStatus;
+  reviewStatus?: RunReviewStatus;
+  deliverablePath?: string;
   input?: unknown;
   output?: unknown;
   logs: RunLogEntry[];
@@ -47,4 +53,11 @@ export type AppendRunLogInput = {
 export type CompleteRunInput = {
   output?: unknown;
   summary?: string;
+  reviewStatus?: RunReviewStatus;
+  deliverablePath?: string;
+  suppressAutoDeliverable?: boolean;
+};
+
+export type UpdateRunReviewInput = {
+  reviewStatus: RunReviewStatus;
 };

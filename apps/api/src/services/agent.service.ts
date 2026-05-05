@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type Agent,
   type CreateAgentInput,
+  type UpdateAgentInstructionsInput,
   type UpdateAgentStatusInput,
 } from "@atellier/shared";
 import { AgentModel } from "../db/models/Agent";
@@ -36,6 +37,7 @@ export class AgentService {
       name: input.name,
       role: input.role,
       status: input.status ?? "idle",
+      instructions: input.instructions,
       currentTaskId: input.currentTaskId,
       lastRunId: input.lastRunId,
       avatar: input.avatar,
@@ -81,6 +83,32 @@ export class AgentService {
         currentTaskId: input.currentTaskId,
         lastRunId: input.lastRunId,
       }),
+      updatedAt: toIso(new Date()),
+    };
+    this.records.set(id, next);
+    return next;
+  }
+
+  async updateInstructions(id: string, input: UpdateAgentInstructionsInput): Promise<Agent | null> {
+    if (this.storageMode === "mongo") {
+      const agent = await AgentModel.findByIdAndUpdate(
+        id,
+        cleanUndefined({
+          instructions: input.instructions,
+        }),
+        { new: true },
+      );
+      return agent ? toJsonRecord<Agent>(agent) : null;
+    }
+
+    const current = this.records.get(id);
+    if (!current) {
+      return null;
+    }
+
+    const next: Agent = {
+      ...current,
+      instructions: input.instructions,
       updatedAt: toIso(new Date()),
     };
     this.records.set(id, next);

@@ -20,6 +20,14 @@ export function useWikiLogApi() {
   });
 }
 
+export function useWikiPageApi(path: string | null) {
+  return useQueryInstance<WikiPageResponse>({
+    queryKey: queryKeys.wiki.page(path ?? ""),
+    queryFn: () => wikiService.readPage(path ?? ""),
+    enabled: Boolean(path),
+  });
+}
+
 export type UseAppendWikiLogApiOptions = UseMutationOptions<AppendWikiLogResponse, Error, AppendWikiLogInput>;
 
 export function useAppendWikiLogApi(options: UseAppendWikiLogApiOptions = {}) {
