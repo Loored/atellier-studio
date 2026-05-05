@@ -1,35 +1,43 @@
 import { Check, Loader2, Play, Route, RotateCcw, Workflow, X } from "lucide-react";
 import type { OrchestrationSkillId, OrchestrationStepStatusEntry } from "@atellier/shared";
+import { cn } from "../../../lib/cn";
 import { useSkillOrchestrationPanel } from "../hooks/useSkillOrchestrationPanel";
 
 function StepIndicator({ step, index }: { step: OrchestrationStepStatusEntry; index: number }) {
   if (step.status === "completed") {
     return (
-      <span className="orchestration-step-index orchestration-step-index--done">
+      <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-green-400 bg-green-400/15">
         <Check size={11} strokeWidth={3} />
       </span>
     );
   }
   if (step.status === "running") {
     return (
-      <span className="orchestration-step-index orchestration-step-index--running">
+      <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-teal bg-teal/[0.12]">
         <Loader2 size={11} className="spin" />
       </span>
     );
   }
   if (step.status === "failed") {
     return (
-      <span className="orchestration-step-index orchestration-step-index--failed">
+      <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-orange bg-orange/15">
         <X size={11} strokeWidth={3} />
       </span>
     );
   }
   return (
-    <span className="orchestration-step-index orchestration-step-index--pending">
+    <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-ink-faint bg-[rgba(74,80,106,0.2)]">
       {index + 1}
     </span>
   );
 }
+
+const STEP_CLASS: Record<OrchestrationStepStatusEntry["status"] | "pending", string> = {
+  pending:   "border-[var(--border-card)] bg-white/[0.02]",
+  running:   "border-teal/30 bg-teal/[0.04] shadow-[0_0_12px_rgba(16,242,170,0.06)]",
+  completed: "border-green-400/[0.22] bg-green-400/[0.03]",
+  failed:    "border-orange/[0.28] bg-orange/[0.04]",
+};
 
 export function SkillOrchestrationPanel() {
   const {
@@ -55,21 +63,24 @@ export function SkillOrchestrationPanel() {
   const doneCount = liveStatus?.steps.filter((s) => s.status === "completed").length ?? 0;
   const totalCount = liveStatus?.steps.length ?? selectedSkill?.steps.length ?? 0;
 
+  const statusBadgeClass = orchStatus === "completed"
+    ? "status-badge status-badge-completed"
+    : orchStatus === "failed"
+      ? "status-badge status-badge-failed"
+      : "status-badge status-badge-running";
+
   return (
-    <section className="panel panel-compact">
-      <div className="panel-header">
+    <section className="col-span-6 min-w-0 border border-[var(--border-card)] rounded-[var(--panel-radius)] p-4 bg-[var(--bg-card)] shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-3.5">
         <div>
-          <p className="eyebrow">Skill</p>
-          <h2>Orchestration</h2>
+          <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Skill</p>
+          <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Orchestration</h2>
         </div>
-        <div className="panel-actions">
+        <div className="inline-flex items-center gap-2">
           {mode === "live" ? (
             <>
-              {orchStatus && (
-                <span className={`status-badge status-badge-${orchStatus === "completed" ? "completed" : orchStatus === "failed" ? "failed" : "running"}`}>
-                  {orchStatus}
-                </span>
-              )}
+              {orchStatus && <span className={statusBadgeClass}>{orchStatus}</span>}
               <button
                 type="button"
                 className="icon-only-button"
@@ -80,41 +91,62 @@ export function SkillOrchestrationPanel() {
               </button>
             </>
           ) : (
-            <span className="panel-chip">{selectedSkill?.steps.length ?? 0} steps</span>
+            <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
+              {selectedSkill?.steps.length ?? 0} steps
+            </span>
           )}
         </div>
       </div>
 
       {mode === "live" ? (
-        <div className="orchestration-live">
-          <div className="orchestration-live-meta">
-            <span className="orchestration-live-goal">{liveStatus?.goal ?? "…"}</span>
+        <div>
+          {/* Live meta bar */}
+          <div className="flex items-baseline justify-between gap-2 mb-3 px-2.5 py-2 border border-[var(--border-card)] rounded-lg bg-purple/[0.04]">
+            <span className="text-[0.78rem] text-ink-muted overflow-hidden text-ellipsis whitespace-nowrap flex-1 italic">
+              {liveStatus?.goal ?? "…"}
+            </span>
             {!isTerminal && liveStatus && (
-              <span className="orchestration-live-progress">{doneCount}/{totalCount}</span>
+              <span className="text-[0.72rem] font-extrabold text-teal whitespace-nowrap tabular-nums">
+                {doneCount}/{totalCount}
+              </span>
             )}
           </div>
-          <ol className="orchestration-step-list">
+
+          {/* Step list */}
+          <ol className="grid gap-2 list-none m-0 p-0 max-h-[280px] overflow-auto">
             {liveStatus
               ? liveStatus.steps.map((step, i) => (
                   <li
                     key={step.stepId}
-                    className={`orchestration-step orchestration-step--${step.status}`}
+                    className={cn(
+                      "grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5 transition-[border-color]",
+                      STEP_CLASS[step.status]
+                    )}
                   >
                     <StepIndicator step={step} index={i} />
-                    <Route size={16} />
+                    <Route size={16} className="text-ink-faint" />
                     <div>
-                      <strong>{step.label}</strong>
-                      <span>{step.agentName} · {step.phase}</span>
+                      <strong className="block text-ink text-[0.82rem] overflow-wrap-anywhere">{step.label}</strong>
+                      <span className="text-ink-muted text-[0.72rem] overflow-wrap-anywhere">
+                        {step.agentName} · {step.phase}
+                      </span>
                     </div>
                   </li>
                 ))
               : selectedSkill?.steps.map((step, i) => (
-                  <li key={step.id} className="orchestration-step orchestration-step--pending">
-                    <span className="orchestration-step-index orchestration-step-index--pending">{i + 1}</span>
-                    <Route size={16} />
+                  <li
+                    key={step.id}
+                    className={cn("grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5", STEP_CLASS.pending)}
+                  >
+                    <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-ink-faint bg-[rgba(74,80,106,0.2)]">
+                      {i + 1}
+                    </span>
+                    <Route size={16} className="text-ink-faint" />
                     <div>
-                      <strong>{step.label}</strong>
-                      <span>{step.agentName} · {step.phase}</span>
+                      <strong className="block text-ink text-[0.82rem] overflow-wrap-anywhere">{step.label}</strong>
+                      <span className="text-ink-muted text-[0.72rem] overflow-wrap-anywhere">
+                        {step.agentName} · {step.phase}
+                      </span>
                     </div>
                   </li>
                 ))}
@@ -122,7 +154,8 @@ export function SkillOrchestrationPanel() {
         </div>
       ) : (
         <>
-          <div className="orchestration-form">
+          {/* Form */}
+          <div className="grid gap-2 mb-3.5">
             <select
               aria-label="Orchestration skill"
               value={selectedSkillId}
@@ -140,6 +173,7 @@ export function SkillOrchestrationPanel() {
               placeholder="Goal"
               rows={3}
               disabled={isStartingOrchestration}
+              className="w-full border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-ink bg-[var(--bg-input)] font-[inherit] text-[0.82rem] leading-[1.45] resize-y outline-none focus:border-purple placeholder:text-ink-faint"
             />
             <textarea
               aria-label="Orchestration context"
@@ -148,6 +182,7 @@ export function SkillOrchestrationPanel() {
               placeholder="Context (optional)"
               rows={2}
               disabled={isStartingOrchestration}
+              className="w-full border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-ink bg-[var(--bg-input)] font-[inherit] text-[0.82rem] leading-[1.45] resize-y outline-none focus:border-purple placeholder:text-ink-faint"
             />
             <button
               type="button"
@@ -160,22 +195,34 @@ export function SkillOrchestrationPanel() {
           </div>
 
           {orchestrationErrorMessage && (
-            <p className="orchestration-error">{orchestrationErrorMessage}</p>
+            <p className="m-0 mb-2.5 text-[#fca5a5] text-[0.78rem] overflow-wrap-anywhere">
+              {orchestrationErrorMessage}
+            </p>
           )}
 
           {isLoadingOrchestrationSkillsWithoutCache && (
-            <p className="empty-state">Loading skills…</p>
+            <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+              Loading skills…
+            </p>
           )}
 
+          {/* Preview steps */}
           {selectedSkill && (
-            <ol className="orchestration-step-list">
+            <ol className="grid gap-2 list-none m-0 p-0 max-h-[280px] overflow-auto">
               {selectedSkill.steps.map((step, i) => (
-                <li key={step.id} className="orchestration-step orchestration-step--pending">
-                  <span className="orchestration-step-index orchestration-step-index--pending">{i + 1}</span>
-                  <Route size={16} />
+                <li
+                  key={step.id}
+                  className={cn("grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5", STEP_CLASS.pending)}
+                >
+                  <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-ink-faint bg-[rgba(74,80,106,0.2)]">
+                    {i + 1}
+                  </span>
+                  <Route size={16} className="text-ink-faint" />
                   <div>
-                    <strong>{step.label}</strong>
-                    <span>{step.agentName} · {step.agentRole} · {step.phase}</span>
+                    <strong className="block text-ink text-[0.82rem] overflow-wrap-anywhere">{step.label}</strong>
+                    <span className="text-ink-muted text-[0.72rem] overflow-wrap-anywhere">
+                      {step.agentName} · {step.agentRole} · {step.phase}
+                    </span>
                   </div>
                 </li>
               ))}
