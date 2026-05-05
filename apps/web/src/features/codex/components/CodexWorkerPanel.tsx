@@ -134,12 +134,37 @@ export function CodexWorkerPanel() {
       </div>
       <ul className="m-0 p-0 list-none space-y-2">
         {steps.map((step) => (
-          <li key={step.id} className="border border-[var(--border-card)] rounded-md px-3 py-2 text-sm text-ink flex items-center justify-between gap-2">
-            <span>{step.summary} <small className="text-ink-muted">({step.status})</small></span>
-            {step.needsApproval && step.status === "pending" ? (
-              <button type="button" className="icon-only-button" onClick={() => void approve(step.id)} title="Approve protected step">
-                Approve step
-              </button>
+          <li key={step.id} className="border border-[var(--border-card)] rounded-md px-3 py-2 text-sm text-ink">
+            <div className="flex items-center justify-between gap-2">
+              <span>{step.summary} <small className="text-ink-muted">({step.status})</small></span>
+              {step.needsApproval && step.status === "pending" ? (
+                <button type="button" className="icon-only-button" onClick={() => void approve(step.id)} title="Approve protected step">
+                  Approve step
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-1 text-xs text-ink-faint">
+              <span className="uppercase tracking-[0.08em]">risk</span>: {step.riskLevel}
+              <span className="mx-1.5">·</span>
+              <span className="uppercase tracking-[0.08em]">command</span>: <span className="text-ink">{step.command}</span>
+            </div>
+            {step.startedAt || step.finishedAt || step.exitCode !== undefined ? (
+              <div className="mt-1 text-xs text-ink-faint">
+                <span className="uppercase tracking-[0.08em]">execution</span>: {step.startedAt ? "started" : "not started"}
+                {step.finishedAt ? " · finished" : ""}
+                {step.exitCode !== undefined ? ` · exit ${step.exitCode}` : ""}
+              </div>
+            ) : null}
+            {step.output ? (
+              <pre aria-label={`Step output ${step.id}`} className="mt-2 mb-0 text-xs whitespace-pre-wrap border border-[var(--border-card)] rounded-md p-2 bg-black/20 text-ink">
+                {step.output}
+              </pre>
+            ) : null}
+            {step.stdoutPath || step.stderrPath ? (
+              <div className="mt-1 text-xs text-ink-faint">
+                {step.stdoutPath ? <p className="m-0">stdout: <span className="text-ink">{step.stdoutPath}</span></p> : null}
+                {step.stderrPath ? <p className="m-0">stderr: <span className="text-ink">{step.stderrPath}</span></p> : null}
+              </div>
             ) : null}
           </li>
         ))}
