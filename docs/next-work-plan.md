@@ -10,6 +10,11 @@ The next cycle should not be another visual pass. The pixel office and Tailwind 
 
 ## Priority 1 - Executor And Model Safety Visibility
 
+**Status: partially done (2026-05-05)**
+
+- ✅ AppShell header now shows executor mode + model profile + model name (from `useHealthApi`).
+- ⏳ Still missing: explicit warning when OpenAI mode is active before starting a run, model profile selector in UI, per-run cost warning, tests for this behavior.
+
 Why now:
 
 - Current runtime can execute real OpenAI-backed runs.
@@ -24,10 +29,10 @@ Target outcome:
 - Mock mode remains easy to enable.
 - Model profile language is explicit: `cheap`, `standard`, `deep`.
 
-Good first slice:
+Remaining slice:
 
-- Add health response fields if missing.
-- Add a compact dashboard/office badge for mode and model.
+- Add a warning banner/modal when starting an orchestration in OpenAI mode.
+- Add model profile selector (cheap / standard / deep).
 - Add tests for API health and UI rendering.
 
 ## Priority 2 - Wiki Brain MVP
@@ -90,19 +95,17 @@ Target outcome:
 
 ## Priority 5 - Tailwind Remainder Only When It Unblocks Work
 
-Claude's Tailwind migration is mostly successful, but the remaining legacy CSS is not the next product bottleneck.
+**Status: mostly done (2026-05-05)**
 
-Deferred:
+- ✅ `OfficeView.tsx` — rebuilt with Tailwind in 2026-05-05 redesign session.
+- ✅ `AgentDetailPanel.tsx` — superseded by `AgentSidePanel.tsx` (Tailwind).
+- ⏳ `MobileView.tsx` — still deferred, not blocking anything.
 
-- `OfficeView.tsx`
-- `AgentDetailPanel.tsx`
-- `MobileView.tsx`
+Touch `MobileView.tsx` when:
 
-Touch these when:
-
-- a real feature needs those surfaces
+- a real feature needs the mobile surface
 - CSS drift blocks maintainability
-- tests or layout regressions appear
+- layout regressions appear
 
 ## Not Now
 
