@@ -46,6 +46,19 @@ Coordinates:
 
 This is not yet a full Codex worker or MCP layer. The current slice uses the existing local agent run spine so orchestration is visible, inspectable, and testable. Real tool-running Codex subagents remain a later worker capability, but the local skill and API contract now describe the process that future workers should execute.
 
+## Karpathy Alignment
+
+The orchestration layer should behave like a controlled agentic pipeline, not a magic autonomous agent. Each skill should make context, tools, permissions, evidence, and review states explicit.
+
+Carry these rules into future orchestration work:
+
+- Build context packs per workflow instead of dumping all repo/wiki context into every run.
+- Keep tasks small enough to verify through logs, diffs, previews, tests, or checklist output.
+- Treat autonomy as a slider. Default to suggest/prepare/execute-with-approval before monitored execution.
+- Show the model/executor mode before expensive or real OpenAI-backed runs.
+- Require human approval before destructive actions, external effects, or broad code changes.
+- Store reusable outcomes in wiki pages and run logs.
+
 ## Guardrails
 
 - Keep raw sources immutable.

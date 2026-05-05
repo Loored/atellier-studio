@@ -1,5 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { type AppendWikiLogInput, type WikiLogEventType } from "@atellier/shared";
+import {
+  type AppendWikiLogInput,
+  type WikiIngestInput,
+  type WikiLogEventType,
+  type WikiQueryInput,
+} from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
 import { badRequest, bodyRecord, optionalStringField, stringField } from "./route-utils";
 
@@ -65,5 +70,69 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
     };
 
     return reply.code(201).send(await services.wiki.appendLog(input));
+  });
+
+  fastify.post("/wiki/ingest", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+
+    const title = stringField(body, "title");
+    const content = stringField(body, "content");
+    if (!title) {
+      return badRequest(reply, "Ingest title is required.");
+    }
+    if (!content) {
+      return badRequest(reply, "Ingest content is required.");
+    }
+
+    const sourceType = optionalStringField(body, "sourceType");
+    const sourcePathHint = optionalStringField(body, "sourcePathHint");
+    const input: WikiIngestInput = {
+      title,
+      content,
+      sourceType: sourceType as WikiIngestInput["sourceType"],
+      sourcePathHint,
+    };
+
+    try {
+      return reply.code(201).send(await services.wiki.ingest(input));
+    } catch (error) {
+      return badRequest(reply, error instanceof Error ? error.message : "Wiki ingest failed.");
+    }
+  });
+
+  fastify.post("/wiki/query", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+
+    const query = stringField(body, "query");
+    if (!query) {
+      return badRequest(reply, "Query is required.");
+    }
+
+    const limitValue = body.limit;
+    const limit = typeof limitValue === "number" && Number.isFinite(limitValue)
+      ? Math.floor(limitValue)
+      : undefined;
+    const sourceType = optionalStringField(body, "sourceType");
+    const input: WikiQueryInput = {
+      query,
+      limit,
+      sourceType: sourceType as WikiQueryInput["sourceType"],
+    };
+
+    try {
+      return reply.code(200).send(await services.wiki.query(input));
+    } catch (error) {
+      return badRequest(reply, error instanceof Error ? error.message : "Wiki query failed.");
+    }
+  });
+
+  fastify.post("/wiki/lint", async (_request, reply) => {
+    return reply.code(200).send(await services.wiki.lint());
   });
 }

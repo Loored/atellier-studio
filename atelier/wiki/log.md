@@ -1608,3 +1608,100 @@
 - status: completed
 - reviewStatus: pending
 - deliverablePath: wiki/deliverables/9f74ea3a-190b-46a0-98d4-6838e011088f-atellier-build-loop-completed.md
+
+## [2026-05-05T05:14:35.546Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 9a3041be-11d5-4314-8264-90c771762237
+- Agent ID: fc9e0275-aa0c-49c8-9ead-42283dee8c7c
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:37.555Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 75f01038-4d93-4fa5-961a-fd15f065c571
+- Agent ID: 2cc3e9c4-c51f-4bb0-8d96-839ec57aee1e
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:39.560Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: cb34853c-bbf7-42d4-8e28-baccfd0cdbed
+- Agent ID: b02661ee-e2c9-4743-a571-f2b048404889
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:41.565Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: de6c5f7b-48f9-443d-a96a-095797fa8be3
+- Agent ID: 93084113-a486-44a7-aa79-1a1cac34b3ae
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:43.569Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: c76c9d36-9211-4fb4-9a3a-1d100274e466
+- Agent ID: 2cc3e9c4-c51f-4bb0-8d96-839ec57aee1e
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:45.581Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: c08f37c0-7606-4f2e-8fb0-ecc75d5c010d
+- Agent ID: 93084113-a486-44a7-aa79-1a1cac34b3ae
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:47.584Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 12b2f607-3bb8-4cc7-a030-b15467bc7e56
+- Agent ID: 5adf0eca-559b-4192-90f7-a6493e85ab46
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-05T05:14:47.753Z] run_completed | Atellier Build Loop completed
+- Run ID: 6ff0a57f-6386-44ab-af70-e4141d719f80
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6ff0a57f-6386-44ab-af70-e4141d719f80-atellier-build-loop-completed.md
+
+## [2026-05-05T06:17:52.000Z] ingest | Karpathy agent insights and Codex memory refresh
+
+- Source path: atelier/raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf
+- Pages created:
+  - atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md
+  - docs/history/implementation-log.md
+  - docs/operations/local-setup.md
+  - docs/next-work-plan.md
+  - atelier/runs/2026-05-05-karpathy-memory-and-next-work.md
+- Pages updated:
+  - CODEX_MEMORY.md
+  - README.md
+  - docs/agent-protocol.md
+  - docs/architecture.md
+  - docs/current-state-and-next-steps.md
+  - docs/roadmap.md
+  - atelier/wiki/index.md
+  - atelier/wiki/workflows/agent-skill-orchestration.md
+  - atelier/tasks/inbox.md
+- Contradictions found: none. Main tension is priority drift: pixel UI exists, but next work should favor Wiki Brain, safety, and reviewability.
+- Tasks proposed: executor/model safety visibility, Wiki Brain MVP, Codex Worker design doc, orchestration reliability, deferred Tailwind remainder.
+
+## [2026-05-05T06:59:10.860Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0

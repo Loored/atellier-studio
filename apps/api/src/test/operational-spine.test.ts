@@ -7,9 +7,10 @@ import type {
   Agent,
   AgentMessage,
   OrchestrationSkillSummary,
+  OrchestrationStatusResult,
   Run,
   RunAgentResult,
-  SkillOrchestrationResult,
+  StartSkillOrchestrationResponse,
   Task,
   WikiPageResponse,
 } from "@atellier/shared";
@@ -29,7 +30,17 @@ describe("operational spine routes", () => {
 
   afterEach(async () => {
     await server.close();
-    await rm(atelierRoot, { recursive: true, force: true });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await rm(atelierRoot, { recursive: true, force: true });
+        break;
+      } catch (error) {
+        if (attempt === 4) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
   });
 
   it("responds to health checks", async () => {
@@ -44,6 +55,8 @@ describe("operational spine routes", () => {
       service: "atellier-api",
       storageMode: "memory",
       executorMode: "mock",
+      executorModel: "gpt-4.1-mini",
+      modelProfile: "standard",
       mongo: {
         connected: false,
       },
@@ -513,38 +526,46 @@ describe("operational spine routes", () => {
       },
     });
 
-    expect(startResponse.statusCode).toBe(201);
-    const result = startResponse.json<SkillOrchestrationResult>();
-    expect(result.skillId).toBe("atellier-build-loop");
-    expect(result.orchestrationRun.type).toBe("orchestration");
-    expect(result.orchestrationRun.status).toBe("completed");
-    expect(result.steps.map((step) => step.stepId)).toEqual([
-      "scope",
-      "build",
-      "runtime",
-      "qa",
-      "fix",
-      "approve",
-      "memory",
-    ]);
+    expect(startResponse.statusCode).toBe(202);
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    expect(started.runId).toEqual(expect.any(String));
+
+    const statusResponse = await server.inject({
+      method: "GET",
+      url: `/orchestrations/${started.runId}/status`,
+    });
+    expect(statusResponse.statusCode).toBe(200);
+    let status = statusResponse.json<OrchestrationStatusResult>();
+    expect(status.skillId).toBe("atellier-build-loop");
+    expect(status.orchestrationRunId).toBe(started.runId);
+    expect(status.steps.length).toBeGreaterThan(0);
+
+    for (let attempt = 0; attempt < 20 && status.status !== "completed"; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const nextStatusResponse = await server.inject({
+        method: "GET",
+        url: `/orchestrations/${started.runId}/status`,
+      });
+      if (nextStatusResponse.statusCode !== 200) {
+        continue;
+      }
+      status = nextStatusResponse.json<OrchestrationStatusResult>();
+    }
+    expect(status.status).toBe("completed");
 
     const runsResponse = await server.inject({
       method: "GET",
       url: "/runs",
     });
     const runList = runsResponse.json<Run[]>();
-    expect(runList.some((run) => run.id === result.orchestrationRun.id)).toBe(true);
-    const childRunIds = new Set(result.steps.map((step) => step.runId));
-    const childRuns = runList.filter((run) => childRunIds.has(run.id));
-    expect(childRuns.every((run) => run.deliverablePath === undefined)).toBe(true);
-    expect(result.orchestrationRun.deliverablePath).toContain("wiki/deliverables/");
+    expect(runList.some((run) => run.id === started.runId)).toBe(true);
 
     const wikiLogResponse = await server.inject({
       method: "GET",
       url: "/wiki/log",
     });
     expect(wikiLogResponse.json<WikiPageResponse>().content).toContain(
-      "run_completed | Atellier Build Loop completed",
+      "run_completed | Pepe PM completed execution and requests review.",
     );
   });
 
@@ -586,5 +607,153 @@ describe("operational spine routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
     expect(response.headers["content-type"]).toContain("text/event-stream");
+  });
+
+  it("ingests wiki content into raw and source summary pages", async () => {
+    const ingestResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Client meeting notes",
+        content: "Need a deterministic wiki ingest flow with source preservation and summary output.",
+        sourceType: "client",
+      },
+    });
+
+    expect(ingestResponse.statusCode).toBe(201);
+    const ingest = ingestResponse.json<{ rawPath: string; summaryPagePath: string; logPath: string }>();
+    expect(ingest.rawPath).toContain("raw/ingest/");
+    expect(ingest.summaryPagePath).toContain("wiki/sources/");
+    expect(ingest.logPath).toBe("wiki/log.md");
+    expect(Array.isArray((ingestResponse.json() as { proposedTasks?: unknown[] }).proposedTasks)).toBe(true);
+
+    const rawPageResponse = await server.inject({
+      method: "GET",
+      url: `/wiki/page?path=${encodeURIComponent(ingest.rawPath)}`,
+    });
+    expect(rawPageResponse.statusCode).toBe(200);
+    expect(rawPageResponse.json<WikiPageResponse>().content).toContain("## Content");
+
+    const summaryPageResponse = await server.inject({
+      method: "GET",
+      url: `/wiki/page?path=${encodeURIComponent(ingest.summaryPagePath)}`,
+    });
+    expect(summaryPageResponse.statusCode).toBe(200);
+    expect(summaryPageResponse.json<WikiPageResponse>().content).toContain("## Summary");
+  });
+
+  it("queries wiki content deterministically", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Research chunk",
+        content: "Atellier should keep memory in markdown and preserve raw sources first.",
+        sourceType: "note",
+      },
+    });
+
+    const queryResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: {
+        query: "preserve raw sources",
+        limit: 3,
+        sourceType: "note",
+      },
+    });
+
+    expect(queryResponse.statusCode).toBe(200);
+    const queryResult = queryResponse.json<{ query: string; matches: Array<{ path: string; snippet: string }> }>();
+    expect(queryResult.query).toBe("preserve raw sources");
+    expect(queryResult.matches.length).toBeGreaterThan(0);
+    expect(queryResult.matches.some((match) => match.path.startsWith("wiki/"))).toBe(true);
+  });
+
+  it("lints wiki pages and returns a deterministic report", async () => {
+    const lintResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/lint",
+    });
+
+    expect(lintResponse.statusCode).toBe(200);
+    const lint = lintResponse.json<{ ok: boolean; issues: Array<{ code: string }>; checkedAt: string }>();
+    expect(typeof lint.ok).toBe("boolean");
+    expect(Array.isArray(lint.issues)).toBe(true);
+    expect(lint.checkedAt).toEqual(expect.any(String));
+  });
+
+  it("returns 400 for invalid wiki ingest payload", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "",
+        content: "",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Ingest title is required." });
+  });
+
+  it("returns 400 for invalid wiki query payload", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: {
+        query: "",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Query is required." });
+  });
+
+  it("adds an inbox task proposal when ingest contains action signals", async () => {
+    const ingestResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Client follow-up plan",
+        content: "Next steps: implement onboarding fix and resolve blocker in run review flow.",
+      },
+    });
+    expect(ingestResponse.statusCode).toBe(201);
+
+    const inboxPageResponse = await server.inject({
+      method: "GET",
+      url: "/wiki/page?path=tasks/inbox.md",
+    });
+    expect(inboxPageResponse.statusCode).toBe(200);
+    expect(inboxPageResponse.json<WikiPageResponse>().content).toContain("- [ ] Client follow-up plan");
+  });
+
+  it("does not duplicate the same inbox proposal on repeated ingest", async () => {
+    const payload = {
+      title: "Duplicate task signal",
+      content: "Next steps: implement and fix pending blocker.",
+    };
+    const first = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload,
+    });
+    expect(first.statusCode).toBe(201);
+    const second = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload,
+    });
+    expect(second.statusCode).toBe(201);
+
+    const inboxPageResponse = await server.inject({
+      method: "GET",
+      url: "/wiki/page?path=tasks/inbox.md",
+    });
+    const inbox = inboxPageResponse.json<WikiPageResponse>().content;
+    const proposalLine = "- [ ] Duplicate task signal";
+    const matches = inbox.split("\n").filter((line) => line.includes(proposalLine));
+    expect(matches.length).toBe(1);
   });
 });

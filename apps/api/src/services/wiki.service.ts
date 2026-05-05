@@ -1,6 +1,17 @@
 import { mkdir, readFile, writeFile, appendFile, readdir, stat, rm } from "node:fs/promises";
 import path from "node:path";
-import { type AppendWikiLogInput, type AppendWikiLogResponse, type WikiPageResponse } from "@atellier/shared";
+import {
+  type AppendWikiLogInput,
+  type AppendWikiLogResponse,
+  type WikiIngestInput,
+  type WikiIngestResponse,
+  type WikiLintIssue,
+  type WikiLintResponse,
+  type WikiPageResponse,
+  type WikiQueryInput,
+  type WikiQueryMatch,
+  type WikiQueryResponse,
+} from "@atellier/shared";
 
 const DEFAULT_INDEX = `# Atellier Studio Wiki Index
 
@@ -119,6 +130,158 @@ export class WikiService {
     };
   }
 
+  async ingest(input: WikiIngestInput): Promise<WikiIngestResponse> {
+    await this.ensureWiki();
+    const title = input.title.trim();
+    const content = input.content.trim();
+    if (!title) {
+      throw new Error("Ingest title is required.");
+    }
+    if (!content) {
+      throw new Error("Ingest content is required.");
+    }
+
+    const timestamp = new Date().toISOString();
+    const datePrefix = timestamp.slice(0, 10);
+    const slug = this.slugify(title);
+    const sourceType = input.sourceType ?? "other";
+    const rawPath = `raw/ingest/${datePrefix}-${slug}.md`;
+    const rawBody = [
+      `# ${title}`,
+      "",
+      `- Captured at: ${timestamp}`,
+      `- Source type: ${sourceType}`,
+      ...(input.sourcePathHint ? [`- Source hint: ${input.sourcePathHint}`] : []),
+      "",
+      "## Content",
+      "",
+      content,
+      "",
+    ].join("\n");
+    await this.writePage(rawPath, rawBody);
+
+    const summaryPath = `wiki/sources/${datePrefix}-${slug}.md`;
+    const summaryBody = [
+      `# ${title}`,
+      "",
+      "## Source",
+      "",
+      `- Raw path: ${rawPath}`,
+      `- Source type: ${sourceType}`,
+      ...(input.sourcePathHint ? [`- Source hint: ${input.sourcePathHint}`] : []),
+      "",
+      "## Summary",
+      "",
+      this.summarizeContent(content),
+      "",
+    ].join("\n");
+    await this.writePage(summaryPath, summaryBody);
+
+    await this.appendLog({
+      eventType: "ingest",
+      title,
+      summary: `Ingested source into ${summaryPath}`,
+      details: {
+        rawPath,
+        summaryPagePath: summaryPath,
+      },
+    });
+
+    const proposedTasks = await this.appendTaskProposalIfNeeded(title, content, summaryPath);
+
+    return {
+      rawPath,
+      summaryPagePath: summaryPath,
+      logPath: "wiki/log.md",
+      proposedTasks,
+    };
+  }
+
+  async query(input: WikiQueryInput): Promise<WikiQueryResponse> {
+    await this.ensureWiki();
+    const query = input.query.trim();
+    if (!query) {
+      throw new Error("Query is required.");
+    }
+    const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
+    const sourceType = input.sourceType;
+    const files = await this.listMarkdownFiles(path.join(this.atelierRootResolved, "wiki"));
+    const matches: WikiQueryMatch[] = [];
+    const queryLower = query.toLowerCase();
+
+    for (const filePath of files) {
+      if (matches.length >= limit) {
+        break;
+      }
+      const content = await readFile(filePath, "utf8");
+      if (sourceType && !content.includes(`- Source type: ${sourceType}`)) {
+        continue;
+      }
+      const index = content.toLowerCase().indexOf(queryLower);
+      if (index < 0) {
+        continue;
+      }
+      const snippetStart = Math.max(0, index - 60);
+      const snippetEnd = Math.min(content.length, index + query.length + 60);
+      const snippet = content.slice(snippetStart, snippetEnd).replace(/\s+/g, " ").trim();
+      matches.push({
+        path: this.toRelativeAtelierPath(filePath),
+        snippet,
+      });
+    }
+
+    await this.appendLog({
+      eventType: "query",
+      title: `Wiki query: ${query}`,
+      summary: `Returned ${matches.length} matches`,
+      details: {
+        limit,
+        ...(sourceType ? { sourceType } : {}),
+      },
+    });
+
+    return {
+      query,
+      matches,
+    };
+  }
+
+  async lint(): Promise<WikiLintResponse> {
+    await this.ensureWiki();
+    const issues: WikiLintIssue[] = [];
+    const indexContent = await readFile(this.indexPath, "utf8");
+    const linkedPaths = Array.from(indexContent.matchAll(/\]\(\.\/([^)]+)\)/g)).map((m) => m[1]);
+
+    for (const linkedPath of linkedPaths) {
+      const resolved = path.resolve(this.wikiRoot, linkedPath);
+      try {
+        await stat(resolved);
+      } catch {
+        issues.push({
+          code: "missing_page",
+          path: `wiki/${linkedPath.replace(/\\/g, "/")}`,
+          message: "Linked page from wiki index does not exist.",
+        });
+      }
+    }
+
+    const checkedAt = new Date().toISOString();
+    await this.appendLog({
+      eventType: "wiki_lint",
+      title: "Wiki lint run",
+      summary: issues.length === 0 ? "No issues found." : `Found ${issues.length} issue(s).`,
+      details: {
+        issues: issues.length,
+      },
+    });
+
+    return {
+      ok: issues.length === 0,
+      issues,
+      checkedAt,
+    };
+  }
+
   private async ensureFile(filePath: string, content: string): Promise<void> {
     try {
       await readFile(filePath, "utf8");
@@ -217,5 +380,95 @@ export class WikiService {
     const matcher = new RegExp(`^- ${key}:\\s*(.+)$`, "m");
     const result = content.match(matcher);
     return result?.[1]?.trim() || null;
+  }
+
+  private summarizeContent(content: string): string {
+    const line = content.replace(/\s+/g, " ").trim();
+    if (line.length <= 220) {
+      return line;
+    }
+    return `${line.slice(0, 217)}...`;
+  }
+
+  private slugify(value: string): string {
+    const base = value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return base || "untitled";
+  }
+
+  private async listMarkdownFiles(root: string): Promise<string[]> {
+    const entries = await readdir(root, { withFileTypes: true });
+    const files: string[] = [];
+    for (const entry of entries) {
+      const fullPath = path.join(root, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...await this.listMarkdownFiles(fullPath));
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith(".md")) {
+        files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  private toRelativeAtelierPath(absolutePath: string): string {
+    return path.relative(this.atelierRootResolved, absolutePath).replace(/\\/g, "/");
+  }
+
+  private shouldProposeTask(title: string, content: string): boolean {
+    const text = `${title}\n${content}`.toLowerCase();
+    const signals = [
+      "todo",
+      "next step",
+      "next steps",
+      "action item",
+      "pending",
+      "blocker",
+      "need to",
+      "fix",
+      "implement",
+    ];
+    return signals.some((signal) => text.includes(signal));
+  }
+
+  private async appendTaskProposalIfNeeded(title: string, content: string, summaryPath: string): Promise<string[]> {
+    if (!this.shouldProposeTask(title, content)) {
+      return [];
+    }
+
+    const inboxPath = path.join(this.atelierRootResolved, "tasks", "inbox.md");
+    await mkdir(path.dirname(inboxPath), { recursive: true });
+    const proposalLine = `- [ ] ${title} (source: ${summaryPath})`;
+    let inboxContent = "";
+    try {
+      inboxContent = await readFile(inboxPath, "utf8");
+    } catch {
+      inboxContent = "";
+    }
+    if (inboxContent.includes(proposalLine)) {
+      await this.appendLog({
+        eventType: "decision",
+        title: "Task proposal skipped as duplicate",
+        summary: proposalLine,
+        details: {
+          inboxPath: "tasks/inbox.md",
+        },
+      });
+      return [];
+    }
+    await appendFile(inboxPath, `\n${proposalLine}\n`, "utf8");
+
+    await this.appendLog({
+      eventType: "decision",
+      title: "Task proposal added from ingest",
+      summary: proposalLine,
+      details: {
+        inboxPath: "tasks/inbox.md",
+      },
+    });
+    return [proposalLine];
   }
 }

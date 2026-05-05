@@ -4,6 +4,7 @@ export const QUERY_KEYS = {
   RUNS: "runs",
   WIKI: "wiki",
   ORCHESTRATIONS: "orchestrations",
+  SYSTEM: "system",
   CLIENTS: "clients",
   PROJECTS: "projects",
 } as const;
@@ -26,10 +27,15 @@ export const queryKeys = {
     index: [QUERY_KEYS.WIKI, "index"] as const,
     log: [QUERY_KEYS.WIKI, "log"] as const,
     page: (wikiPath: string) => [QUERY_KEYS.WIKI, "page", wikiPath] as const,
+    query: (query: string, limit: number, sourceType: string) =>
+      [QUERY_KEYS.WIKI, "query", query, limit, sourceType] as const,
   },
   orchestrations: {
     skills: [QUERY_KEYS.ORCHESTRATIONS, "skills"] as const,
     status: (runId: string) => [QUERY_KEYS.ORCHESTRATIONS, "status", runId] as const,
+  },
+  system: {
+    health: [QUERY_KEYS.SYSTEM, "health"] as const,
   },
   clients: {
     all: [QUERY_KEYS.CLIENTS] as const,

@@ -38,3 +38,45 @@ export type AppendWikiLogResponse = {
   path: string;
   entry: string;
 };
+
+export type WikiIngestInput = {
+  title: string;
+  content: string;
+  sourceType?: "note" | "research" | "client" | "decision" | "other";
+  sourcePathHint?: string;
+};
+
+export type WikiIngestResponse = {
+  rawPath: string;
+  summaryPagePath: string;
+  logPath: string;
+  proposedTasks: string[];
+};
+
+export type WikiQueryInput = {
+  query: string;
+  limit?: number;
+  sourceType?: "note" | "research" | "client" | "decision" | "other";
+};
+
+export type WikiQueryMatch = {
+  path: string;
+  snippet: string;
+};
+
+export type WikiQueryResponse = {
+  query: string;
+  matches: WikiQueryMatch[];
+};
+
+export type WikiLintIssue = {
+  code: "missing_page" | "broken_link" | "stale_index_entry";
+  path: string;
+  message: string;
+};
+
+export type WikiLintResponse = {
+  ok: boolean;
+  issues: WikiLintIssue[];
+  checkedAt: string;
+};
