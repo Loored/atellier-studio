@@ -18,16 +18,23 @@ export function TasksPanel() {
   } = useTasksPanel();
 
   return (
-    <section className="panel panel-wide">
-      <div className="panel-header">
+    <section className="col-span-12 min-w-0 border border-[var(--border-card)] rounded-[var(--panel-radius)] p-4 bg-[var(--bg-card)] shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-3.5">
         <div>
-          <p className="eyebrow">Queue</p>
-          <h2>Tasks</h2>
+          <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Queue</p>
+          <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Tasks</h2>
         </div>
-        <span className="panel-chip">{taskList.length} total</span>
+        <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
+          {taskList.length} total
+        </span>
       </div>
 
-      <form className="task-form" onSubmit={handleCreateTask}>
+      {/* Create form */}
+      <form
+        className="grid grid-cols-[minmax(180px,1fr)_120px_auto] gap-2 mb-3.5"
+        onSubmit={handleCreateTask}
+      >
         <input
           aria-label="Task title"
           maxLength={TASK_TITLE_MAX_LENGTH}
@@ -50,21 +57,34 @@ export function TasksPanel() {
         </button>
       </form>
 
-      {isLoadingTasksWithoutCache ? <p className="empty-state">Loading tasks</p> : null}
-      {!isLoadingTasksWithoutCache && taskList.length === 0 ? <p className="empty-state">No tasks yet</p> : null}
+      {isLoadingTasksWithoutCache ? (
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          Loading tasks
+        </p>
+      ) : null}
+      {!isLoadingTasksWithoutCache && taskList.length === 0 ? (
+        <p className="m-0 border border-dashed border-purple/[0.18] rounded-lg p-3.5 text-ink-faint text-[0.85rem] bg-purple/[0.02]">
+          No tasks yet
+        </p>
+      ) : null}
 
-      <ul className="item-list">
+      <ul className="grid gap-2 list-none m-0 p-0">
         {taskList.map((task) => (
-          <li className="item-card task-item" key={task.id}>
-            <CircleDot size={18} />
+          <li
+            key={task.id}
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 min-h-14 border border-[var(--border-card)] rounded-lg px-3 py-2.5 bg-white/[0.02] transition-[border-color,background] hover:bg-[var(--bg-card-hover)] hover:border-purple/[0.22]"
+          >
+            <CircleDot size={18} className="text-ink-faint" />
             <div>
-              <strong>{task.title}</strong>
-              <span className="item-meta">
+              <strong className="block text-[0.88rem] font-semibold text-ink overflow-wrap-anywhere mb-0.5">
+                {task.title}
+              </strong>
+              <span className="flex items-center flex-wrap gap-1.5 text-ink-muted text-[0.78rem]">
                 <span>{task.priority} priority</span>
                 <small className={`status-badge status-badge-${task.status}`}>{task.status}</small>
               </span>
             </div>
-            <div className="button-cluster">
+            <div className="inline-flex gap-1.5">
               <button
                 className="icon-only-button"
                 type="button"
