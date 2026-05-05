@@ -54,8 +54,8 @@
   --text-tertiary:      var(--color-ink-faint);
   --text-accent:        var(--color-ink-accent);
 
-  --sidebar-w:          64px;
-  --header-h:           48px;
+  --sidebar-w:          220px;
+  --header-h:           52px;
   --panel-radius:       var(--radius-lg);
 }
 
@@ -308,6 +308,17 @@ body {
 .roster-avatar-dot--active  { background: var(--accent-teal); box-shadow: 0 0 6px var(--accent-teal); }
 .roster-avatar-dot--blocked { background: var(--accent-orange); }
 
+/* ─── Subtle operational motion ─── */
+.orchestration-step-active {
+  animation: stepShimmer 1800ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+@keyframes stepShimmer {
+  0% { box-shadow: 0 0 0 rgba(16, 242, 170, 0); }
+  50% { box-shadow: 0 0 10px rgba(16, 242, 170, 0.16); }
+  100% { box-shadow: 0 0 0 rgba(16, 242, 170, 0); }
+}
+
 /* ─── Main area ─── */
 .app-main {
   overflow: hidden;
@@ -325,6 +336,15 @@ body {
 
 .app-view--active {
   display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orchestration-step-active,
+  .spin,
+  .status-dot--live,
+  .status-badge-needs-human {
+    animation: none !important;
+  }
 }
 
 /* ─── Full office layout ─── */
@@ -1054,25 +1074,28 @@ body {
 }
 
 /* ─── Buttons ─── */
-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 32px;
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-md);
-  padding: 0 12px;
-  color: var(--text-primary);
-  background: var(--accent-purple-glow);
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: all 0.15s;
-}
+/* Placed in @layer base so Tailwind utility classes always override it */
+@layer base {
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-md);
+    padding: 0 12px;
+    color: var(--text-primary);
+    background: var(--accent-purple-glow);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
 
-button:hover { background: rgba(139, 92, 246, 0.26); }
-button:disabled { cursor: not-allowed; opacity: 0.4; }
+  button:hover { background: rgba(139, 92, 246, 0.26); }
+  button:disabled { cursor: not-allowed; opacity: 0.4; }
+}
 
 .icon-button { white-space: nowrap; }
 
@@ -1088,22 +1111,106 @@ button:disabled { cursor: not-allowed; opacity: 0.4; }
 
 .icon-only-button:hover { color: var(--text-primary); border-color: var(--border-accent); }
 
-/* ─── Inputs ─── */
-input, select {
-  min-height: 32px;
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-md);
-  padding: 0 10px;
-  color: var(--text-primary);
-  background: var(--bg-input);
-  font-size: 0.82rem;
-  outline: none;
-  transition: border-color 0.15s;
+/* Primary filled button */
+.btn-primary {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: #fff;
+  font-weight: 700;
+  padding: 0 20px;
+  min-height: 36px;
+  gap: 8px;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  box-shadow: 0 0 28px rgba(139, 92, 246, 0.4);
 }
 
-input:focus, select:focus { border-color: var(--accent-purple); }
-input::placeholder { color: var(--text-tertiary); }
-select option { background: var(--bg-elevated); }
+/* Ghost button */
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border-card);
+  color: var(--text-secondary);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: rgba(139, 92, 246, 0.25);
+  color: var(--text-primary);
+}
+
+/* Review tabs */
+.review-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.review-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.review-tab:hover { color: var(--text-primary); background: var(--bg-card); border-color: var(--border-card); }
+.review-tab--active {
+  color: var(--accent-purple);
+  background: var(--accent-purple-glow);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+.review-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 5px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+}
+.review-tab--active .review-tab-count {
+  background: rgba(139, 92, 246, 0.3);
+}
+
+/* ─── Inputs ─── */
+@layer base {
+  input, select {
+    min-height: 32px;
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-md);
+    padding: 0 10px;
+    color: var(--text-primary);
+    background: var(--bg-input);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input:focus, select:focus { border-color: var(--accent-purple); }
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.28);
+  }
+  button:focus-visible {
+    outline: 2px solid rgba(139, 92, 246, 0.5);
+    outline-offset: 2px;
+  }
+  input::placeholder { color: var(--text-tertiary); }
+  select option { background: var(--bg-elevated); }
+}
 
 /* ─── Agent form (in dashboard AgentsPanel) ─── */
 .agent-form {
@@ -1356,6 +1463,35 @@ select option { background: var(--bg-elevated); }
   border-color: rgba(139, 92, 246, 0.3);
 }
 
+.status-badge-needs-human {
+  color: var(--color-gold);
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.25);
+  animation: needsHumanPulse 2.5s ease-in-out infinite;
+}
+
+/* Review-specific status badges */
+.status-badge-review-pending {
+  color: var(--color-gold);
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+.status-badge-review-approved {
+  color: var(--color-green);
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.25);
+}
+.status-badge-review-changes-requested {
+  color: var(--accent-orange);
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.25);
+}
+.status-badge-review-unlinked {
+  color: var(--text-tertiary);
+  background: rgba(74, 80, 106, 0.15);
+  border-color: rgba(74, 80, 106, 0.25);
+}
+
 /* ─── Item meta ─── */
 .item-meta {
   display: flex;
@@ -1443,6 +1579,24 @@ select option { background: var(--bg-elevated); }
 }
 
 .button-cluster { display: inline-flex; gap: 6px; }
+
+/* ─── Agent list item status accents ─── */
+.agent-item--needs-human {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.025);
+}
+.agent-item--needs-human:hover {
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.05);
+}
+.agent-item--blocked {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.025);
+}
+.agent-item--blocked:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.05);
+}
 
 .status-badge-review-approved {
   color: var(--color-green);
@@ -1537,6 +1691,11 @@ select option { background: var(--bg-elevated); }
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
+}
+
+@keyframes needsHumanPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  50%       { box-shadow: 0 0 6px rgba(251, 191, 36, 0.28); }
 }
 
 /* ─── Scrollbars ─── */

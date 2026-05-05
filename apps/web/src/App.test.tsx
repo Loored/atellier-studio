@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { queryClient } from "./api/query/queryClient";
+import { wikiService } from "./api/services/wiki.service";
 
 const createTaskMock = vi.hoisted(() => vi.fn());
 const appendLogMock = vi.hoisted(() => vi.fn());
@@ -14,6 +15,13 @@ const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
+const createCodexRunMock = vi.hoisted(() => vi.fn());
+const getCodexRunMock = vi.hoisted(() => vi.fn());
+const planCodexRunMock = vi.hoisted(() => vi.fn());
+const approveCodexStepMock = vi.hoisted(() => vi.fn());
+const executeNextCodexMock = vi.hoisted(() => vi.fn());
+const cancelCodexMock = vi.hoisted(() => vi.fn());
+const finalizeCodexMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -135,6 +143,7 @@ vi.mock("./api/services/wiki.service", () => ({
       ready: true,
     }),
     appendLog: vi.fn(),
+    readPage: vi.fn(),
     ingest: ingestWikiMock,
     query: queryWikiMock,
     lint: lintWikiMock,
@@ -154,6 +163,18 @@ vi.mock("./api/services/system.service", () => ({
       metrics: { agentsTotal: 1, waitingAgents: 0, activeRuns: 1 },
       memory: { rssBytes: 1000, heapUsedBytes: 500 },
     }),
+  },
+}));
+
+vi.mock("./api/services/codex-worker.service", () => ({
+  codexWorkerService: {
+    create: createCodexRunMock,
+    get: getCodexRunMock,
+    plan: planCodexRunMock,
+    approveStep: approveCodexStepMock,
+    executeNext: executeNextCodexMock,
+    cancel: cancelCodexMock,
+    finalize: finalizeCodexMock,
   },
 }));
 
@@ -249,6 +270,36 @@ describe("App", () => {
       issues: [],
       checkedAt: "2026-05-05T00:00:00.000Z",
     });
+    createCodexRunMock.mockResolvedValue({ id: "codex-run-1" });
+    getCodexRunMock.mockResolvedValue({
+      run: {
+        id: "codex-run-1",
+        status: "queued",
+        output: {
+          finalize: {
+            runLog: "runs/2026-05-05-codex-worker-codex-run-1.md",
+            finalizedAt: "2026-05-05T00:00:00.000Z",
+          },
+        },
+      },
+      mode: "approved_step",
+      profile: "standard",
+      goal: "Implement a safe API change",
+      steps: [
+        { id: "step-1", summary: "Inspect relevant files and constraints", status: "pending", needsApproval: false },
+        { id: "step-2", summary: "Implement bounded change and update tests", status: "pending", needsApproval: true },
+      ],
+    });
+    planCodexRunMock.mockResolvedValue({});
+    approveCodexStepMock.mockResolvedValue({});
+    executeNextCodexMock.mockResolvedValue({});
+    cancelCodexMock.mockResolvedValue({});
+    finalizeCodexMock.mockResolvedValue({});
+    vi.mocked(wikiService.readPage).mockResolvedValue({
+      path: "runs/2026-05-05-codex-worker-codex-run-1.md",
+      ready: true,
+      content: "# Run Log - Codex Worker Finalize\n\nFinalized from dashboard codex worker panel.",
+    });
   });
 
   it("renders the dashboard with operational data", async () => {
@@ -266,7 +317,7 @@ describe("App", () => {
     render(<App />);
 
     await user.type(await screen.findByLabelText("Task title"), "Review V3");
-    await user.click(screen.getByRole("button", { name: /create/i }));
+    await user.click(screen.getAllByRole("button", { name: /create/i })[0]);
 
     await waitFor(() => {
       expect(createTaskMock).toHaveBeenCalledWith({
@@ -400,5 +451,35 @@ describe("App", () => {
         sourceType: "note",
       });
     });
+  });
+
+  it("runs codex worker panel actions", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: /create run/i }));
+    await waitFor(() => expect(createCodexRunMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: "Plan" }));
+    await waitFor(() => expect(planCodexRunMock).toHaveBeenCalledWith("codex-run-1"));
+
+    await user.click(screen.getByRole("button", { name: "Approve step" }));
+    await waitFor(() => expect(approveCodexStepMock).toHaveBeenCalledWith("codex-run-1", "step-2"));
+
+    await user.click(screen.getByRole("button", { name: "Execute next" }));
+    await waitFor(() => expect(executeNextCodexMock).toHaveBeenCalledWith("codex-run-1"));
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(cancelCodexMock).toHaveBeenCalledWith("codex-run-1"));
+
+    await user.click(screen.getByRole("button", { name: "Finalize" }));
+    await waitFor(() =>
+      expect(finalizeCodexMock).toHaveBeenCalledWith("codex-run-1", "Finalized from dashboard codex worker panel."),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open run log" }));
+    expect(await screen.findByText(/Run Log - Codex Worker Finalize/i)).toBeInTheDocument();
+    expect(screen.getByText(/Status:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Finalized at:/i)).toBeInTheDocument();
   });
 });

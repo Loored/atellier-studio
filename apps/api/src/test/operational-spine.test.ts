@@ -756,4 +756,158 @@ describe("operational spine routes", () => {
     const matches = inbox.split("\n").filter((line) => line.includes(proposalLine));
     expect(matches.length).toBe(1);
   });
+
+  it("creates and plans a codex worker run", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: {
+        goal: "Add a safe backend endpoint",
+        mode: "approved_step",
+        profile: "standard",
+      },
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+    const run = createResponse.json<Run>();
+
+    const planResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/plan`,
+    });
+
+    expect(planResponse.statusCode).toBe(200);
+    const viewResponse = await server.inject({
+      method: "GET",
+      url: `/codex/runs/${run.id}`,
+    });
+    expect(viewResponse.statusCode).toBe(200);
+    const view = viewResponse.json<{ steps: Array<{ id: string; needsApproval: boolean }> }>();
+    expect(view.steps.length).toBeGreaterThan(0);
+    expect(view.steps.some((step) => step.needsApproval)).toBe(true);
+  });
+
+  it("requires approval for protected codex worker steps and allows cancel", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: {
+        goal: "Implement endpoint and run tests",
+        mode: "approved_step",
+        profile: "standard",
+      },
+    });
+    const run = createResponse.json<Run>();
+
+    await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/plan`,
+    });
+
+    const firstExecute = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/execute-next`,
+    });
+    expect(firstExecute.statusCode).toBe(200);
+
+    const secondExecute = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/execute-next`,
+    });
+    expect(secondExecute.statusCode).toBe(400);
+
+    const viewResponse = await server.inject({
+      method: "GET",
+      url: `/codex/runs/${run.id}`,
+    });
+    const view = viewResponse.json<{ steps: Array<{ id: string; needsApproval: boolean }> }>();
+    const protectedStep = view.steps.find((step) => step.needsApproval);
+    expect(protectedStep).toBeDefined();
+
+    const approveResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/approve-step`,
+      payload: {
+        stepId: protectedStep?.id,
+      },
+    });
+    expect(approveResponse.statusCode).toBe(200);
+
+    const executeAfterApproval = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/execute-next`,
+    });
+    expect(executeAfterApproval.statusCode).toBe(200);
+
+    const cancelResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/cancel`,
+    });
+    expect(cancelResponse.statusCode).toBe(200);
+    expect(cancelResponse.json<Run>().status).toBe("blocked");
+  });
+
+  it("finalizes codex worker runs with durable run and wiki log entries", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: {
+        goal: "Finalize codex worker output",
+        mode: "approved_step",
+        profile: "standard",
+      },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+
+    const finalizeResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/finalize`,
+      payload: {
+        summary: "Codex worker finalized with durable memory.",
+        changedFiles: ["apps/api/src/services/codex-worker.service.ts"],
+        testEvidence: ["pnpm test:api passed", "pnpm typecheck passed"],
+      },
+    });
+    expect(finalizeResponse.statusCode).toBe(200);
+    expect(finalizeResponse.json<Run>().status).toBe("completed");
+
+    const wikiLogResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    const wikiLog = wikiLogResponse.json<WikiPageResponse>().content;
+    expect(wikiLog).toContain("decision | Codex worker run finalized");
+    expect(wikiLog).toContain(`Run ID: ${run.id}`);
+
+    const datePrefix = new Date().toISOString().slice(0, 10);
+    const runLogPath = `runs/${datePrefix}-codex-worker-${run.id}.md`;
+    const runLogResponse = await server.inject({
+      method: "GET",
+      url: `/wiki/page?path=${encodeURIComponent(runLogPath)}`,
+    });
+    expect(runLogResponse.statusCode).toBe(200);
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("Codex worker finalized with durable memory.");
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("apps/api/src/services/codex-worker.service.ts");
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("pnpm test:api passed");
+  });
+
+  it("rejects retry-step when step is not failed or blocked", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: {
+        goal: "Retry guard",
+        mode: "approved_step",
+        profile: "standard",
+      },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+    const viewResponse = await server.inject({ method: "GET", url: `/codex/runs/${run.id}` });
+    const view = viewResponse.json<{ steps: Array<{ id: string }> }>();
+    const retryResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/retry-step`,
+      payload: { stepId: view.steps[0]?.id },
+    });
+    expect(retryResponse.statusCode).toBe(400);
+  });
 });
