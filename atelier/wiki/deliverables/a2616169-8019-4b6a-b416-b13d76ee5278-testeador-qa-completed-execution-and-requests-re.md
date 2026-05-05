@@ -1,0 +1,22 @@
+# Testeador QA completed execution and requests review.
+
+- Run ID: a2616169-8019-4b6a-b416-b13d76ee5278
+- Type: manual
+- Status: completed
+- Review: pending
+- Created: 2026-05-05T01:43:27.848Z
+- Updated: 2026-05-05T01:43:44.338Z
+
+## Summary
+
+Testeador QA completed execution and requests review.
+
+## Output
+
+```json
+{
+  "messageId": "4cdf9bb1-4290-4492-8d06-fb5143616007",
+  "response": "Summary/ blocker\n- Blocker: I do not have the \"recent output\" artifacts (logs, screenshots, event stream). Unable to perform output-specific verification. Please attach the recent orchestration output (JSON/events/logs/screenshots) and environment details (build/tag, timestamp, region) to proceed.\n\nKey quality risks and verification checks for \"live orchestration mode\" in Office View\n(assumes orchestration coordinates live UI, event stream, and backend actions)\n\n1) Data sync / stale state\n- Risk: UI shows stale or inconsistent state vs backend.\n- Checks: compare UI state to backend API responses for same timestamp; run repeated refreshes and verify eventual consistency; assert last-modified/timestamps match.\n\n2) Event ordering / race conditions\n- Risk: Out-of-order events lead to incorrect state or actions applied to wrong entity.\n- Checks: replay event stream in test harness to verify deterministic ordering; insert delays/parallel events and verify final state is correct; assert monotonic sequence IDs.\n\n3) Missing/failed event delivery\n- Risk: Lost events cause missing actions or alerts.\n- Checks: simulate dropped messages, confirm retry/backoff, verify idempotency of handlers, check dead-letter queue contents and metrics.\n\n4) Authorization / permission violations\n- Risk: Users see or execute actions they should not.\n- Checks: test with users of different roles; attempt forbidden actions; verify API returns 403 and UI hides controls.\n\n5) Incorrect side-effects (actions applied to wrong office/target)\n- Risk: Commands trigger effects on wrong office view or other tenants.\n- Checks: tag events with office/tenant ID, exercise multi-tenant scenarios, assert target IDs on action logs and downstream responses.\n\n6) UI rendering / layout regressions\n- Risk: Components mis-positioned, overlapping, or actionable elements unresponsive.\n- Checks: visual regression snapshots, accessibility checks, cross-browser tests, keyboard navigation and focus order.\n\n7) Latency / performance degradation\n- Risk: Live orchestration becomes unresponsive under load.\n- Checks: load test with realistic concurrency, measure end-to-end latency, alert thresholds, and tail latency (95/99th percentiles).\n\n8) Error handling & user feedback\n- Risk: Silent failures or unclear error messages in UI.\n- Checks: induce backend errors/timeouts, verify UI shows clear error and recovery options, confirm retry flows.\n\n9) State reconciliation & rollback\n- Risk: No clear rollback if an orchestration step fails mid-flow.\n- Checks: test partial-failure scenarios and verify compensating actions or clean rollback; validate transaction/logging of steps.\n\n10) Observability / telemetry gaps\n- Risk: Insufficient logs/metrics to diagnose production incidents.\n- Checks: verify structured logs contain correlation IDs, events, timestamps; check traces for critical flows; confirm dashboards/alerts exist.\n\n11) Security / data leakage\n- Risk: Sensitive info exposed in UI or logs.\n- Checks: scan logs/UI for PII/credentials, run pen-test on orchestration endpoints, verify encryption in transit/storage.\n\n12) Timezone / localization issues\n- Risk: Incorrect timestamps or locale-specific formatting in office view.\n- Checks: validate timestamp display against user timezone settings, test locale variations.\n\nMinimum acceptance checks to run immediately (high priority)\n- Smoke test: trigger a known orchestration action and confirm end-to-end success within SLA.\n- Role-based access: verify at least one admin and one standard user behavior.\n- Event traceability: ensure the action has a correlation ID appearing in UI, backend logs, and downstream services.\n\nNext steps / what I need from you\n- Attach the recent output (event log / orchestration trace / UI screenshots) and environment (build/tag, timestamp, region).\n- Optionally provide steps to reproduce the trigger used in office view and affected user accounts.\n\nTesteador QA, Atellier Studio.",
+  "needsHuman": true
+}
+```

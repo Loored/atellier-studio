@@ -11,6 +11,7 @@ Milestone 0: Operational Spine
 - Local MongoDB
 - Fastify API
 - React dashboard
+- Skill-triggered agent orchestration runs
 - Markdown wiki index and log
 - Minimal API and UI tests
 
@@ -84,7 +85,7 @@ pnpm --filter @atellier/web dev
 
 The API defaults to `http://127.0.0.1:4000`.
 The web app defaults to Vite's local dev URL.
-Agent execution defaults to `mock` mode. Set `AGENT_EXECUTOR_MODE=openai` to enable real LLM execution.
+Agent execution runs in real OpenAI mode by default for local runtime. You must provide `OPENAI_API_KEY`, or explicitly opt into mock mode with `AGENT_EXECUTOR_MODE=mock`.
 
 The API CORS default is intentionally local-first: browser origins on `localhost`, `127.0.0.1`, and `::1` are allowed for local development, while arbitrary remote origins are not reflected.
 The API listen host also defaults to `127.0.0.1`; set `API_HOST=0.0.0.0` only when you intentionally want LAN exposure.
@@ -113,11 +114,21 @@ pnpm build
 - `atelier/tasks`: markdown task views
 - `atelier/runs`: execution history
 
+## Agent Orchestration
+
+The dashboard includes an Orchestration panel backed by:
+
+- `GET /orchestrations/skills`
+- `POST /orchestrations/skills/:skillId/run`
+
+Current skills are `atellier-build-loop` and `llm-wiki-ingest-loop`. They use the existing local agent/run/wiki spine and do not yet execute external Codex workers or MCP tools.
+
 ## Codex Workflow
 
 - `CODEX_MEMORY.md` tracks local setup, decisions, mistakes already solved, and user preferences.
 - `AGENTS.md` and app-level `AGENTS.md` files define project rules for future coding sessions.
 - `.agents/skills` contains repeatable local workflows for wiki ingest, API layer changes, feature building, test running, and review.
+- `.agents/skills/atellier-agent-orchestrator` defines the build/fix/validate and LLM Wiki orchestration contract.
 - `.codex/config.toml` keeps Codex defaults conservative.
 - `CONTRIBUTING.md` defines commit, branch, PR, and merge standards.
 
