@@ -60,11 +60,18 @@ export class CodexWorkerService {
     return this.runs.updateStatus(id, "queued", { ...(run.output as object | undefined), codexWorker: { ...worker, steps } });
   }
 
-  async approveStep(id: string, stepId: string): Promise<Run | null> {
+  async approveStep(id: string, stepId: string): Promise<Run | { error: string } | null> {
     const run = await this.runs.getById(id);
     if (!run) return null;
     const worker = this.extract(run);
     if (!worker) return null;
+    const target = worker.steps.find((step) => step.id === stepId);
+    if (!target) return { error: "Step not found." };
+    if (!target.needsApproval) return { error: "This step does not require approval." };
+    if (target.status === "completed") return { error: "Completed steps cannot be approved again." };
+    if (target.status === "failed" || target.status === "blocked") {
+      return { error: "Retry the step before approving it again." };
+    }
     const steps = worker.steps.map((s) =>
       s.id === stepId && s.status === "pending" ? { ...s, status: "approved" as const, approvedAt: new Date().toISOString() } : s,
     );
@@ -76,6 +83,9 @@ export class CodexWorkerService {
     if (!run) return null;
     const worker = this.extract(run);
     if (!worker) return null;
+    if (run.status === "blocked") return { error: "Run is cancelled or blocked." };
+    if (run.status === "completed") return { error: "Run is already completed." };
+    if (worker.steps.length === 0) return { error: "Run has not been planned yet." };
     const idx = worker.steps.findIndex((s) => s.status === "approved" || (!s.needsApproval && s.status === "pending"));
     if (idx === -1) return { error: "No executable step available. Approve a step first." };
     const step = worker.steps[idx];
@@ -88,7 +98,12 @@ export class CodexWorkerService {
         : s,
     );
     await this.runs.appendLog(id, { level: "info", message: `Codex worker executed step: ${step.summary}` });
-    return this.runs.updateStatus(id, "running", { ...(run.output as object | undefined), codexWorker: { ...worker, steps: updated } });
+    const allCompleted = updated.every((candidate) => candidate.status === "completed");
+    return this.runs.updateStatus(
+      id,
+      allCompleted ? "completed" : "running",
+      { ...(run.output as object | undefined), codexWorker: { ...worker, steps: updated } },
+    );
   }
 
   async retryStep(id: string, stepId: string): Promise<Run | { error: string } | null> {
@@ -110,15 +125,26 @@ export class CodexWorkerService {
     return this.runs.updateStatus(id, "queued", { ...(run.output as object | undefined), codexWorker: { ...worker, steps } });
   }
 
-  async cancel(id: string): Promise<Run | null> {
+  async cancel(id: string): Promise<Run | { error: string } | null> {
+    const run = await this.runs.getById(id);
+    if (!run) return null;
+    if (run.status === "completed") return { error: "Completed runs cannot be cancelled." };
+    if (run.status === "blocked") return { error: "Run is already cancelled." };
     return this.runs.updateStatus(id, "blocked", { reason: "Cancelled by operator" });
   }
 
-  async finalize(id: string, input: FinalizeCodexWorkerRunInput = {}): Promise<Run | null> {
+  async finalize(id: string, input: FinalizeCodexWorkerRunInput = {}): Promise<Run | { error: string } | null> {
     const run = await this.runs.getById(id);
     if (!run) return null;
     const worker = this.extract(run);
     if (!worker) return null;
+    if (worker.steps.length === 0) {
+      return { error: "Cannot finalize before planning steps." };
+    }
+    const unresolved = worker.steps.filter((step) => step.status !== "completed");
+    if (unresolved.length > 0) {
+      return { error: "Cannot finalize while there are unresolved steps." };
+    }
     const now = new Date();
     const datePrefix = now.toISOString().slice(0, 10);
     const runPath = `runs/${datePrefix}-codex-worker-${id}.md`;

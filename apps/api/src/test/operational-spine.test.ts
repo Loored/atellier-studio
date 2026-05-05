@@ -989,6 +989,18 @@ describe("operational spine routes", () => {
     });
     const run = createResponse.json<Run>();
     await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
+    const plannedViewResponse = await server.inject({ method: "GET", url: `/codex/runs/${run.id}` });
+    const plannedView = plannedViewResponse.json<{ steps: Array<{ id: string; needsApproval: boolean }> }>();
+    const approvalSteps = plannedView.steps.filter((step) => step.needsApproval);
+    for (const step of approvalSteps) {
+      await server.inject({
+        method: "POST",
+        url: `/codex/runs/${run.id}/approve-step`,
+        payload: { stepId: step.id },
+      });
+      await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
+    }
 
     const finalizeResponse = await server.inject({
       method: "POST",
@@ -1017,6 +1029,58 @@ describe("operational spine routes", () => {
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("Codex worker finalized with durable memory.");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("apps/api/src/services/codex-worker.service.ts");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("pnpm test:api passed");
+  });
+
+  it("rejects finalize when codex worker still has unresolved steps", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: {
+        goal: "Finalize guard check",
+        mode: "approved_step",
+        profile: "standard",
+      },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+
+    const finalizeResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/finalize`,
+      payload: {
+        summary: "Trying to finalize early",
+      },
+    });
+
+    expect(finalizeResponse.statusCode).toBe(400);
+    expect(finalizeResponse.json()).toEqual({ error: "Cannot finalize while there are unresolved steps." });
+  });
+
+  it("rejects execute-next on cancelled codex worker runs", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: {
+        goal: "Cancelled run guard",
+        mode: "approved_step",
+        profile: "standard",
+      },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+
+    const cancelResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/cancel`,
+    });
+    expect(cancelResponse.statusCode).toBe(200);
+
+    const executeResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/execute-next`,
+    });
+    expect(executeResponse.statusCode).toBe(400);
+    expect(executeResponse.json()).toEqual({ error: "Run is cancelled or blocked." });
   });
 
   it("rejects retry-step when step is not failed or blocked", async () => {

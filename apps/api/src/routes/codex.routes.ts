@@ -36,8 +36,10 @@ export async function codexRoutes(fastify: FastifyInstance, services: AppService
     if (!body) return badRequest(reply, "Request body must be an object.");
     const stepId = stringField(body, "stepId");
     if (!stepId) return badRequest(reply, "stepId is required.");
-    const run = await services.codexWorkers.approveStep(id, stepId);
-    return run ?? notFound(reply, "Codex worker run not found.");
+    const result = await services.codexWorkers.approveStep(id, stepId);
+    if (!result) return notFound(reply, "Codex worker run not found.");
+    if ("error" in result) return badRequest(reply, result.error);
+    return result;
   });
 
   fastify.post("/codex/runs/:id/execute-next", async (request, reply) => {
@@ -65,8 +67,10 @@ export async function codexRoutes(fastify: FastifyInstance, services: AppService
   fastify.post("/codex/runs/:id/cancel", async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!isValidObjectId(id)) return badRequest(reply, "Run id is invalid.");
-    const run = await services.codexWorkers.cancel(id);
-    return run ?? notFound(reply, "Codex worker run not found.");
+    const result = await services.codexWorkers.cancel(id);
+    if (!result) return notFound(reply, "Codex worker run not found.");
+    if ("error" in result) return badRequest(reply, result.error);
+    return result;
   });
 
   fastify.post("/codex/runs/:id/finalize", async (request, reply) => {
@@ -80,7 +84,9 @@ export async function codexRoutes(fastify: FastifyInstance, services: AppService
     const testEvidence = Array.isArray(body.testEvidence)
       ? body.testEvidence.filter((value): value is string => typeof value === "string")
       : undefined;
-    const run = await services.codexWorkers.finalize(id, { summary, changedFiles, testEvidence });
-    return run ?? notFound(reply, "Codex worker run not found.");
+    const result = await services.codexWorkers.finalize(id, { summary, changedFiles, testEvidence });
+    if (!result) return notFound(reply, "Codex worker run not found.");
+    if ("error" in result) return badRequest(reply, result.error);
+    return result;
   });
 }
