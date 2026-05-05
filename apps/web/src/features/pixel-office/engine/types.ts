@@ -1,6 +1,8 @@
 import type { AgentRole, AgentStatus } from "@atellier/shared";
 
-export type PixelCharacterState = "idle" | "working" | "blocked" | "done";
+// "waiting" = needs-human: agent completed work, waiting at execution zone for review.
+// Moves to work zone like "working" but does NOT show collaboration mesh lines.
+export type PixelCharacterState = "idle" | "working" | "waiting" | "blocked" | "done";
 
 export type PixelCharacterDirection = "down" | "up" | "right" | "left";
 

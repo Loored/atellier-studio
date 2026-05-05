@@ -29,7 +29,10 @@ function hashToIndex(value: string, length: number): number {
 function toState(status: Agent["status"]): PixelCharacterState {
   if (status === "idle") return "idle";
   if (status === "done") return "done";
-  if (status === "blocked" || status === "needs-human") return "blocked";
+  if (status === "blocked") return "blocked";
+  // needs-human → "waiting": agent completed their task and is at the work zone awaiting review.
+  // "waiting" moves to work zone but does not draw collaboration mesh lines.
+  if (status === "needs-human") return "waiting";
   return "working";
 }
 

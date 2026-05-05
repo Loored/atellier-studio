@@ -59,9 +59,10 @@ export function PixelOfficeCanvas({ characters, onCharacterClick }: Props) {
       // Update movement for each character
       for (const char of charsRef.current) {
         const isExecuting = char.status === "executing";
-        const isWorking = char.state === "working";
-        const targetX = isExecuting || isWorking ? char.workX : char.deskX;
-        const targetY = isExecuting || isWorking ? char.workY : char.deskY;
+        const isWorking  = char.state === "working";
+        const isWaiting  = char.state === "waiting"; // needs-human: stays at work zone
+        const targetX = isExecuting || isWorking || isWaiting ? char.workX : char.deskX;
+        const targetY = isExecuting || isWorking || isWaiting ? char.workY : char.deskY;
 
         // Work jitter only — no wander for idle (wander kept isMoving=true forever,
         // causing perpetual walk-in-place animation).
