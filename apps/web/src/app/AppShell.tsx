@@ -49,22 +49,24 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-root">
-      <header className="app-header">
-        <div className="app-logo">
-          <span className="app-logo-mark">Atellier</span>
-          <span className="app-logo-workspace">STUDIO</span>
+    <div className="grid grid-cols-[var(--sidebar-w)_1fr] grid-rows-[var(--header-h)_1fr] h-screen overflow-hidden">
+      <header className="col-span-2 flex items-center justify-between gap-4 px-4 pl-3 bg-[rgba(5,7,16,0.95)] backdrop-blur-[20px] border-b border-white/5 z-10">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[1.1rem] font-bold italic text-ink tracking-[-0.02em]">Atellier</span>
+          <span className="text-[0.65rem] font-bold tracking-[0.1em] text-ink-faint">STUDIO</span>
         </div>
-        <div className="app-header-status">
+        <div className="flex items-center gap-1.5 text-[0.78rem] text-ink-muted">
           <span className="status-dot status-dot--live" />
           <span>Sesión activa</span>
         </div>
-        <div className="app-header-right">
-          <span className="app-header-pill">{agents.length} agentes</span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center h-6 border border-[var(--border-card)] rounded-full px-2.5 text-[0.72rem] font-semibold text-ink-muted bg-[var(--bg-card)]">
+            {agents.length} agentes
+          </span>
         </div>
       </header>
       <Sidebar view={view} onViewChange={setView} agents={agents} />
-      <main className="app-main">
+      <main className="overflow-hidden bg-canvas relative">
         {view === "office" ? <OfficeView /> : <Dashboard />}
       </main>
     </div>
