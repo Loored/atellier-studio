@@ -25,6 +25,9 @@ const RunSchema = new Schema<Run>(
   { timestamps: true },
 );
 
+RunSchema.index({ agentId: 1, createdAt: -1 });
+RunSchema.index({ "input.orchestrationRunId": 1 });
+
 RunSchema.set("toJSON", {
   versionKey: false,
   transform: (_doc, ret) => {

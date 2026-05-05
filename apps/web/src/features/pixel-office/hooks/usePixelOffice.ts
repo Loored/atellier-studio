@@ -57,6 +57,9 @@ export function agentsToPixelCharacters(agents: Agent[], prev?: PixelCharacter[]
       role: agent.role,
       status: agent.status,
       lastRunId: agent.lastRunId,
+      currentStep: agent.currentStep
+        ? { label: agent.currentStep.label, phase: agent.currentStep.phase, nextAgentName: agent.currentStep.nextAgentName }
+        : undefined,
       state: toState(agent.status),
       deskX: seat.x,
       deskY: seat.y,

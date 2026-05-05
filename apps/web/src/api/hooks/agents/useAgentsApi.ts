@@ -9,16 +9,25 @@ import type {
   UpdateAgentInstructionsInput,
   UpdateAgentStatusInput,
 } from "@atellier/shared";
+
+const ACTIVE_STATUSES = new Set(["reading", "thinking", "planning", "writing", "executing", "reviewing"]);
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
 import { useMutationInstance } from "../../query/useMutationInstance";
 import { useQueryInstance } from "../../query/useQueryInstance";
 import { agentsService } from "../../services/agents.service";
 
-export function useAgentsApi() {
+export function useAgentsApi({ livePolling = false }: { livePolling?: boolean } = {}) {
   return useQueryInstance<Agent[]>({
     queryKey: queryKeys.agents.all,
     queryFn: agentsService.list,
+    refetchInterval: livePolling
+      ? (query) => {
+          const agents = query.state.data as Agent[] | undefined;
+          return agents?.some((a) => ACTIVE_STATUSES.has(a.status)) ? 1_000 : 15_000;
+        }
+      : false,
+    staleTime: livePolling ? 0 : 30_000,
   });
 }
 

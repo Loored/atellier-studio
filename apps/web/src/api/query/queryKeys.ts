@@ -29,6 +29,7 @@ export const queryKeys = {
   },
   orchestrations: {
     skills: [QUERY_KEYS.ORCHESTRATIONS, "skills"] as const,
+    status: (runId: string) => [QUERY_KEYS.ORCHESTRATIONS, "status", runId] as const,
   },
   clients: {
     all: [QUERY_KEYS.CLIENTS] as const,

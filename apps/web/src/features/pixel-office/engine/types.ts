@@ -4,12 +4,19 @@ export type PixelCharacterState = "idle" | "working" | "blocked" | "done";
 
 export type PixelCharacterDirection = "down" | "up" | "right" | "left";
 
+export type PixelCharacterStep = {
+  label: string;
+  phase: string;
+  nextAgentName?: string;
+};
+
 export type PixelCharacter = {
   id: string;
   name: string;
   role: AgentRole;
   status: AgentStatus;
   lastRunId?: string;
+  currentStep?: PixelCharacterStep;
   state: PixelCharacterState;
   deskX: number;    // home seat X
   deskY: number;    // home seat Y

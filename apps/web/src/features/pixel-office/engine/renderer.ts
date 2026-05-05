@@ -796,6 +796,43 @@ function drawCharacterLabel(
   ctx.textAlign = 'start';
 }
 
+function drawStepBubble(
+  ctx: CanvasRenderingContext2D,
+  char: PixelCharacter,
+): void {
+  if (!char.currentStep) return;
+
+  const label = char.currentStep.label;
+  const next = char.currentStep.nextAgentName;
+  const cx = char.currentX;
+  const by = char.currentY - 92;
+
+  ctx.font = 'bold 8px Inter, sans-serif';
+  const labelW = ctx.measureText(label).width;
+  const boxW = Math.max(labelW + 12, 60);
+  const boxH = next ? 26 : 16;
+
+  // Pill background
+  ctx.fillStyle = 'rgba(124, 58, 237, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(cx - boxW / 2, by, boxW, boxH, 4);
+  ctx.fill();
+
+  // Step label
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, cx, by + 10);
+
+  // Next agent hint
+  if (next) {
+    ctx.font = '7px Inter, sans-serif';
+    ctx.fillStyle = '#c4b5fd';
+    ctx.fillText(`→ ${next}`, cx, by + 22);
+  }
+
+  ctx.textAlign = 'start';
+}
+
 function drawStatusBubble(
   ctx: CanvasRenderingContext2D,
   char: PixelCharacter,
@@ -846,6 +883,7 @@ export function renderOffice(
     drawCharacterSprite(ctx, char, tick);
     drawCharacterAccessory(ctx, char, tick);
     drawCharacterLabel(ctx, char);
+    drawStepBubble(ctx, char);
     drawStatusBubble(ctx, char);
   }
 }

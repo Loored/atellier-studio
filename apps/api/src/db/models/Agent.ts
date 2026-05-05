@@ -11,6 +11,16 @@ const AgentAvatarSchema = new Schema(
   { _id: false },
 );
 
+const AgentCurrentStepSchema = new Schema(
+  {
+    label: String,
+    phase: String,
+    orchestrationRunId: String,
+    nextAgentName: String,
+  },
+  { _id: false },
+);
+
 const AgentSchema = new Schema<Agent>(
   {
     name: { type: String, required: true, trim: true },
@@ -19,6 +29,7 @@ const AgentSchema = new Schema<Agent>(
     instructions: String,
     currentTaskId: String,
     lastRunId: String,
+    currentStep: AgentCurrentStepSchema,
     avatar: AgentAvatarSchema,
   },
   { timestamps: true },

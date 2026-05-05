@@ -1,3 +1,4 @@
+import { Building2, LayoutDashboard } from "lucide-react";
 import type { Agent } from "@atellier/shared";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -18,6 +19,10 @@ type SidebarProps = {
 };
 
 export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
+  const activeCount = agents.filter((a) =>
+    ["reading","thinking","planning","writing","executing","reviewing"].includes(a.status)
+  ).length;
+
   return (
     <aside className="app-sidebar">
       <nav className="sidebar-nav">
@@ -26,7 +31,7 @@ export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
           onClick={() => onViewChange("office")}
           title="Oficina"
         >
-          <span className="sidebar-nav-abbr">OF</span>
+          <Building2 size={18} />
           <span className="sidebar-nav-label">OFICINA</span>
         </button>
         <button
@@ -34,7 +39,7 @@ export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
           onClick={() => onViewChange("dashboard")}
           title="Dashboard"
         >
-          <span className="sidebar-nav-abbr">DB</span>
+          <LayoutDashboard size={18} />
           <span className="sidebar-nav-label">PANEL</span>
         </button>
       </nav>
@@ -44,6 +49,12 @@ export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
           <span className="sidebar-stat-value">{agents.length}</span>
           <span className="sidebar-stat-label">agentes</span>
         </div>
+        {activeCount > 0 && (
+          <div className="sidebar-stat">
+            <span className="sidebar-stat-value" style={{ color: "var(--accent-teal)" }}>{activeCount}</span>
+            <span className="sidebar-stat-label">activos</span>
+          </div>
+        )}
       </div>
 
       <div className="sidebar-roster">
@@ -59,7 +70,7 @@ export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
               <span>{agent.name.charAt(0).toUpperCase()}</span>
               <span
                 className={`roster-avatar-dot roster-avatar-dot--${
-                  agent.status === "idle"
+                  agent.status === "idle" || agent.status === "done"
                     ? "idle"
                     : agent.status === "blocked" || agent.status === "needs-human"
                       ? "blocked"

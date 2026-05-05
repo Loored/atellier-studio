@@ -1,8 +1,9 @@
-import { useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
+import type { UseMutationOptions } from "@tanstack/react-query";
 import type {
   OrchestrationSkillSummary,
-  SkillOrchestrationResult,
+  OrchestrationStatusResult,
   StartSkillOrchestrationInput,
+  StartSkillOrchestrationResponse,
 } from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
@@ -17,29 +18,32 @@ export function useOrchestrationSkillsApi() {
   });
 }
 
+export function useOrchestrationStatusApi(runId: string | null) {
+  return useQueryInstance<OrchestrationStatusResult>({
+    queryKey: queryKeys.orchestrations.status(runId ?? ""),
+    queryFn: () => orchestrationsService.getStatus(runId!),
+    enabled: !!runId,
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const data = query.state.data as OrchestrationStatusResult | undefined;
+      if (!data) return 2_000;
+      return data.status === "completed" || data.status === "failed" ? false : 2_000;
+    },
+  });
+}
+
 export type UseStartSkillOrchestrationApiOptions =
-  UseMutationOptions<SkillOrchestrationResult, Error, StartSkillOrchestrationInput>;
+  UseMutationOptions<StartSkillOrchestrationResponse, Error, StartSkillOrchestrationInput>;
 
 export function useStartSkillOrchestrationApi(options: UseStartSkillOrchestrationApiOptions = {}) {
-  const queryClient = useQueryClient();
-  const { notifyError, notifySuccess } = useApiAlerts();
+  const { notifyError } = useApiAlerts();
 
-  return useMutationInstance<SkillOrchestrationResult, Error, StartSkillOrchestrationInput>(
+  return useMutationInstance<StartSkillOrchestrationResponse, Error, StartSkillOrchestrationInput>(
     {
       mutationFn: (input) => orchestrationsService.startSkillRun(input),
       ...options,
     },
     {
-      onSuccess: async (result) => {
-        notifySuccess("Skill orchestration completed");
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.orchestrationRun.id) }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page("wiki/deliverables/index.md") }),
-        ]);
-      },
       onError: (error) => notifyError(error),
     },
   );

@@ -30,6 +30,24 @@ export class RunService {
     return [...this.records.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async getById(id: string): Promise<Run | null> {
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findById(id);
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+    return this.records.get(id) ?? null;
+  }
+
+  async listByOrchestrationRunId(orchestrationRunId: string): Promise<Run[]> {
+    if (this.storageMode === "mongo") {
+      const runs = await RunModel.find({ "input.orchestrationRunId": orchestrationRunId }).sort({ createdAt: 1 });
+      return toJsonRecord<Run[]>(runs);
+    }
+    return [...this.records.values()]
+      .filter((r) => (r.input as Record<string, unknown> | undefined)?.orchestrationRunId === orchestrationRunId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
   async create(input: CreateRunInput): Promise<Run> {
     if (this.storageMode === "mongo") {
       const run = await RunModel.create({
