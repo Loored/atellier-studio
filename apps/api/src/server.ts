@@ -5,6 +5,7 @@ import { type StorageMode } from "./services/service-utils";
 import { agentsRoutes } from "./routes/agents.routes";
 import { healthRoutes } from "./routes/health.routes";
 import { isAllowedLocalOrigin } from "./routes/route-utils";
+import { orchestrationsRoutes } from "./routes/orchestrations.routes";
 import { runsRoutes } from "./routes/runs.routes";
 import { tasksRoutes } from "./routes/tasks.routes";
 import { wikiRoutes } from "./routes/wiki.routes";
@@ -38,8 +39,14 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       callback(null, isAllowedLocalOrigin(origin));
     },
   });
-  await fastify.register(healthRoutes);
+  await fastify.register(async (instance) =>
+    healthRoutes(instance, services, {
+      storageMode: options.storageMode ?? "mongo",
+      agentExecutorMode: options.agentExecutorMode ?? "mock",
+    }),
+  );
   await fastify.register(async (instance) => agentsRoutes(instance, services));
+  await fastify.register(async (instance) => orchestrationsRoutes(instance, services));
   await fastify.register(async (instance) => tasksRoutes(instance, services));
   await fastify.register(async (instance) => runsRoutes(instance, services));
   await fastify.register(async (instance) => wikiRoutes(instance, services));

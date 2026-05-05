@@ -141,6 +141,111 @@ docker compose up -d mongo
 - Added explicit `Resume` action for `blocked`/`needs-human` states to recover agents quickly.
 - `needs-human` is now treated as waiting state in panel visuals instead of hard blocked.
 
+### 2026-05-04 - Parallel ops hardening
+
+- Added persistent `instructions` field for agents in shared types, API storage, and UI editing flow.
+- Expanded `/health` response with storage/executor mode, Mongo state, waiting-agent count, active-run count, and process memory metrics.
+- Added optional run completion metadata: `reviewStatus` and `deliverablePath`.
+- Added browser notifications for new `needs-human` transitions and a mobile nav badge for waiting-agent count.
+- Validation: `pnpm typecheck` and `pnpm test` passed.
+
+### 2026-05-04 - Run review and deliverables dashboard
+
+- Added API route `PATCH /runs/:id/review` and service support for updating run review states (`pending`, `approved`, `changes-requested`).
+- Upgraded web Runs Timeline with:
+  - completed-run review actions (`Approve`, `Changes`, `Pending`)
+  - operational filters by related agent state (`needs-human`, `blocked`)
+  - review-state filters.
+- Added `DeliverablesPanel` to dashboard to surface runs linked to `deliverablePath`.
+- Added tests for API review route and web review action flow.
+- Validation: `pnpm typecheck`, `pnpm test:api`, and `pnpm test:web` passed.
+
+### 2026-05-04 - Deliverable preview + auto review defaults
+
+- Added secure API route `GET /wiki/page?path=<relative-path>` for reading markdown files under `atelier/` for deliverable preview.
+- Deliverables panel now supports selecting a deliverable path and previewing file content inline.
+- Run completion now sets default review states automatically:
+  - non-review runs => `pending`
+  - review runs => `approved`
+  - explicit review status still takes precedence.
+- Dashboard metrics now include `needs-human`, `blocked`, and `pending review` counters.
+- Added API tests for wiki page read route and default review transition behavior.
+- Validation: `pnpm typecheck`, `pnpm test:api`, and `pnpm test:web` passed.
+
+### 2026-05-04 - Auto deliverable generation and approval audit
+
+- Added `WikiService.writePage` with atelier-root path safety checks; wiki bootstrap now ensures `wiki/deliverables` exists.
+- `RunService.complete` now auto-generates a deliverable markdown file when:
+  - `summary` is present
+  - `deliverablePath` is not provided.
+- Generated file path pattern: `wiki/deliverables/<runId>-<summary-slug>.md`.
+- Added explicit wiki decision entry `Deliverable accepted` whenever run review state becomes `approved` (on completion or review update).
+- Added API tests covering generated deliverable retrieval and approval decision logging.
+- Validation: `pnpm typecheck`, `pnpm test:api`, and `pnpm test:web` passed.
+
+### 2026-05-04 - Manual deliverable promotion and index refresh
+
+- Added API route `PATCH /runs/:id/promote-deliverable` to generate and attach deliverables for previously completed runs.
+- Added deliverables index regeneration on write:
+  - `wiki/deliverables/index.md` is rebuilt automatically whenever deliverable markdown files are created/updated.
+- Added `Promote` action in `RunsTimeline` for completed runs missing a `deliverablePath`.
+- Added tests for promote endpoint behavior, deliverables index refresh, and timeline promote action.
+- Validation: `pnpm typecheck`, `pnpm test:api`, and `pnpm test:web` passed.
+
+### 2026-05-05 - Deliverable unlink + index metadata
+
+- Added API route `PATCH /runs/:id/unlink-deliverable`:
+  - unsets `deliverablePath` from run
+  - removes the deliverable markdown file if it exists.
+- Added `WikiService.deletePage` with atelier-root path safety and auto-refresh of deliverables index on delete.
+- Upgraded `wiki/deliverables/index.md` columns to include `Type` and `Review` metadata extracted from deliverable markdown.
+- Timeline completed-run controls now show `Unlink` when a run already has a deliverable.
+- Added API/web tests for unlink flow and updated review-action test selector for multiple completed runs.
+- Validation: `pnpm test:api` and `pnpm test:web` passed.
+
+### 2026-05-05 - Deliverable unlink confirmation and panel filters
+
+- Added client-side confirmation prompt before `unlink-deliverable` mutation in timeline controls.
+- Added Deliverables panel filters:
+  - run type (`all` + each `RUN_TYPES` value)
+  - review status (`all` + `RUN_REVIEW_STATUSES`).
+- Updated web tests for:
+  - unlink flow with confirmation
+  - filtered deliverables visibility behavior.
+- Validation: `pnpm test:web` and `pnpm test:api` passed.
+
+### 2026-05-05 - Real integration runtime default
+
+- Removed `useOrchestrationSim` runtime usage from office experience so frontend no longer mutates agent status with fake timers.
+- Removed orchestration simulation toggle from office bottom bar.
+
+### 2026-05-05 - Skill-triggered agent orchestration
+
+- Added shared orchestration types and `orchestration` run type.
+- Added API routes:
+  - `GET /orchestrations/skills`
+  - `POST /orchestrations/skills/:skillId/run`
+- Added `SkillOrchestrationService` with initial templates:
+  - `atellier-build-loop`
+  - `llm-wiki-ingest-loop`
+- Added dashboard Orchestration panel following service -> API hook -> feature hook -> component conventions.
+- Added local Codex skill `.agents/skills/atellier-agent-orchestrator/SKILL.md` for build/fix/validate and wiki ingest orchestration.
+- Preserved the operator-provided LLM Wiki/orchestration reference under `atelier/raw/references/` and summarized the decision in `atelier/wiki/workflows/agent-skill-orchestration.md`.
+- Orchestrated child agent runs suppress automatic deliverables; the parent orchestration run is the reviewable deliverable.
+- Backend executor selection now defaults to real OpenAI mode when `OPENAI_API_KEY` is set:
+  - explicit `AGENT_EXECUTOR_MODE=mock` still forces mock mode.
+- Updated README to describe real-mode-first executor behavior.
+- Validation: `pnpm typecheck`, `pnpm test:api`, and `pnpm test:web` passed.
+
+### 2026-05-05 - Real orchestration toggle restored
+
+- Restored Office bottom-bar orchestration toggle but wired it to real backend execution (`useOrchestrationLive`) instead of fake status simulation.
+- Live orchestration now periodically dispatches real `run` requests for eligible agents, using role-specific instructions.
+- Added strict runtime guard in API startup:
+  - non-test runtime now requires `OPENAI_API_KEY` unless `AGENT_EXECUTOR_MODE=mock` is explicitly set.
+- Updated app-services executor mode selection to prefer OpenAI when API key exists.
+- Validation: `pnpm typecheck`, `pnpm test:api`, and `pnpm test:web` passed.
+
 ## Git Workflow Standard
 
 ### Commit messages

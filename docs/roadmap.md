@@ -5,6 +5,7 @@
 - Local MongoDB
 - Fastify API
 - Agents, tasks, runs, run logs
+- Skill-triggered orchestration runs
 - Wiki index/log readiness
 - Dashboard
 - Minimal tests
@@ -24,6 +25,7 @@
 ## Milestone 3: Agent Roles
 
 - Intake, wiki curator, PM, builder, and QA workflows
+- Editable orchestration templates and richer parent/child run views
 
 ## Milestone 4: Pixel Atelier
 

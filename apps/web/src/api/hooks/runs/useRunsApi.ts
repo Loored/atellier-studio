@@ -1,5 +1,11 @@
 import { useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
-import type { AppendRunLogInput, CompleteRunInput, CreateRunInput, Run } from "@atellier/shared";
+import type {
+  AppendRunLogInput,
+  CompleteRunInput,
+  CreateRunInput,
+  Run,
+  UpdateRunReviewInput,
+} from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
 import { useMutationInstance } from "../../query/useMutationInstance";
@@ -84,6 +90,92 @@ export function useCompleteRunApi(options: UseCompleteRunApiOptions = {}) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type UpdateRunReviewVariables = {
+  runId: string;
+  input: UpdateRunReviewInput;
+};
+
+export type UseUpdateRunReviewApiOptions = UseMutationOptions<Run, Error, UpdateRunReviewVariables>;
+
+export function useUpdateRunReviewApi(options: UseUpdateRunReviewApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<Run, Error, UpdateRunReviewVariables>(
+    {
+      mutationFn: ({ runId, input }) => runsService.updateReview(runId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (run) => {
+        notifySuccess("Run review updated");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type PromoteRunDeliverableVariables = {
+  runId: string;
+};
+
+export type UsePromoteRunDeliverableApiOptions = UseMutationOptions<Run, Error, PromoteRunDeliverableVariables>;
+
+export function usePromoteRunDeliverableApi(options: UsePromoteRunDeliverableApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<Run, Error, PromoteRunDeliverableVariables>(
+    {
+      mutationFn: ({ runId }) => runsService.promoteDeliverable(runId),
+      ...options,
+    },
+    {
+      onSuccess: async (run) => {
+        notifySuccess("Deliverable created");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page("wiki/deliverables/index.md") }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type UseUnlinkRunDeliverableApiOptions = UseMutationOptions<Run, Error, PromoteRunDeliverableVariables>;
+
+export function useUnlinkRunDeliverableApi(options: UseUnlinkRunDeliverableApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<Run, Error, PromoteRunDeliverableVariables>(
+    {
+      mutationFn: ({ runId }) => runsService.unlinkDeliverable(runId),
+      ...options,
+    },
+    {
+      onSuccess: async (run) => {
+        notifySuccess("Deliverable unlinked");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page("wiki/deliverables/index.md") }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
         ]);
       },

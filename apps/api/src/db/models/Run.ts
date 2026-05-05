@@ -1,5 +1,5 @@
 import mongoose, { Schema } from "mongoose";
-import { RUN_LOG_LEVELS, RUN_STATUSES, RUN_TYPES, type Run } from "@atellier/shared";
+import { RUN_LOG_LEVELS, RUN_REVIEW_STATUSES, RUN_STATUSES, RUN_TYPES, type Run } from "@atellier/shared";
 
 const RunLogEntrySchema = new Schema(
   {
@@ -16,6 +16,8 @@ const RunSchema = new Schema<Run>(
     agentId: String,
     type: { type: String, enum: RUN_TYPES, required: true },
     status: { type: String, enum: RUN_STATUSES, default: "queued", required: true },
+    reviewStatus: { type: String, enum: RUN_REVIEW_STATUSES, required: false },
+    deliverablePath: String,
     input: Schema.Types.Mixed,
     output: Schema.Types.Mixed,
     logs: { type: [RunLogEntrySchema], default: [] },

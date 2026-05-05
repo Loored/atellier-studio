@@ -11,8 +11,11 @@ export function useDashboard() {
 
   return {
     agentCount: agentList.length,
+    blockedAgentCount: agentList.filter((agent) => agent.status === "blocked").length,
+    needsHumanAgentCount: agentList.filter((agent) => agent.status === "needs-human").length,
     activeTaskCount: taskList.filter((task) => task.status === "active").length,
     recentRunCount: runList.length,
+    pendingReviewRunCount: runList.filter((run) => run.reviewStatus === "pending").length,
     wikiLogReady: Boolean(wikiLog?.ready),
     isRefreshingDashboard: isFetchingAgents || isFetchingTasks || isFetchingRuns || isFetchingWikiLog,
   };

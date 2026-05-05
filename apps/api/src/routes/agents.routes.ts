@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import {
+  AGENT_INSTRUCTIONS_MAX_LENGTH,
   AGENT_INSTRUCTION_MAX_LENGTH,
   AGENT_MESSAGE_MAX_LENGTH,
   AGENT_ROLES,
@@ -46,9 +47,16 @@ export async function agentsRoutes(fastify: FastifyInstance, services: AppServic
       name,
       role: body.role,
       status: body.status,
+      instructions: optionalStringField(body, "instructions"),
       currentTaskId: optionalStringField(body, "currentTaskId"),
       lastRunId: optionalStringField(body, "lastRunId"),
     };
+    if (input.instructions && input.instructions.length > AGENT_INSTRUCTIONS_MAX_LENGTH) {
+      return badRequest(
+        reply,
+        `Agent instructions must be ${AGENT_INSTRUCTIONS_MAX_LENGTH} characters or fewer.`,
+      );
+    }
 
     return reply.code(201).send(await services.agents.create(input));
   });
@@ -73,6 +81,31 @@ export async function agentsRoutes(fastify: FastifyInstance, services: AppServic
       lastRunId: optionalStringField(body, "lastRunId"),
     });
 
+    return agent ?? notFound(reply, "Agent not found.");
+  });
+
+  fastify.patch("/agents/:id/instructions", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Agent id is invalid.");
+    }
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+
+    const instructions = optionalStringField(body, "instructions");
+    if (instructions === undefined) {
+      return badRequest(reply, "Instructions are required.");
+    }
+    if (instructions.length > AGENT_INSTRUCTIONS_MAX_LENGTH) {
+      return badRequest(
+        reply,
+        `Agent instructions must be ${AGENT_INSTRUCTIONS_MAX_LENGTH} characters or fewer.`,
+      );
+    }
+
+    const agent = await services.agents.updateInstructions(id, { instructions });
     return agent ?? notFound(reply, "Agent not found.");
   });
 

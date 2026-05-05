@@ -7,6 +7,7 @@ import path from "node:path";
 import { AgentService } from "./agent.service";
 import { MessageService } from "./message.service";
 import { RunService } from "./run.service";
+import { SkillOrchestrationService } from "./skill-orchestration.service";
 import { TaskService } from "./task.service";
 import { WikiService } from "./wiki.service";
 import { type StorageMode } from "./service-utils";
@@ -17,6 +18,7 @@ export type AppServices = {
   messages: MessageService;
   tasks: TaskService;
   runs: RunService;
+  skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
 };
 
@@ -44,8 +46,10 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   const agents = new AgentService(storageMode);
   const runs = new RunService(storageMode, wiki);
   const messages = new MessageService(storageMode);
+  const executorMode: AgentExecutorMode = options.agentExecutorMode
+    ?? (options.openaiApiKey ? "openai" : "mock");
   const executor = createAgentExecutorService({
-    mode: options.agentExecutorMode ?? "mock",
+    mode: executorMode,
     openai: options.openaiApiKey
       ? {
           apiKey: options.openaiApiKey,
@@ -53,16 +57,18 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
         }
       : undefined,
   });
+  const agentRuns = new AgentRunService(agents, runs, messages, executor, {
+    maxHandoffDepth: options.maxHandoffDepth,
+    executionTimeoutMs: options.executionTimeoutMs,
+  });
 
   return {
     agents,
-    agentRuns: new AgentRunService(agents, runs, messages, executor, {
-      maxHandoffDepth: options.maxHandoffDepth,
-      executionTimeoutMs: options.executionTimeoutMs,
-    }),
+    agentRuns,
     messages,
     tasks: new TaskService(storageMode),
     runs,
+    skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs),
     wiki,
   };
 }

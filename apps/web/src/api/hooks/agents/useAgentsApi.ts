@@ -6,6 +6,7 @@ import type {
   CreateAgentInput,
   RunAgentInput,
   RunAgentResult,
+  UpdateAgentInstructionsInput,
   UpdateAgentStatusInput,
 } from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
@@ -67,6 +68,36 @@ export function useUpdateAgentStatusApi(options: UseUpdateAgentStatusApiOptions 
     },
     {
       onSuccess: async (agent) => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agent.id) }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type UpdateAgentInstructionsVariables = {
+  agentId: string;
+  input: UpdateAgentInstructionsInput;
+};
+
+export type UseUpdateAgentInstructionsApiOptions =
+  UseMutationOptions<Agent, Error, UpdateAgentInstructionsVariables>;
+
+export function useUpdateAgentInstructionsApi(options: UseUpdateAgentInstructionsApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<Agent, Error, UpdateAgentInstructionsVariables>(
+    {
+      mutationFn: ({ agentId, input }) => agentsService.updateInstructions(agentId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (agent) => {
+        notifySuccess("Agent instructions updated");
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agent.id) }),

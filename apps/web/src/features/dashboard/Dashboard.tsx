@@ -1,12 +1,23 @@
 import { Activity, BookOpen, CheckCircle2, Loader2 } from "lucide-react";
 import { AgentsPanel } from "../agents/components/AgentsPanel";
+import { SkillOrchestrationPanel } from "../orchestrations/components/SkillOrchestrationPanel";
+import { DeliverablesPanel } from "../runs/components/DeliverablesPanel";
 import { RunsTimeline } from "../runs/components/RunsTimeline";
 import { TasksPanel } from "../tasks/components/TasksPanel";
 import { WikiPanel } from "../wiki/components/WikiPanel";
 import { useDashboard } from "./hooks/useDashboard";
 
 export function Dashboard() {
-  const { agentCount, activeTaskCount, recentRunCount, wikiLogReady, isRefreshingDashboard } =
+  const {
+    agentCount,
+    blockedAgentCount,
+    needsHumanAgentCount,
+    activeTaskCount,
+    recentRunCount,
+    pendingReviewRunCount,
+    wikiLogReady,
+    isRefreshingDashboard,
+  } =
     useDashboard();
 
   return (
@@ -33,6 +44,16 @@ export function Dashboard() {
           <small>Agents</small>
         </div>
         <div className="metric">
+          <Activity size={18} />
+          <span>{needsHumanAgentCount}</span>
+          <small>Needs human</small>
+        </div>
+        <div className="metric">
+          <Activity size={18} />
+          <span>{blockedAgentCount}</span>
+          <small>Blocked agents</small>
+        </div>
+        <div className="metric">
           <CheckCircle2 size={18} />
           <span>{activeTaskCount}</span>
           <small>Active tasks</small>
@@ -43,6 +64,11 @@ export function Dashboard() {
           <small>Recent runs</small>
         </div>
         <div className="metric">
+          <CheckCircle2 size={18} />
+          <span>{pendingReviewRunCount}</span>
+          <small>Pending review</small>
+        </div>
+        <div className="metric">
           <BookOpen size={18} />
           <span>{wikiLogReady ? "On" : "Off"}</span>
           <small>Wiki log</small>
@@ -51,7 +77,9 @@ export function Dashboard() {
 
       <div className="dashboard-grid">
         <AgentsPanel />
+        <SkillOrchestrationPanel />
         <RunsTimeline />
+        <DeliverablesPanel />
         <TasksPanel />
         <WikiPanel />
       </div>

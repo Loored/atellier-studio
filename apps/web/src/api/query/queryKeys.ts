@@ -3,6 +3,7 @@ export const QUERY_KEYS = {
   TASKS: "tasks",
   RUNS: "runs",
   WIKI: "wiki",
+  ORCHESTRATIONS: "orchestrations",
   CLIENTS: "clients",
   PROJECTS: "projects",
 } as const;
@@ -24,6 +25,10 @@ export const queryKeys = {
   wiki: {
     index: [QUERY_KEYS.WIKI, "index"] as const,
     log: [QUERY_KEYS.WIKI, "log"] as const,
+    page: (wikiPath: string) => [QUERY_KEYS.WIKI, "page", wikiPath] as const,
+  },
+  orchestrations: {
+    skills: [QUERY_KEYS.ORCHESTRATIONS, "skills"] as const,
   },
   clients: {
     all: [QUERY_KEYS.CLIENTS] as const,

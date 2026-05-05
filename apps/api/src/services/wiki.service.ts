@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, appendFile, readdir, stat, rm } from "node:fs/promises";
 import path from "node:path";
 import { type AppendWikiLogInput, type AppendWikiLogResponse, type WikiPageResponse } from "@atellier/shared";
 
@@ -27,9 +27,11 @@ const DEFAULT_LOG = `# Atellier Studio Wiki Log
 
 export class WikiService {
   private readonly wikiRoot: string;
+  private readonly atelierRootResolved: string;
 
   constructor(private readonly atelierRoot: string) {
-    this.wikiRoot = path.join(atelierRoot, "wiki");
+    this.atelierRootResolved = path.resolve(atelierRoot);
+    this.wikiRoot = path.join(this.atelierRootResolved, "wiki");
   }
 
   get indexPath(): string {
@@ -43,7 +45,7 @@ export class WikiService {
   async ensureWiki(): Promise<void> {
     await mkdir(this.wikiRoot, { recursive: true });
     await Promise.all(
-      ["clients", "projects", "entities", "workflows", "decisions", "synthesis"].map((segment) =>
+      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "deliverables"].map((segment) =>
         mkdir(path.join(this.wikiRoot, segment), { recursive: true }),
       ),
     );
@@ -67,6 +69,42 @@ export class WikiService {
       content: await readFile(this.logPath, "utf8"),
       ready: true,
     };
+  }
+
+  async readPage(relativePath: string): Promise<WikiPageResponse> {
+    await this.ensureWiki();
+    const { normalized, resolved } = this.resolveAtelierPath(relativePath);
+
+    return {
+      path: normalized,
+      content: await readFile(resolved, "utf8"),
+      ready: true,
+    };
+  }
+
+  async writePage(relativePath: string, content: string): Promise<WikiPageResponse> {
+    await this.ensureWiki();
+    const { normalized, resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    await writeFile(resolved, content, "utf8");
+    if (this.isDeliverableMarkdownPath(normalized)) {
+      await this.refreshDeliverablesIndex();
+    }
+
+    return {
+      path: normalized,
+      content,
+      ready: true,
+    };
+  }
+
+  async deletePage(relativePath: string): Promise<void> {
+    await this.ensureWiki();
+    const { normalized, resolved } = this.resolveAtelierPath(relativePath);
+    await rm(resolved, { force: true });
+    if (this.isDeliverableMarkdownPath(normalized)) {
+      await this.refreshDeliverablesIndex();
+    }
   }
 
   async appendLog(input: AppendWikiLogInput): Promise<AppendWikiLogResponse> {
@@ -93,6 +131,62 @@ export class WikiService {
     }
   }
 
+  private resolveAtelierPath(relativePath: string): { normalized: string; resolved: string } {
+    const normalized = relativePath.trim();
+    if (!normalized) {
+      throw new Error("Wiki page path is required.");
+    }
+
+    const resolved = path.resolve(this.atelierRootResolved, normalized);
+    const prefix = `${this.atelierRootResolved}${path.sep}`;
+    if (!(resolved === this.atelierRootResolved || resolved.startsWith(prefix))) {
+      throw new Error("Wiki page path is outside atelier root.");
+    }
+
+    return { normalized, resolved };
+  }
+
+  private isDeliverableMarkdownPath(relativePath: string): boolean {
+    const normalized = relativePath.replace(/\\/g, "/");
+    return normalized.startsWith("wiki/deliverables/") &&
+      normalized.endsWith(".md") &&
+      normalized !== "wiki/deliverables/index.md";
+  }
+
+  private async refreshDeliverablesIndex(): Promise<void> {
+    const deliverablesDir = path.join(this.wikiRoot, "deliverables");
+    await mkdir(deliverablesDir, { recursive: true });
+    const fileNames = await readdir(deliverablesDir);
+    const markdownFiles = fileNames
+      .filter((fileName) => fileName.endsWith(".md") && fileName !== "index.md")
+      .sort();
+
+    const rows: string[] = [];
+    for (const fileName of markdownFiles) {
+      const fullPath = path.join(deliverablesDir, fileName);
+      const fileStats = await stat(fullPath);
+      const fileContent = await readFile(fullPath, "utf8");
+      const runType = this.extractMetadata(fileContent, "Type");
+      const reviewStatus = this.extractMetadata(fileContent, "Review");
+      const relativePath = `wiki/deliverables/${fileName}`;
+      rows.push(
+        `| [${fileName}](./${fileName}) | ${relativePath} | ${runType || "_unknown_"} | ${reviewStatus || "_unknown_"} | ${fileStats.mtime.toISOString()} |`,
+      );
+    }
+
+    const content = [
+      "# Deliverables Index",
+      "",
+      "| File | Path | Type | Review | Updated |",
+      "| --- | --- | --- | --- | --- |",
+      ...(rows.length > 0 ? rows : ["| _none_ | _none_ | _none_ | _none_ | _none_ |"]),
+      "",
+    ].join("\n");
+
+    const indexPath = path.join(deliverablesDir, "index.md");
+    await writeFile(indexPath, content, "utf8");
+  }
+
   private formatEntry(input: AppendWikiLogInput): string {
     const lines = [`## [${new Date().toISOString()}] ${input.eventType} | ${input.title}`];
 
@@ -117,5 +211,11 @@ export class WikiService {
     }
 
     return `${lines.join("\n")}\n`;
+  }
+
+  private extractMetadata(content: string, key: string): string | null {
+    const matcher = new RegExp(`^- ${key}:\\s*(.+)$`, "m");
+    const result = content.match(matcher);
+    return result?.[1]?.trim() || null;
   }
 }

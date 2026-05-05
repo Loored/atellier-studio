@@ -9,6 +9,7 @@ export type RunAgentInput = {
   context?: string;
   handoffAgentId?: string;
   handoffInstruction?: string;
+  recordDeliverable?: boolean;
 };
 
 export type RunAgentResult = {
