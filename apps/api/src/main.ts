@@ -16,7 +16,7 @@ const agentExecutorMode: AgentExecutorMode = forceMockExecutor
   ? "mock"
   : process.env.OPENAI_API_KEY
     ? "openai"
-    : "openai";
+    : "mock";
 const maxHandoffDepth = Number(process.env.AGENT_MAX_HANDOFF_DEPTH ?? 1);
 const executionTimeoutMs = Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 45_000);
 

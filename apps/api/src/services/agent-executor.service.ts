@@ -22,8 +22,13 @@ export interface AgentExecutorService {
   execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult>;
 }
 
+const MOCK_STEP_DELAY_MS = Number(process.env.MOCK_STEP_DELAY_MS ?? 0);
+
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    if (MOCK_STEP_DELAY_MS > 0) {
+      await new Promise((r) => setTimeout(r, MOCK_STEP_DELAY_MS));
+    }
     const normalizedInstruction = input.instruction.trim();
     const normalizedContext = input.context?.trim();
     const contextLine = normalizedContext ? `\nContexto: ${normalizedContext}` : "";

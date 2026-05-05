@@ -58,12 +58,25 @@ export class AgentRunService {
       input: {
         instruction: input.instruction,
         context: input.context,
+        ...(input.orchestrationStep && {
+          orchestrationRunId: input.orchestrationStep.orchestrationRunId,
+          orchestrationStepLabel: input.orchestrationStep.label,
+          orchestrationPhase: input.orchestrationStep.phase,
+        }),
       },
     });
 
     await this.agents.updateStatus(agentId, {
       status: "executing",
       lastRunId: run.id,
+      currentStep: input.orchestrationStep
+        ? {
+            label: input.orchestrationStep.label,
+            phase: input.orchestrationStep.phase,
+            orchestrationRunId: input.orchestrationStep.orchestrationRunId,
+            nextAgentName: input.orchestrationStep.nextAgentName,
+          }
+        : undefined,
     });
     emit?.({ type: "status", status: "running" });
 
@@ -122,6 +135,7 @@ export class AgentRunService {
       const updatedAgent = await this.agents.updateStatus(agentId, {
         status: execution.needsHuman ? "needs-human" : "done",
         lastRunId: completedRun.id,
+        currentStep: null,
       });
 
       if (!updatedAgent) {
@@ -173,6 +187,7 @@ export class AgentRunService {
       await this.agents.updateStatus(agentId, {
         status: "blocked",
         lastRunId: run.id,
+        currentStep: null,
       });
       emit?.({ type: "error", message });
       throw error;
