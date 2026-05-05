@@ -9,6 +9,14 @@ type CodexWorkerPanelStep = {
   summary: string;
   status: string;
   needsApproval: boolean;
+  riskLevel: "low" | "medium" | "high";
+  command: string;
+  startedAt?: string;
+  finishedAt?: string;
+  exitCode?: number;
+  output?: string;
+  stdoutPath?: string;
+  stderrPath?: string;
 };
 
 export function useCodexWorkerPanel() {

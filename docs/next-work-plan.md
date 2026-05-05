@@ -8,79 +8,57 @@ Keep moving Atellier toward a private operating system for memory, execution, re
 
 The next cycle should not be another visual pass. The pixel office and Tailwind migration are useful, but the highest leverage work is making agent execution safer, more inspectable, and more wiki-native.
 
-## Priority 1 - Executor And Model Safety Visibility
+## Status Snapshot (2026-05-05)
 
-**Status: partially done (2026-05-05)**
+Done in this cycle:
 
-- ✅ AppShell header now shows executor mode + model profile + model name (from `useHealthApi`).
-- ⏳ Still missing: explicit warning when OpenAI mode is active before starting a run, model profile selector in UI, per-run cost warning, tests for this behavior.
+- Executor safety visibility is now in place across app shell and execution surfaces.
+- `/health` now exposes `executorMode`, `executorModel`, and `modelProfile`.
+- OpenAI confirmation/warning states exist for orchestration, runs, office live mode, and codex worker run creation.
+- Wiki Brain MVP routes are implemented and tested:
+  - `POST /wiki/ingest`
+  - `POST /wiki/query`
+  - `POST /wiki/lint`
+- `docs/codex-worker.md` exists and Codex Worker control-plane v1 is implemented with:
+  - create / plan / approve-step / execute-next / cancel / finalize
+  - guardrails for invalid transitions
+  - durable finalize run log + wiki event
+  - web + API coverage
+
+## Priority 1 - Codex Worker Evidence Pass (v1.1)
 
 Why now:
 
-- Current runtime can execute real OpenAI-backed runs.
-- The user has already seen quota/cost risk.
-- Karpathy-style autonomy needs explicit permissions and a visible autonomy slider.
+- Control-plane safety exists, but operator confidence depends on better execution evidence.
+- This is the shortest path to a usable private operating system loop before real command adapters.
 
 Target outcome:
 
-- `/health` exposes executor mode, model, and ideally model profile.
-- UI shows executor mode/model before the operator starts runs.
-- Real OpenAI mode has a clear warning.
-- Mock mode remains easy to enable.
-- Model profile language is explicit: `cheap`, `standard`, `deep`.
+- Per-step evidence is inspectable, not only step status.
+- Finalize includes stronger review payload before close.
+- UI makes approval and unresolved states obvious without reading logs manually.
 
-Remaining slice:
+Scope:
 
-- Add a warning banner/modal when starting an orchestration in OpenAI mode.
-- Add model profile selector (cheap / standard / deep).
-- Add tests for API health and UI rendering.
+- persist richer step output metadata in codex worker run output
+- expose per-step output in codex worker panel
+- strengthen finalize summary/evidence structure
+- keep fake executor; no real Codex CLI integration yet
 
-## Priority 2 - Wiki Brain MVP
+## Priority 2 - Wiki Brain v2 (Write Path Safety + Reuse)
 
 Why now:
 
-- The LLM Wiki principle is documented, but not yet first-class as product behavior.
-- The source/input -> wiki update -> task loop should become operational, not only a convention.
+- Ingest/query/lint are done, but writeback and reuse loops are still thin.
+- This is where memory quality starts compounding over time.
 
 Target outcome:
 
-- `POST /wiki/ingest`
-- `POST /wiki/query`
-- `POST /wiki/lint`
+- safe wiki page write/update route with path controls
+- stronger contradiction/stale-link reporting workflow
+- query results can be promoted into reusable wiki notes intentionally
 
-Initial implementation can be deterministic and non-LLM.
-
-Required behavior:
-
-- preserve raw source references
-- create/update source summaries
-- update index and log
-- detect simple contradictions or stale links
-- propose tasks when source material implies work
-- keep outputs in Markdown, not only MongoDB
-
-## Priority 3 - Codex Worker Design Doc
-
-Why now:
-
-- Atellier has Codex rules and skills, but no controlled in-app Codex Worker.
-- Building it without a design pass would risk unsafe command execution and vague permissions.
-
-Create:
-
-- `docs/codex-worker.md` or similar design doc
-
-Cover:
-
-- command execution model
-- sandbox and approval policy
-- model profiles
-- logging into runs
-- human review before risky changes
-- test doubles and no real Codex calls in tests
-- UI controls for approval, cancel, retry, inspect logs
-
-## Priority 4 - Orchestration Reliability
+## Priority 3 - Orchestration Reliability
 
 Why now:
 
@@ -93,7 +71,7 @@ Target outcome:
 - Move templates to their own module only when adding more workflows.
 - Link parent orchestration runs to child runs in UI when useful.
 
-## Priority 5 - Tailwind Remainder Only When It Unblocks Work
+## Priority 4 - Tailwind Remainder Only When It Unblocks Work
 
 **Status: mostly done (2026-05-05)**
 
@@ -122,14 +100,13 @@ Touch `MobileView.tsx` when:
 Read AGENTS.md, CODEX_MEMORY.md, docs/current-state-and-next-steps.md, and docs/next-work-plan.md.
 
 Goal:
-Add executor/model safety visibility before expanding agent autonomy.
+Close documentation drift and implement Codex Worker evidence improvements.
 
 Tasks:
-1. Verify /health exposes executor mode and model; add fields if missing.
-2. Add a visible UI badge for executor mode and model.
-3. Add clear warning copy or state when OpenAI-backed execution is active.
-4. Keep mock mode easy to identify and use.
-5. Add focused API/web tests for the changed behavior.
+1. Update docs to reflect completed executor safety, wiki brain MVP, and codex worker control-plane work.
+2. Extend codex worker run output with richer per-step evidence fields and render them in panel UI.
+3. Keep transition guardrails and finalize checks strict.
+4. Add focused API/web tests for new evidence rendering and payload behavior.
 
 Do not:
 - add MCP

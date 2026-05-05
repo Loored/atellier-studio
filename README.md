@@ -145,10 +145,9 @@ pnpm codex:wiki-lint
 
 ## Next Work
 
-1. Wiki Brain
-2. Executor/model cost safety
-3. Codex Worker design
-4. Orchestration reliability
-5. MCP Layer later
+1. Codex Worker evidence pass (step output artifacts + stronger finalize review payloads)
+2. Wiki Brain v2 (safe page write/update + stronger contradiction reuse loop)
+3. Orchestration template modularization as workflows grow
+4. MCP Layer later
 
-MCP, Codex worker execution, auth, cloud deploy, multiplayer, and vector search are intentionally out of scope until the Wiki Brain and safety layers are stable. Pixel office exists as a visualization layer, but it is not the next product priority.
+MCP, auth, cloud deploy, multiplayer, and vector search are intentionally out of scope until Wiki Brain and Codex Worker evidence loops are stable. Pixel office exists as a visualization layer, but it is not the next product priority.

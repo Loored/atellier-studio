@@ -286,8 +286,25 @@ describe("App", () => {
       profile: "standard",
       goal: "Implement a safe API change",
       steps: [
-        { id: "step-1", summary: "Inspect relevant files and constraints", status: "pending", needsApproval: false },
-        { id: "step-2", summary: "Implement bounded change and update tests", status: "pending", needsApproval: true },
+        {
+          id: "step-1",
+          summary: "Inspect relevant files and constraints",
+          status: "pending",
+          needsApproval: false,
+          riskLevel: "low",
+          command: "rg --files",
+          output: "Fake executor completed step.",
+          stdoutPath: "runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stdout.log",
+          stderrPath: "runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stderr.log",
+        },
+        {
+          id: "step-2",
+          summary: "Implement bounded change and update tests",
+          status: "pending",
+          needsApproval: true,
+          riskLevel: "medium",
+          command: "pnpm test:api",
+        },
       ],
     });
     planCodexRunMock.mockResolvedValue({});
@@ -478,6 +495,8 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "Execute next" }));
     await waitFor(() => expect(executeNextCodexMock).toHaveBeenCalledWith("codex-run-1"));
+    expect(screen.getByText(/stdout:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fake executor completed step\./i)).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
     expect(screen.getByText(/Finalize blocked:/i)).toBeInTheDocument();
