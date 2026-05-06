@@ -98,8 +98,8 @@ export function OfficeView() {
 
       {/* ── Page header ────────────────────────────────────── */}
       <div className="shrink-0 px-6 pt-5 pb-4 border-b border-(--border-subtle)">
-        <div className="flex items-center justify-between gap-4 mb-3">
-          <div>
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div className="min-w-0">
             <h1 className="text-[1.8rem] font-extrabold tracking-[-0.03em] text-ink leading-none">
               Office
             </h1>
@@ -108,18 +108,28 @@ export function OfficeView() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {runningCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 h-7 border border-teal/30 rounded-lg px-2.5 text-[0.75rem] text-teal bg-teal/10 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal" />
-                {runningCount} running
-              </span>
-            )}
-            {waitingCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 h-7 border border-gold/30 rounded-lg px-2.5 text-[0.75rem] text-gold bg-gold/10 font-semibold">
-                {waitingCount} waiting
-              </span>
-            )}
+          <div className="grid justify-items-end gap-2">
+            <div className="flex items-center gap-2">
+              {runningCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 h-7 border border-teal/30 rounded-lg px-2.5 text-[0.75rem] text-teal bg-teal/10 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal" />
+                  {runningCount} running
+                </span>
+              )}
+              {waitingCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 h-7 border border-gold/30 rounded-lg px-2.5 text-[0.75rem] text-gold bg-gold/10 font-semibold">
+                  {waitingCount} waiting
+                </span>
+              )}
+            </div>
+            {isOpenAiExecution ? (
+              <div className="inline-flex max-w-[320px] items-start gap-2 rounded-lg border border-orange/25 bg-orange/10 px-2.5 py-1.5 text-[0.67rem] leading-snug text-orange">
+                <span className="mt-[0.22rem] h-1.5 w-1.5 rounded-full bg-orange flex-shrink-0" />
+                <span>
+                  OpenAI execution active ({modelProfile} · {executorModel}). Live mode can auto-run agents and consume tokens.
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -169,11 +179,6 @@ export function OfficeView() {
             </button>
           </div>
         </div>
-        {isOpenAiExecution ? (
-          <p className="mt-2 m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">
-            OpenAI execution is active ({modelProfile} · {executorModel}). Live mode auto-runs agents and may consume tokens continuously.
-          </p>
-        ) : null}
       </div>
 
       {/* ── Body: canvas + side panel ──────────────────────── */}
@@ -232,7 +237,7 @@ export function OfficeView() {
 
         {/* Agent side panel */}
         {selectedAgent && (
-          <div className="w-[340px] shrink-0 overflow-y-auto">
+          <div className="w-[420px] xl:w-[460px] shrink-0 overflow-y-auto border-l border-[var(--border-subtle)]">
             <AgentSidePanel
               agent={selectedAgent}
               agentIndex={agents.findIndex((a) => a.id === selectedAgent.id)}

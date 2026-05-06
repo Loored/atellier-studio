@@ -27,7 +27,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     bodyLimit: 1024 * 1024,
     logger: options.logger ?? false,
   });
-  const services = options.services ?? createAppServices(options);
+  const services = options.services ?? await createAppServices(options);
 
   await services.wiki.ensureWiki();
   fastify.addHook("onRequest", async (_request, reply) => {
