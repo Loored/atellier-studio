@@ -2,6 +2,7 @@ export type WikiLogEventType =
   | "initialization"
   | "ingest"
   | "query"
+  | "wiki_write"
   | "run_completed"
   | "run_log"
   | "wiki_lint"
@@ -12,6 +13,11 @@ export type WikiPageResponse = {
   path: string;
   content: string;
   ready: boolean;
+};
+
+export type WikiWritePageInput = {
+  path: string;
+  content: string;
 };
 
 export type WikiLogEntry = {

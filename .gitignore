@@ -142,6 +142,7 @@ vite.config.ts.timestamp-*
 
 # Local browser automation artifacts
 .playwright-mcp/
+.playwright-cli/
 
 # OS files
 .DS_Store

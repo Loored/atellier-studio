@@ -692,6 +692,65 @@ describe("operational spine routes", () => {
     expect(queryResult.matches.some((match) => match.path.startsWith("wiki/"))).toBe(true);
   });
 
+  it("writes a wiki page through the safe write route", async () => {
+    const writeResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/notes/wiki-brain-v2.md",
+        content: "# Wiki Brain v2\n\n- Add safe write path.\n",
+      },
+    });
+    expect(writeResponse.statusCode).toBe(201);
+    expect(writeResponse.json<WikiPageResponse>().path).toBe("wiki/notes/wiki-brain-v2.md");
+
+    const pageResponse = await server.inject({
+      method: "GET",
+      url: "/wiki/page?path=wiki/notes/wiki-brain-v2.md",
+    });
+    expect(pageResponse.statusCode).toBe(200);
+    expect(pageResponse.json<WikiPageResponse>().content).toContain("Wiki Brain v2");
+
+    const logResponse = await server.inject({
+      method: "GET",
+      url: "/wiki/log",
+    });
+    expect(logResponse.statusCode).toBe(200);
+    expect(logResponse.json<WikiPageResponse>().content).toContain("wiki_write | Wiki page updated");
+  });
+
+  it("rejects unsafe wiki write paths", async () => {
+    const outsideWrite = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "tasks/inbox.md",
+        content: "# Not allowed",
+      },
+    });
+    expect(outsideWrite.statusCode).toBe(400);
+
+    const reservedWrite = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/log.md",
+        content: "# Not allowed",
+      },
+    });
+    expect(reservedWrite.statusCode).toBe(400);
+
+    const invalidCategory = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/random/custom.md",
+        content: "# Not allowed",
+      },
+    });
+    expect(invalidCategory.statusCode).toBe(400);
+  });
+
   it("ranks wiki query matches deterministically by relevance and path", async () => {
     await server.inject({
       method: "POST",

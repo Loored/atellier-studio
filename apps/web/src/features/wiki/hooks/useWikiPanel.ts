@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { useWikiIndexApi, useWikiIngestApi, useWikiLintApi, useWikiLogApi, useWikiPageApi, useWikiQueryApi } from "../../../api/hooks/wiki/useWikiApi";
+import {
+  useWikiIndexApi,
+  useWikiIngestApi,
+  useWikiLintApi,
+  useWikiLogApi,
+  useWikiPageApi,
+  useWikiQueryApi,
+  useWikiWritePageApi,
+} from "../../../api/hooks/wiki/useWikiApi";
 
 export function useWikiPanel() {
   const [ingestTitle, setIngestTitle] = useState("");
@@ -9,6 +17,8 @@ export function useWikiPanel() {
   const [querySourceType, setQuerySourceType] = useState<"all" | "note" | "research" | "client" | "decision" | "other">("all");
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const [selectedSummaryPath, setSelectedSummaryPath] = useState<string | null>(null);
+  const [writePath, setWritePath] = useState("wiki/notes/my-note.md");
+  const [writeContent, setWriteContent] = useState("");
 
   const {
     data: wikiIndex,
@@ -36,6 +46,11 @@ export function useWikiPanel() {
     isPending: isLinting,
     data: lintResult,
   } = useWikiLintApi();
+  const {
+    mutateAsync: writeWikiPage,
+    isPending: isWritingWikiPage,
+    data: writeResult,
+  } = useWikiWritePageApi();
 
   const latestLog = wikiLog?.content
     .split("\n")
@@ -47,6 +62,11 @@ export function useWikiPanel() {
   const proposedTasks = ingestResult?.proposedTasks ?? [];
   const canRunIngest = ingestTitle.trim().length > 0 && ingestContent.trim().length > 0 && !isIngesting;
   const canRunQuery = queryInput.trim().length > 0;
+  const canWritePage =
+    writePath.trim().endsWith(".md") &&
+    writePath.trim().length > 0 &&
+    writeContent.trim().length > 0 &&
+    !isWritingWikiPage;
   const lintIssues = lintResult?.issues ?? [];
   const lintCheckedAt = lintResult?.checkedAt ?? null;
   const lintSummary = useMemo(() => {
@@ -84,8 +104,38 @@ export function useWikiPanel() {
     setActiveQuery(queryInput.trim());
   }
 
+  function promoteQueryMatchToDraft(matchPath: string, snippet: string): void {
+    const slug = matchPath
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "query-note";
+    setWritePath(`wiki/notes/query-${slug}.md`);
+    setWriteContent([
+      `# Query Draft - ${matchPath}`,
+      "",
+      "## Source",
+      "",
+      `- path: ${matchPath}`,
+      "",
+      "## Notes",
+      "",
+      snippet,
+      "",
+    ].join("\n"));
+  }
+
   async function runLint(): Promise<void> {
     await lintWiki();
+  }
+
+  async function submitWritePage(): Promise<void> {
+    if (!canWritePage) return;
+    const result = await writeWikiPage({
+      path: writePath.trim(),
+      content: writeContent.trim(),
+    });
+    setSelectedSummaryPath(result.path);
   }
 
   return {
@@ -121,9 +171,18 @@ export function useWikiPanel() {
     lintSummary,
     canRunIngest,
     canRunQuery,
+    canWritePage,
+    writePath,
+    writeContent,
+    setWritePath,
+    setWriteContent,
+    isWritingWikiPage,
+    writeResult,
     submitIngest,
     selectIngestSummary,
     submitQuery,
+    promoteQueryMatchToDraft,
     runLint,
+    submitWritePage,
   };
 }
