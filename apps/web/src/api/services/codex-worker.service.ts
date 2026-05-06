@@ -1,25 +1,17 @@
-import type { CodexWorkerMode, CodexWorkerProfile } from "@atellier/shared";
+import type {
+  CodexWorkerFinalizeEvidence,
+  CodexWorkerMode,
+  CodexWorkerProfile,
+  CodexWorkerStep,
+} from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
 type CodexWorkerView = {
-  run: { id: string; status: string; output?: { finalize?: { runLog?: string; finalizedAt?: string } } };
+  run: { id: string; status: string; output?: { finalize?: { runLog?: string; finalizedAt?: string; evidence?: CodexWorkerFinalizeEvidence } } };
   mode: CodexWorkerMode;
   profile: CodexWorkerProfile;
   goal: string;
-  steps: Array<{
-    id: string;
-    summary: string;
-    status: string;
-    needsApproval: boolean;
-    riskLevel: "low" | "medium" | "high";
-    command: string;
-    startedAt?: string;
-    finishedAt?: string;
-    exitCode?: number;
-    output?: string;
-    stdoutPath?: string;
-    stderrPath?: string;
-  }>;
+  steps: CodexWorkerStep[];
 };
 
 export const codexWorkerService = {

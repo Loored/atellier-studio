@@ -19,6 +19,8 @@ export function WikiPanel() {
     setQueryInput,
     setQuerySourceType,
     queryMatches,
+    relatedPages,
+    contradictions,
     isFetchingQuery,
     isIngesting,
     ingestResult,
@@ -225,6 +227,34 @@ export function WikiPanel() {
               <p className="text-[0.74rem] text-ink-faint">No results yet.</p>
             ) : null}
           </div>
+          {relatedPages.length > 0 ? (
+            <div className="mt-2 border-t border-white/5 pt-2">
+              <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-1.5">Related pages</p>
+              <div className="grid gap-1.5 max-h-28 overflow-auto">
+                {relatedPages.map((page) => (
+                  <div key={page.path} className="text-[0.74rem] text-ink-muted">
+                    <p className="m-0 text-ink">{page.path}</p>
+                    <p className="m-0 text-ink-faint">{page.reason}</p>
+                    <p className="m-0 text-ink-muted">{page.summary}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {contradictions.length > 0 ? (
+            <div className="mt-2 border-t border-white/5 pt-2">
+              <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-orange mb-1.5">Possible contradictions</p>
+              <div className="grid gap-1.5 max-h-28 overflow-auto">
+                {contradictions.map((item) => (
+                  <div key={`${item.primaryPath}-${item.conflictingPath}`} className="text-[0.74rem] text-ink-muted">
+                    <p className="m-0 text-ink">{item.primaryPath}</p>
+                    <p className="m-0 text-ink-faint">vs {item.conflictingPath}</p>
+                    <p className="m-0 text-ink-muted">{item.reason}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
@@ -242,9 +272,13 @@ export function WikiPanel() {
           ) : null}
           <div className="mt-2 max-h-24 overflow-auto">
             {lintIssues.map((issue) => (
-              <p key={`${issue.path}-${issue.code}`} className="text-[0.74rem] text-ink-muted mb-1">
-                {issue.code}: {issue.path}
-              </p>
+              <div key={`${issue.path}-${issue.code}`} className="mb-2 text-[0.74rem] text-ink-muted">
+                <p className="m-0">
+                  {issue.code}: <span className="text-ink">{issue.path}</span>
+                </p>
+                <p className="m-0 mt-0.5 text-ink-faint">{issue.message}</p>
+                {issue.suggestion ? <p className="m-0 mt-0.5 text-ink-faint">Suggest: {issue.suggestion}</p> : null}
+              </div>
             ))}
           </div>
         </section>

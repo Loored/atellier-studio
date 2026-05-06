@@ -5,6 +5,50 @@ import type { PixelCharacter } from "./engine/types";
 
 const MOVE_SPEED = 1.2; // pixels per frame
 
+function hashToSignedOffset(value: string, amplitude: number): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return (hash % (amplitude * 2 + 1)) - amplitude;
+}
+
+function buildInteractionAnchors(characters: PixelCharacter[]): Map<string, { x: number; y: number }> {
+  const byName = new Map(characters.map((char) => [char.name, char] as const));
+  const anchors = new Map<string, { x: number; y: number }>();
+  const reservedTargets = new Set<string>();
+
+  for (const source of characters) {
+    const targetName = source.currentStep?.nextAgentName;
+    if (!targetName) continue;
+    const target = byName.get(targetName);
+    if (!target || reservedTargets.has(target.id)) continue;
+
+    reservedTargets.add(target.id);
+
+    const midpointX = (source.deskX + target.deskX) / 2;
+    const midpointY = (source.deskY + target.deskY) / 2;
+    const dx = target.deskX - source.deskX;
+    const dy = target.deskY - source.deskY;
+    const length = Math.hypot(dx, dy) || 1;
+    const nx = -dy / length;
+    const ny = dx / length;
+    const separation = 26;
+    const wobble = hashToSignedOffset(`${source.id}:${target.id}`, 6);
+
+    anchors.set(source.id, {
+      x: midpointX - nx * separation + wobble,
+      y: midpointY - ny * separation,
+    });
+    anchors.set(target.id, {
+      x: midpointX + nx * separation + wobble,
+      y: midpointY + ny * separation,
+    });
+  }
+
+  return anchors;
+}
+
 type Props = {
   characters: PixelCharacter[];
   onCharacterClick?: (characterId: string) => void;
@@ -57,12 +101,14 @@ export function PixelOfficeCanvas({ characters, onCharacterClick }: Props) {
       const tick = tickRef.current;
 
       // Update movement for each character
+      const interactionAnchors = buildInteractionAnchors(charsRef.current);
       for (const char of charsRef.current) {
         const isExecuting = char.status === "executing";
         const isWorking  = char.state === "working";
         const isWaiting  = char.state === "waiting"; // needs-human: stays at work zone
-        const targetX = isExecuting || isWorking || isWaiting ? char.workX : char.deskX;
-        const targetY = isExecuting || isWorking || isWaiting ? char.workY : char.deskY;
+        const interactionAnchor = interactionAnchors.get(char.id);
+        const targetX = interactionAnchor?.x ?? (isExecuting || isWorking || isWaiting ? char.workX : char.deskX);
+        const targetY = interactionAnchor?.y ?? (isExecuting || isWorking || isWaiting ? char.workY : char.deskY);
 
         // Work jitter only — no wander for idle (wander kept isMoving=true forever,
         // causing perpetual walk-in-place animation).

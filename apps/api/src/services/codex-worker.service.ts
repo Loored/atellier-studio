@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { CodexWorkerMode, CodexWorkerProfile, CodexWorkerStep, Run } from "@atellier/shared";
+import type {
+  CodexWorkerFinalizeEvidence,
+  CodexWorkerMode,
+  CodexWorkerProfile,
+  CodexWorkerStep,
+  Run,
+} from "@atellier/shared";
 import { RunService } from "./run.service";
 import { WikiService } from "./wiki.service";
 
@@ -101,6 +107,21 @@ export class CodexWorkerService {
     await mkdir(path.dirname(stdoutAbsolute), { recursive: true });
     await writeFile(stdoutAbsolute, `Fake executor completed step: ${step.summary}\nCommand: ${step.command}\n`, "utf8");
     await writeFile(stderrAbsolute, "", "utf8");
+    const evidence = {
+      summary: "Fake executor completed step.",
+      capturedAt: finishedAt,
+      command: step.command,
+      workingDirectory: step.workingDirectory,
+      notes: [
+        "Executed by the fake executor.",
+        `stdout written to ${stdoutPath}`,
+        `stderr written to ${stderrPath}`,
+      ],
+      artifacts: [
+        { label: "stdout", path: stdoutPath },
+        { label: "stderr", path: stderrPath },
+      ],
+    };
     const updated = worker.steps.map((s, i) =>
       i === idx
         ? {
@@ -112,6 +133,7 @@ export class CodexWorkerService {
             output: "Fake executor completed step.",
             stdoutPath,
             stderrPath,
+            evidence,
           }
         : s,
     );
@@ -145,6 +167,7 @@ export class CodexWorkerService {
             output: undefined,
             stdoutPath: undefined,
             stderrPath: undefined,
+            evidence: undefined,
           }
         : s,
     );
@@ -194,6 +217,20 @@ export class CodexWorkerService {
       "",
       ...worker.steps.flatMap((s) => {
         const lines = [`- ${s.summary} [${s.status}]`];
+        if (s.evidence) {
+          lines.push(`  - evidence: ${s.evidence.summary}`);
+          lines.push(`  - capturedAt: ${s.evidence.capturedAt}`);
+          lines.push(`  - command: ${s.evidence.command}`);
+          lines.push(`  - workingDirectory: ${s.evidence.workingDirectory}`);
+          if (s.evidence.notes.length > 0) {
+            lines.push("  - notes:");
+            lines.push(...s.evidence.notes.map((note) => `    - ${note}`));
+          }
+          if (s.evidence.artifacts.length > 0) {
+            lines.push("  - artifacts:");
+            lines.push(...s.evidence.artifacts.map((artifact) => `    - ${artifact.label}: ${artifact.path}`));
+          }
+        }
         if (s.exitCode !== undefined) lines.push(`  - exitCode: ${s.exitCode}`);
         if (s.stdoutPath) lines.push(`  - stdout: ${s.stdoutPath}`);
         if (s.stderrPath) lines.push(`  - stderr: ${s.stderrPath}`);
@@ -202,6 +239,7 @@ export class CodexWorkerService {
       "",
       "## Evidence",
       "",
+      `- Completed steps: ${completed}/${worker.steps.length}`,
       `- Changed files: ${(input.changedFiles ?? []).length}`,
       ...(input.changedFiles ?? []).map((file) => `  - ${file}`),
       `- Test evidence: ${(input.testEvidence ?? []).length}`,
@@ -226,12 +264,23 @@ export class CodexWorkerService {
         totalSteps: worker.steps.length,
         changedFiles: (input.changedFiles ?? []).join(", "),
         testEvidence: (input.testEvidence ?? []).join(", "),
+        evidenceCompletedSteps: completed,
+        evidenceTotalSteps: worker.steps.length,
       },
     });
     return this.runs.updateStatus(id, "completed", {
       ...(run.output as object | undefined),
       codexWorker: worker,
-      finalize: { runLog: runPath, finalizedAt: now.toISOString() },
+      finalize: {
+        runLog: runPath,
+        finalizedAt: now.toISOString(),
+        evidence: {
+          completedSteps: completed,
+          totalSteps: worker.steps.length,
+          changedFiles: input.changedFiles ?? [],
+          testEvidence: input.testEvidence ?? [],
+        } satisfies CodexWorkerFinalizeEvidence,
+      },
     });
   }
 

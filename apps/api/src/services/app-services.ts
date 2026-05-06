@@ -13,6 +13,7 @@ import { TaskService } from "./task.service";
 import { WikiService } from "./wiki.service";
 import { type StorageMode } from "./service-utils";
 import { CodexWorkerService } from "./codex-worker.service";
+import { readdir } from "node:fs/promises";
 
 export type AppServices = {
   agents: AgentService;
@@ -44,13 +45,37 @@ export function resolveAtellierRoot(input?: string): string {
   return path.resolve(process.cwd(), "../../atelier");
 }
 
-export function createAppServices(options: CreateAppServicesOptions = {}): AppServices {
+async function listVerifiedRepoFiles(repoRoot: string, relativeDir: string): Promise<string[]> {
+  const root = path.join(repoRoot, relativeDir);
+  try {
+    const files: string[] = [];
+    const entries = await readdir(root, { withFileTypes: true });
+    for (const entry of entries) {
+      const childRelativePath = path.posix.join(relativeDir, entry.name);
+      if (entry.isFile()) {
+        files.push(childRelativePath);
+      } else if (entry.isDirectory()) {
+        files.push(...(await listVerifiedRepoFiles(repoRoot, childRelativePath)));
+      }
+    }
+    return files.sort();
+  } catch {
+    return [];
+  }
+}
+
+export async function createAppServices(options: CreateAppServicesOptions = {}): Promise<AppServices> {
   const storageMode = options.storageMode ?? "mongo";
   const atelierRootResolved = resolveAtellierRoot(options.atelierRoot);
+  const repoRootResolved = path.resolve(atelierRootResolved, "..");
   const wiki = new WikiService(atelierRootResolved);
   const agents = new AgentService(storageMode);
   const runs = new RunService(storageMode, wiki);
   const messages = new MessageService(storageMode);
+  const repoFileHints = [
+    ...(await listVerifiedRepoFiles(repoRootResolved, "apps/web/src/features/wiki")),
+    ...(await listVerifiedRepoFiles(repoRootResolved, "apps/api/src/services")),
+  ];
   const executorMode: AgentExecutorMode = options.agentExecutorMode
     ?? (options.openaiApiKey ? "openai" : "mock");
   const executor = createAgentExecutorService({
@@ -61,10 +86,12 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
           model: options.openaiModel ?? "gpt-4.1-mini",
         }
       : undefined,
+    repoFileHints,
   });
   const agentRuns = new AgentRunService(agents, runs, messages, executor, {
     maxHandoffDepth: options.maxHandoffDepth,
     executionTimeoutMs: options.executionTimeoutMs,
+    verifiedRepoFiles: repoFileHints,
   });
 
   return {

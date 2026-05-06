@@ -3,10 +3,12 @@ import type { AgentExecutorService, ExecuteAgentInstructionInput } from "./agent
 import { AgentService } from "./agent.service";
 import { MessageService } from "./message.service";
 import { RunService } from "./run.service";
+import { validateAgentResponse } from "./agent-response-validator";
 
 export class AgentRunService {
   private readonly maxHandoffDepth: number;
   private readonly executionTimeoutMs: number;
+  private readonly verifiedRepoFiles: string[];
 
   constructor(
     private readonly agents: AgentService,
@@ -16,12 +18,14 @@ export class AgentRunService {
     options: {
       maxHandoffDepth?: number;
       executionTimeoutMs?: number;
+      verifiedRepoFiles?: string[];
     } = {},
   ) {
     const rawDepth = options.maxHandoffDepth;
     const rawTimeout = options.executionTimeoutMs;
     this.maxHandoffDepth = Number.isFinite(rawDepth) ? Math.max(0, Math.floor(rawDepth as number)) : 1;
     this.executionTimeoutMs = Number.isFinite(rawTimeout) ? Math.max(1000, rawTimeout as number) : 45_000;
+    this.verifiedRepoFiles = [...new Set(options.verifiedRepoFiles ?? [])].sort();
   }
 
   async run(agentId: string, input: RunAgentInput): Promise<RunAgentResult | null> {
@@ -58,6 +62,7 @@ export class AgentRunService {
       input: {
         instruction: input.instruction,
         context: input.context,
+        verifiedRepoFiles: this.verifiedRepoFiles,
         ...(input.orchestrationStep && {
           orchestrationRunId: input.orchestrationStep.orchestrationRunId,
           orchestrationStepLabel: input.orchestrationStep.label,
@@ -99,6 +104,30 @@ export class AgentRunService {
         context: input.context,
       });
 
+      const validation = validateAgentResponse({
+        role: agent.role,
+        response: execution.response,
+        verifiedRepoFiles: this.verifiedRepoFiles,
+      });
+
+      const combinedInvalidReferencedFiles = validation.invalidReferencedFiles;
+
+      if (combinedInvalidReferencedFiles.length > 0) {
+        await this.runs.appendLog(run.id, {
+          level: "warn",
+          message: `Agent response referenced unverified files: ${combinedInvalidReferencedFiles.join(", ")}`,
+        });
+      }
+
+      if (validation.issues.length > 0) {
+        for (const issue of validation.issues) {
+          await this.runs.appendLog(run.id, {
+            level: issue.severity === "error" ? "error" : "warn",
+            message: `[${validation.role}] ${issue.message}`,
+          });
+        }
+      }
+
       for (const chunk of this.chunkText(execution.response, 80)) {
         emit?.({ type: "chunk", content: chunk });
       }
@@ -124,6 +153,16 @@ export class AgentRunService {
           messageId: assistantMessage.id,
           response: execution.response,
           needsHuman: execution.needsHuman,
+          validation: {
+            role: validation.role,
+            passed: validation.passed,
+            issues: validation.issues,
+            verifiedRepoFiles: this.verifiedRepoFiles,
+            invalidReferencedFiles: combinedInvalidReferencedFiles,
+            referencedFiles: validation.referencedFiles,
+            candidateFiles: validation.candidateFiles,
+            changedFiles: validation.changedFiles,
+          },
         },
         suppressAutoDeliverable: input.recordDeliverable === false,
       });
@@ -161,17 +200,17 @@ export class AgentRunService {
             message: "Handoff skipped: detected circular handoff target.",
           });
         } else {
-        await this.handleHandoff({
-          sourceAgent: updatedAgent,
-          sourceRunId: completedRun.id,
-          sourceInstruction: input.instruction,
-          sourceResponse: execution.response,
-          handoffAgentId: input.handoffAgentId,
-          handoffInstruction: input.handoffInstruction,
-          remainingHandoffDepth: remainingHandoffDepth - 1,
-          lineage: new Set(lineage),
-          emit,
-        });
+          await this.handleHandoff({
+            sourceAgent: updatedAgent,
+            sourceRunId: completedRun.id,
+            sourceInstruction: input.instruction,
+            sourceResponse: execution.response,
+            handoffAgentId: input.handoffAgentId,
+            handoffInstruction: input.handoffInstruction,
+            remainingHandoffDepth: remainingHandoffDepth - 1,
+            lineage: new Set(lineage),
+            emit,
+          });
         }
       }
 
@@ -276,6 +315,12 @@ export class AgentRunService {
       context: `handoff from ${options.sourceAgent.name}`,
     });
 
+    const validation = validateAgentResponse({
+      role: targetAgent.role,
+      response: handoffExecution.response,
+      verifiedRepoFiles: this.verifiedRepoFiles,
+    });
+
     for (const chunk of this.chunkText(handoffExecution.response, 80)) {
       options.emit?.({ type: "chunk", content: chunk });
     }
@@ -293,6 +338,7 @@ export class AgentRunService {
         handoffFromRunId: options.sourceRunId,
         response: handoffExecution.response,
         messageId: handoffAssistantMessage.id,
+        validation,
       },
     });
 

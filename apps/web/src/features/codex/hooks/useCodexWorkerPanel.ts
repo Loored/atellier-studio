@@ -1,23 +1,8 @@
 import { useState } from "react";
-import type { CodexWorkerMode, CodexWorkerProfile } from "@atellier/shared";
+import type { CodexWorkerFinalizeEvidence, CodexWorkerMode, CodexWorkerProfile, CodexWorkerStep } from "@atellier/shared";
 import { useCodexWorkerApi } from "../../../api/hooks/codex/useCodexWorkerApi";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import { wikiService } from "../../../api/services/wiki.service";
-
-type CodexWorkerPanelStep = {
-  id: string;
-  summary: string;
-  status: string;
-  needsApproval: boolean;
-  riskLevel: "low" | "medium" | "high";
-  command: string;
-  startedAt?: string;
-  finishedAt?: string;
-  exitCode?: number;
-  output?: string;
-  stdoutPath?: string;
-  stderrPath?: string;
-};
 
 export function useCodexWorkerPanel() {
   const [goal, setGoal] = useState("Implement a safe API change");
@@ -30,9 +15,10 @@ export function useCodexWorkerPanel() {
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
 
-  const steps: CodexWorkerPanelStep[] = api.codexWorkerQuery.data?.steps ?? [];
+  const steps: CodexWorkerStep[] = api.codexWorkerQuery.data?.steps ?? [];
   const runLogPath = api.codexWorkerQuery.data?.run?.output?.finalize?.runLog ?? null;
   const finalizedAt = api.codexWorkerQuery.data?.run?.output?.finalize?.finalizedAt ?? null;
+  const finalizeEvidence: CodexWorkerFinalizeEvidence | null = api.codexWorkerQuery.data?.run?.output?.finalize?.evidence ?? null;
   const runStatus = api.codexWorkerQuery.data?.run?.status ?? null;
   const [runLogContent, setRunLogContent] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -177,6 +163,7 @@ export function useCodexWorkerPanel() {
     modelProfile,
     runLogPath,
     finalizedAt,
+    finalizeEvidence,
     runLogContent,
     actionError,
     steps,

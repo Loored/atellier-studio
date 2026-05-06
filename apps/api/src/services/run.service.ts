@@ -4,6 +4,7 @@ import {
   type AppendRunLogInput,
   type CompleteRunInput,
   type CreateRunInput,
+  type AgentValidationResult,
   type Run,
   type RunLogEntry,
   type RunReviewStatus,
@@ -207,6 +208,16 @@ export class RunService {
 
   async updateReviewStatus(id: string, reviewStatus: RunReviewStatus): Promise<Run | null> {
     if (this.storageMode === "mongo") {
+      const existing = await RunModel.findById(id);
+      if (!existing) {
+        return null;
+      }
+      const existingRun = toJsonRecord<Run>(existing);
+      const validation = this.readValidation(existingRun.output);
+      if (reviewStatus === "approved" && this.hasBlockingValidationIssues(validation)) {
+        throw new Error(this.buildReviewBlockedMessage(validation));
+      }
+
       const run = await RunModel.findByIdAndUpdate(
         id,
         cleanUndefined({
@@ -230,6 +241,11 @@ export class RunService {
       return null;
     }
 
+    const validation = this.readValidation(current.output);
+    if (reviewStatus === "approved" && this.hasBlockingValidationIssues(validation)) {
+      throw new Error(this.buildReviewBlockedMessage(validation));
+    }
+
     const next: Run = {
       ...current,
       reviewStatus,
@@ -240,6 +256,37 @@ export class RunService {
       await this.appendDeliverableAcceptedLog(next);
     }
     return next;
+  }
+
+  private readValidation(output: unknown): AgentValidationResult | null {
+    const validation = (output as { validation?: AgentValidationResult } | undefined)?.validation;
+    return validation ?? null;
+  }
+
+  private hasBlockingValidationIssues(validation: AgentValidationResult | null): boolean {
+    if (!validation) {
+      return false;
+    }
+    if (!validation.passed) {
+      return true;
+    }
+    return (validation.issues ?? []).some((issue) => issue.severity === "error");
+  }
+
+  private buildReviewBlockedMessage(validation: AgentValidationResult | null): string {
+    if (!validation) {
+      return "Run validation blocked approval.";
+    }
+
+    const issueText = (validation.issues ?? [])
+      .filter((issue) => issue.severity === "error")
+      .slice(0, 3)
+      .map((issue) => issue.message)
+      .join(" ");
+
+    return issueText
+      ? `Run validation blocked approval: ${issueText}`
+      : "Run validation blocked approval.";
   }
 
   async promoteDeliverable(id: string): Promise<Run | null> {

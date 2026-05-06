@@ -1,6 +1,7 @@
 import { Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
 import { RUN_REVIEW_STATUSES } from "@atellier/shared";
 import { RUN_LOG_MESSAGE_MAX_LENGTH } from "@atellier/shared";
+import { ValidationSummary } from "../../../components/ValidationSummary";
 import { useRunsTimeline } from "../hooks/useRunsTimeline";
 
 export function RunsTimeline() {
@@ -97,6 +98,7 @@ export function RunsTimeline() {
           const pendingLogMessage = runLogMessages[run.id]?.trim() ?? "";
           const latestLog = run.logs.at(-1);
           const isRunning = run.status === "running";
+          const validation = readRunValidation(run);
 
           return (
             <li
@@ -128,6 +130,12 @@ export function RunsTimeline() {
                 <p className="mt-2 text-[0.72rem] text-ink-muted overflow-wrap-anywhere">
                   {latestLog.level}: {latestLog.message}
                 </p>
+              ) : null}
+
+              {validation ? (
+                <div className="mt-2">
+                  <ValidationSummary validation={validation} />
+                </div>
               ) : null}
 
               {run.status !== "completed" ? (
@@ -230,4 +238,25 @@ export function RunsTimeline() {
       </ul>
     </section>
   );
+}
+
+function readRunValidation(run: {
+  output?: unknown;
+}) {
+  const output = run.output as
+    | {
+        validation?: {
+          role?: string;
+          passed?: boolean;
+          issues?: Array<{ code?: string; message?: string; severity?: string }>;
+          verifiedRepoFiles?: string[];
+          invalidReferencedFiles?: string[];
+          referencedFiles?: string[];
+          candidateFiles?: string[];
+          changedFiles?: string[];
+        };
+      }
+    | undefined;
+
+  return output?.validation ?? null;
 }

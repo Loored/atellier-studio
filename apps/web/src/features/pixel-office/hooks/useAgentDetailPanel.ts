@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AGENT_STATUSES, type AgentRunStreamEvent } from "@atellier/shared";
-import type { Agent } from "@atellier/shared";
+import type { Agent, Run, RunAgentResult } from "@atellier/shared";
 import {
   useAgentMessagesApi,
   useAgentsApi,
@@ -8,6 +8,7 @@ import {
   useUpdateAgentInstructionsApi,
   useUpdateAgentStatusApi,
 } from "../../../api/hooks/agents/useAgentsApi";
+import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
 
 type TerminalLineTone = "info" | "success" | "error" | "muted";
 
@@ -26,17 +27,23 @@ export function useAgentDetailPanel(agent: Agent) {
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
   const [streamingResponse, setStreamingResponse] = useState("");
   const [streamingStatus, setStreamingStatus] = useState<"idle" | "queued" | "running" | "finalizing">("idle");
+  const [latestStreamResult, setLatestStreamResult] = useState<RunAgentResult | null>(null);
   const [instructionsDraft, setInstructionsDraft] = useState(agent.instructions ?? "");
   const runAgentStream = useRunAgentStreamApi();
   const updateAgentStatus = useUpdateAgentStatusApi();
   const updateAgentInstructions = useUpdateAgentInstructionsApi();
   const { data: agentList = [] } = useAgentsApi();
+  const { data: runList = [] } = useRunsApi();
   const handoffCandidateList = agentList.filter((candidate) => candidate.id !== agent.id);
   const {
     data: messageList = [],
     isFetching: isFetchingMessages,
     isLoadingWithoutCache: isLoadingMessagesWithoutCache,
   } = useAgentMessagesApi(agent.id);
+  const latestRun = latestStreamResult?.run ?? findLatestRun(runList, agent.lastRunId);
+  const latestValidation = streamingStatus === "idle" ? readRunValidation(latestRun) : null;
+  const latestResponse = latestStreamResult?.assistantMessage.content ?? "";
+  const displayAgent = latestStreamResult?.agent ?? agent;
 
   useEffect(() => {
     setInstructionsDraft(agent.instructions ?? "");
@@ -88,6 +95,7 @@ export function useAgentDetailPanel(agent: Agent) {
     runAgentStream.reset();
     setStreamingResponse("");
     setStreamingStatus("queued");
+    setLatestStreamResult(null);
 
     runAgentStream.mutate(
       {
@@ -107,7 +115,9 @@ export function useAgentDetailPanel(agent: Agent) {
             return;
           }
           if (event.type === "result") {
+            setLatestStreamResult(event.result);
             setStreamingStatus("idle");
+            setStreamingResponse("");
             return;
           }
           if (event.type === "error") {
@@ -121,6 +131,7 @@ export function useAgentDetailPanel(agent: Agent) {
           setHandoffInstruction("");
           pushTerminalLine("run completed", "success");
           setStreamingStatus("idle");
+          setStreamingResponse("");
         },
         onError: (error) => {
           pushTerminalLine(`run error: ${error.message}`, "error");
@@ -295,6 +306,7 @@ export function useAgentDetailPanel(agent: Agent) {
     messageList,
     streamingResponse,
     streamingStatus,
+    isStreamingActive: streamingStatus !== "idle" || runAgentStream.isPending,
     instructionsDraft,
     isFetchingMessages,
     isLoadingMessagesWithoutCache,
@@ -312,5 +324,35 @@ export function useAgentDetailPanel(agent: Agent) {
     handleRunTerminalCommand,
     handleSendInstruction,
     handleToggleTerminal,
+    latestRun,
+    latestValidation,
+    latestResponse,
+    displayAgent,
   };
+}
+
+function findLatestRun(runList: Run[], lastRunId?: string): Run | null {
+  if (!lastRunId) {
+    return null;
+  }
+  return runList.find((run) => run.id === lastRunId) ?? null;
+}
+
+function readRunValidation(run: Run | null) {
+  const output = run?.output as
+    | {
+        validation?: {
+          role?: string;
+          passed?: boolean;
+          issues?: Array<{ code?: string; message?: string; severity?: string }>;
+          verifiedRepoFiles?: string[];
+          invalidReferencedFiles?: string[];
+          referencedFiles?: string[];
+          candidateFiles?: string[];
+          changedFiles?: string[];
+        };
+      }
+    | undefined;
+
+  return output?.validation ?? null;
 }
