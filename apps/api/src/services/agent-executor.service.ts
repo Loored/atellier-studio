@@ -16,6 +16,7 @@ export type AgentExecutorMode = "mock" | "openai";
 export type OpenAiAgentExecutorConfig = {
   apiKey: string;
   model: string;
+  repoFileHints?: string[];
 };
 
 export interface AgentExecutorService {
@@ -44,7 +45,7 @@ Responsibilities:
 - Produce builder-ready deliverables with a clear QA handoff note
 - Do not expand scope beyond what was planned
 
-Output format: implementation report (changes made → risk assessment → blockers → QA handoff).`,
+Output format: implementation report (candidate files → summary → risk assessment → blockers → QA handoff).`,
 
   qa: `You are the quality assurance agent for Atellier Studio.
 Responsibilities:
@@ -117,11 +118,13 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
       ctxLine,
       `**Task:** ${taskSnippet}`,
       ``,
-      `**Implementation path:**`,
-      `1. Located target: relevant service/route layer`,
-      `2. Change type: additive — no breaking contract changes`,
-      `3. Files affected: service + route + test`,
-      `4. All existing patterns preserved`,
+      `**Candidate files:**`,
+      `- apps/api/src/services/wiki.service.ts`,
+      ``,
+      `**Summary:**`,
+      `Proposed an additive service-layer change using existing patterns.`,
+      ``,
+      `**Risk assessment:** Low — no breaking contract changes expected`,
       ``,
       `**Blockers:** None identified`,
       ``,
@@ -233,6 +236,15 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
       `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
       "",
       roleExpertise,
+      "This chat executor cannot edit repository files. Be truthful about that boundary.",
+      "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
+      "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
+      this.config.repoFileHints?.length
+        ? [
+            "Verified repository files you may reference:",
+            ...this.config.repoFileHints.map((filePath) => `- ${filePath}`),
+          ].join("\n")
+        : "",
       customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
     ]
       .filter(Boolean)
@@ -291,14 +303,17 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
 export function createAgentExecutorService(options: {
   mode: AgentExecutorMode;
   openai?: OpenAiAgentExecutorConfig;
+  repoFileHints?: string[];
 }): AgentExecutorService {
   if (options.mode === "openai") {
     if (!options.openai?.apiKey) {
       throw new Error("OPENAI_API_KEY is required when AGENT_EXECUTOR_MODE=openai.");
     }
-    return new OpenAiAgentExecutorService(options.openai);
+    return new OpenAiAgentExecutorService({
+      ...options.openai,
+      repoFileHints: options.repoFileHints,
+    });
   }
 
   return new MockAgentExecutorService();
 }
-

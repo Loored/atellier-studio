@@ -9,8 +9,10 @@ import {
   type WikiLintResponse,
   type WikiPageResponse,
   type WikiQueryInput,
+  type WikiContradiction,
   type WikiQueryMatch,
   type WikiQueryResponse,
+  type WikiRelatedPage,
 } from "@atellier/shared";
 
 const DEFAULT_INDEX = `# Atellier Studio Wiki Index
@@ -95,9 +97,9 @@ export class WikiService {
 
   async writePage(relativePath: string, content: string): Promise<WikiPageResponse> {
     await this.ensureWiki();
-    const { normalized, resolved } = this.resolveAtelierPath(relativePath);
-    await mkdir(path.dirname(resolved), { recursive: true });
-    await writeFile(resolved, content, "utf8");
+    this.assertWritableWikiMarkdownPath(relativePath);
+    await this.writeAtelierPage(relativePath, content);
+    const normalized = relativePath.trim();
     if (this.isDeliverableMarkdownPath(normalized)) {
       await this.refreshDeliverablesIndex();
     }
@@ -107,6 +109,12 @@ export class WikiService {
       content,
       ready: true,
     };
+  }
+
+  private async writeAtelierPage(relativePath: string, content: string): Promise<void> {
+    const { resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    await writeFile(resolved, content, "utf8");
   }
 
   async deletePage(relativePath: string): Promise<void> {
@@ -158,7 +166,7 @@ export class WikiService {
       content,
       "",
     ].join("\n");
-    await this.writePage(rawPath, rawBody);
+    await this.writeAtelierPage(rawPath, rawBody);
 
     const summaryPath = `wiki/sources/${datePrefix}-${slug}.md`;
     const summaryBody = [
@@ -175,7 +183,7 @@ export class WikiService {
       this.summarizeContent(content),
       "",
     ].join("\n");
-    await this.writePage(summaryPath, summaryBody);
+    await this.writeAtelierPage(summaryPath, summaryBody);
     await this.upsertSourceIndexEntry(summaryPath, sourceType, datePrefix);
 
     await this.appendLog({
@@ -207,8 +215,14 @@ export class WikiService {
     const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
     const sourceType = input.sourceType;
     const files = await this.listMarkdownFiles(path.join(this.atelierRootResolved, "wiki"));
+    const indexEntries = await this.readWikiIndexEntries();
     const rankedMatches: Array<WikiQueryMatch & { score: number }> = [];
+    const relatedPages: WikiRelatedPage[] = [];
+    const contradictions: WikiContradiction[] = [];
     const queryLower = query.toLowerCase();
+    const queryTerms = queryLower.split(/\s+/).filter((term) => term.length > 2);
+    const relatedSeen = new Set<string>();
+    const contradictionMap = new Map<string, string[]>();
 
     for (const filePath of files) {
       const content = await readFile(filePath, "utf8");
@@ -232,6 +246,43 @@ export class WikiService {
         score: occurrenceCount + titleBonus,
       });
     }
+
+    for (const entry of indexEntries) {
+      const entryText = `${entry.path} ${entry.summary} ${entry.category}`.toLowerCase();
+      const relevance = queryTerms.filter((term) => entryText.includes(term)).length;
+      if (relevance === 0) {
+        continue;
+      }
+
+      if (!relatedSeen.has(entry.path)) {
+        relatedSeen.add(entry.path);
+        relatedPages.push({
+          path: entry.path,
+          summary: entry.summary,
+          reason: entry.category === "sources"
+            ? "Source summary shares query terms."
+            : "Index entry shares query terms.",
+        });
+      }
+
+      const key = entry.summary.toLowerCase().replace(/\s+/g, " ").trim();
+      const paths = contradictionMap.get(key) ?? [];
+      paths.push(entry.path);
+      contradictionMap.set(key, paths);
+    }
+
+    for (const [summary, paths] of contradictionMap.entries()) {
+      const uniquePaths = Array.from(new Set(paths));
+      if (uniquePaths.length < 2) {
+        continue;
+      }
+      contradictions.push({
+        primaryPath: uniquePaths[0]!,
+        conflictingPath: uniquePaths[1]!,
+        reason: `Multiple wiki index entries share the summary "${summary}" and should be reviewed together.`,
+      });
+    }
+
     const matches = rankedMatches
       .sort((a, b) => {
         if (b.score !== a.score) {
@@ -255,6 +306,8 @@ export class WikiService {
     return {
       query,
       matches,
+      relatedPages: relatedPages.slice(0, 5),
+      contradictions: contradictions.slice(0, 3),
     };
   }
 
@@ -274,6 +327,7 @@ export class WikiService {
           code: "missing_page",
           path: `wiki/${linkedPath.replace(/\\/g, "/")}`,
           message: "Linked page from wiki index does not exist.",
+          suggestion: `Recreate or remove the missing link from wiki/index.md: ${linkedPath}`,
         });
       }
     }
@@ -283,6 +337,7 @@ export class WikiService {
         code: "stale_index_entry",
         path: `wiki/${duplicatePath.replace(/\\/g, "/")}`,
         message: "Wiki index contains duplicate entries for the same path.",
+        suggestion: "Deduplicate the index rows so each page appears once.",
       });
     }
 
@@ -297,6 +352,7 @@ export class WikiService {
           code: "stale_index_entry",
           path: sourceRelativePath,
           message: "Source summary is missing Raw path metadata.",
+          suggestion: "Restore the Raw path metadata so lint can trace the original source.",
         });
         continue;
       }
@@ -309,6 +365,7 @@ export class WikiService {
           code: "broken_link",
           path: sourceRelativePath,
           message: `Raw source reference is missing: ${rawPath}`,
+          suggestion: "Fix the Raw path reference or restore the missing raw source.",
         });
       }
     }
@@ -342,6 +399,45 @@ export class WikiService {
     }
   }
 
+  private async readWikiIndexEntries(): Promise<Array<{ path: string; summary: string; category: string }>> {
+    const indexContent = await readFile(this.indexPath, "utf8");
+    const lines = indexContent.split("\n");
+    const headerIndex = lines.findIndex((line) => line.trim() === "| Path | Summary | Category | Last updated | Source count |");
+    if (headerIndex < 0) {
+      return [];
+    }
+
+    const entries: Array<{ path: string; summary: string; category: string }> = [];
+    for (let index = headerIndex + 2; index < lines.length; index += 1) {
+      const line = lines[index]?.trim();
+      if (!line) {
+        break;
+      }
+      if (!line.startsWith("| [")) {
+        continue;
+      }
+
+      const cells = line.split("|").map((cell) => cell.trim()).filter(Boolean);
+      if (cells.length < 5) {
+        continue;
+      }
+
+      const pathMatch = cells[0]?.match(/\]\(([^)]+)\)/);
+      const pathValue = pathMatch?.[1];
+      if (!pathValue) {
+        continue;
+      }
+
+      entries.push({
+        path: pathValue.replace(/^\.\//, ""),
+        summary: cells[1] ?? "",
+        category: cells[2] ?? "",
+      });
+    }
+
+    return entries;
+  }
+
   private resolveAtelierPath(relativePath: string): { normalized: string; resolved: string } {
     const normalized = relativePath.trim();
     if (!normalized) {
@@ -355,6 +451,35 @@ export class WikiService {
     }
 
     return { normalized, resolved };
+  }
+
+  private assertWritableWikiMarkdownPath(relativePath: string): void {
+    const normalized = relativePath.trim().replace(/\\/g, "/");
+    const canonical = normalized.startsWith("atelier/") ? normalized.slice("atelier/".length) : normalized;
+    if (!canonical.startsWith("wiki/")) {
+      throw new Error("Writable wiki path must start with wiki/.");
+    }
+    if (!canonical.endsWith(".md")) {
+      throw new Error("Writable wiki path must be a markdown file.");
+    }
+    if (canonical === "wiki/index.md" || canonical === "wiki/log.md" || canonical === "wiki/deliverables/index.md") {
+      throw new Error("Writable wiki path is reserved.");
+    }
+    const segment = canonical.split("/")[1] ?? "";
+    const allowedSegments = new Set([
+      "clients",
+      "projects",
+      "entities",
+      "workflows",
+      "decisions",
+      "synthesis",
+      "sources",
+      "deliverables",
+      "notes",
+    ]);
+    if (!allowedSegments.has(segment)) {
+      throw new Error("Writable wiki path must target an allowed wiki category.");
+    }
   }
 
   private isDeliverableMarkdownPath(relativePath: string): boolean {

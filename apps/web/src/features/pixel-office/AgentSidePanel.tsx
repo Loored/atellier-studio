@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronRight, Copy, Send, Terminal, X, Zap } from "lucide-react";
 import type { Agent } from "@atellier/shared";
 import { cn } from "../../lib/cn";
+import { ValidationSummary } from "../../components/ValidationSummary";
 import { useAgentDetailPanel } from "./hooks/useAgentDetailPanel";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -98,6 +99,8 @@ type Props = {
 export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("activity");
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const {
     instruction,
@@ -109,6 +112,7 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
     messageList,
     streamingResponse,
     streamingStatus,
+    isStreamingActive,
     instructionsDraft,
     isLoadingMessagesWithoutCache,
     isRunningInstruction,
@@ -124,22 +128,25 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
     handleResumeAgent,
     handleRunTerminalCommand,
     handleSendInstruction,
+    latestValidation,
+    latestResponse,
+    displayAgent,
   } = useAgentDetailPanel(agent);
 
-  const isActive    = ["reading","thinking","planning","writing","executing","reviewing"].includes(agent.status);
-  const isWaiting   = agent.status === "needs-human";
-  const isBlocked   = agent.status === "blocked";
+  const isActive    = ["reading","thinking","planning","writing","executing","reviewing"].includes(displayAgent.status);
+  const isWaiting   = displayAgent.status === "needs-human";
+  const isBlocked   = displayAgent.status === "blocked";
 
-  const statusColor = STATUS_COLOR[agent.status] ?? STATUS_COLOR.idle;
-  const statusDot   = STATUS_DOT[agent.status]   ?? STATUS_DOT.idle;
-  const progress    = PROGRESS_WIDTH[agent.status] ?? "0%";
-  const activityTxt = ACTIVITY_TEXT[agent.status] ?? "In progress…";
+  const statusColor = STATUS_COLOR[displayAgent.status] ?? STATUS_COLOR.idle;
+  const statusDot   = STATUS_DOT[displayAgent.status]   ?? STATUS_DOT.idle;
+  const progress    = PROGRESS_WIDTH[displayAgent.status] ?? "0%";
+  const activityTxt = ACTIVITY_TEXT[displayAgent.status] ?? "In progress…";
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-sidebar)] border-l border-[var(--border-subtle)]">
 
       {/* ── Header ─────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-[var(--border-subtle)]">
+      <div className="flex-shrink-0 px-4 pt-4 pb-2.5 border-b border-[var(--border-subtle)]">
         <div className="flex items-start justify-between gap-2 mb-3">
           <p className="text-[0.6rem] font-bold tracking-[0.12em] uppercase text-ink-faint">
             Selected Agent
@@ -183,7 +190,7 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
         <div className="flex items-center gap-2 mt-2.5">
           <span className={cn("inline-flex items-center gap-1.5 h-6 border rounded-md px-2 text-[0.7rem] font-semibold", statusColor)}>
             <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", statusDot)} />
-            {STATUS_LABELS[agent.status] ?? agent.status}
+            {STATUS_LABELS[displayAgent.status] ?? displayAgent.status}
           </span>
           <span className="text-[0.68rem] text-ink-faint">ID: {agentIndex + 1}</span>
 
@@ -200,7 +207,7 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
       </div>
 
       {/* ── Current task ───────────────────────────────────── */}
-      <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border-subtle)]">
+      <div className="flex-shrink-0 px-4 py-2.5 border-b border-[var(--border-subtle)]">
         <p className="text-[0.6rem] font-bold tracking-[0.12em] uppercase text-ink-faint mb-2">
           Current Task
         </p>
@@ -253,9 +260,14 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
       </div>
 
       {/* ── Tab content ────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-[240px]">
+        {latestValidation ? (
+          <div className="px-4 pt-3">
+            <ValidationSummary validation={latestValidation} />
+          </div>
+        ) : null}
         {activeTab === "handoffs" && (
-          <div className="px-4 py-3 grid gap-3">
+          <div className="px-4 py-2.5 grid gap-2.5">
             {isLoadingMessagesWithoutCache ? (
               <p className="text-[0.75rem] text-ink-faint">Loading messages…</p>
             ) : messageList.length === 0 ? (
@@ -278,7 +290,7 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
         )}
 
         {activeTab === "activity" && (
-          <div className="px-4 py-3 grid gap-2">
+          <div className="px-4 py-2.5 grid gap-2">
             {/* Live status */}
             <div className="flex items-start gap-2">
               <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1", statusDot)} />
@@ -286,7 +298,7 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
             </div>
 
             {/* Streaming output */}
-            {(isRunningInstruction || streamingResponse) && (
+            {isStreamingActive && (
               <div className="border border-teal/20 rounded-lg px-3 py-2 bg-teal/[0.03] mt-1">
                 {streamingStatus !== "idle" && (
                   <p className="text-[0.65rem] font-bold tracking-[0.08em] uppercase text-teal mb-1">
@@ -298,6 +310,17 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
                 </p>
               </div>
             )}
+
+            {!isStreamingActive && latestResponse ? (
+              <div className="border border-[var(--border-card)] rounded-lg px-3 py-2 bg-black/15 mt-1">
+                <p className="text-[0.65rem] font-bold tracking-[0.08em] uppercase text-ink-faint mb-1">
+                  Latest response
+                </p>
+                <p className="text-[0.72rem] text-ink-muted whitespace-pre-wrap overflow-wrap-anywhere leading-relaxed">
+                  {latestResponse}
+                </p>
+              </div>
+            ) : null}
 
             {streamErrorMessage && (
               <p className="text-[0.72rem] text-[#fca5a5] overflow-wrap-anywhere">{streamErrorMessage}</p>
@@ -380,70 +403,88 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
       </div>
 
       {/* ── Instructions ───────────────────────────────────── */}
-      <div className="flex-shrink-0 px-4 py-3 border-t border-[var(--border-subtle)]">
-        <p className="text-[0.6rem] font-bold tracking-[0.1em] uppercase text-ink-faint mb-1.5">
-          Instructions
-        </p>
-        <textarea
-          className="w-full h-16 border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-[0.75rem] bg-black/20 text-ink resize-none outline-none focus:border-purple leading-relaxed"
-          placeholder="Persistent agent instructions…"
-          value={instructionsDraft}
-          onChange={(e) => setInstructionsDraft(e.target.value)}
-        />
+      <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-4 py-2.5">
         <button
           type="button"
-          className="mt-1.5 w-full h-7 text-[0.72rem] border-teal/30 text-teal bg-teal/[0.07] hover:bg-teal/[0.12]"
-          onClick={handleSaveInstructions}
-          disabled={isUpdatingInstructions}
+          onClick={() => setInstructionsOpen((v) => !v)}
+          className="flex items-center gap-2 w-full text-[0.6rem] font-bold tracking-[0.1em] uppercase text-ink-faint hover:text-ink-muted"
         >
-          {isUpdatingInstructions ? "Saving…" : "Save instructions"}
+          <span>Instructions</span>
+          <ChevronRight size={11} className={cn("ml-auto transition-transform", instructionsOpen && "rotate-90")} />
         </button>
+        {instructionsOpen && (
+          <div className="mt-2 grid gap-1.5">
+            <textarea
+              className="w-full h-14 border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-[0.74rem] bg-black/20 text-ink resize-none outline-none focus:border-purple leading-relaxed"
+              placeholder="Persistent agent instructions…"
+              value={instructionsDraft}
+              onChange={(e) => setInstructionsDraft(e.target.value)}
+            />
+            <button
+              type="button"
+              className="w-full h-7 text-[0.72rem] border-teal/30 text-teal bg-teal/[0.07] hover:bg-teal/[0.12]"
+              onClick={handleSaveInstructions}
+              disabled={isUpdatingInstructions}
+            >
+              {isUpdatingInstructions ? "Saving…" : "Save instructions"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Message composer ───────────────────────────────── */}
-      <div className="flex-shrink-0 px-4 pt-3 pb-4 border-t border-[var(--border-subtle)]">
-        <p className="text-[0.6rem] font-bold tracking-[0.1em] uppercase text-ink-faint mb-1.5">
-          Send message to {agent.name}
-        </p>
-        <textarea
-          className="w-full h-[72px] border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-[0.82rem] bg-[var(--bg-input)] text-ink resize-none outline-none focus:border-purple placeholder:text-ink-faint leading-relaxed"
-          placeholder="Write a message or instruction…"
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSendInstruction();
-          }}
-        />
-        <div className="grid grid-cols-[1fr_auto] gap-2 mt-2">
-          <select
-            className="h-8 text-[0.78rem]"
-            value={handoffAgentId}
-            onChange={(e) => setHandoffAgentId(e.target.value)}
-            aria-label="Handoff target"
-          >
-            <option value="">No handoff</option>
-            {handoffCandidateList.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} ({c.role})</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn-primary h-8 px-4 text-[0.8rem]"
-            onClick={handleSendInstruction}
-            disabled={!instruction.trim() || isRunningInstruction || isUpdatingAgentStatus}
-            aria-label="Send message"
-          >
-            <Send size={13} />
-            Send
-          </button>
-        </div>
-        {handoffAgentId && (
-          <input
-            className="w-full h-8 mt-1.5 text-[0.78rem]"
-            placeholder="Handoff instruction for next agent…"
-            value={handoffInstruction}
-            onChange={(e) => setHandoffInstruction(e.target.value)}
-          />
+      <div className="flex-shrink-0 border-t border-[var(--border-subtle)] px-4 py-2.5">
+        <button
+          type="button"
+          onClick={() => setComposerOpen((v) => !v)}
+          className="flex items-center gap-2 w-full text-[0.6rem] font-bold tracking-[0.1em] uppercase text-ink-faint hover:text-ink-muted"
+        >
+          <span>Send message to {agent.name}</span>
+          <ChevronRight size={11} className={cn("ml-auto transition-transform", composerOpen && "rotate-90")} />
+        </button>
+        {composerOpen && (
+          <div className="mt-2">
+            <textarea
+              className="w-full h-[64px] border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-[0.78rem] bg-[var(--bg-input)] text-ink resize-none outline-none focus:border-purple placeholder:text-ink-faint leading-relaxed"
+              placeholder="Write a message or instruction…"
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSendInstruction();
+              }}
+            />
+            <div className="grid grid-cols-[1fr_auto] gap-2 mt-2">
+              <select
+                className="h-8 text-[0.78rem]"
+                value={handoffAgentId}
+                onChange={(e) => setHandoffAgentId(e.target.value)}
+                aria-label="Handoff target"
+              >
+                <option value="">No handoff</option>
+                {handoffCandidateList.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.role})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-primary h-8 px-4 text-[0.8rem]"
+                onClick={handleSendInstruction}
+                disabled={!instruction.trim() || isRunningInstruction || isUpdatingAgentStatus}
+                aria-label="Send message"
+              >
+                <Send size={13} />
+                Send
+              </button>
+            </div>
+            {handoffAgentId && (
+              <input
+                className="w-full h-8 mt-1.5 text-[0.78rem]"
+                placeholder="Handoff instruction for next agent…"
+                value={handoffInstruction}
+                onChange={(e) => setHandoffInstruction(e.target.value)}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>

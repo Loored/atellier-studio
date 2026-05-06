@@ -15,6 +15,8 @@ const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
+const appendWikiLogMock = vi.hoisted(() => vi.fn());
+const writeWikiPageMock = vi.hoisted(() => vi.fn());
 const createCodexRunMock = vi.hoisted(() => vi.fn());
 const getCodexRunMock = vi.hoisted(() => vi.fn());
 const planCodexRunMock = vi.hoisted(() => vi.fn());
@@ -142,11 +144,12 @@ vi.mock("./api/services/wiki.service", () => ({
         "# Atellier Studio Wiki Log\n\n## [2026-05-04T00:00:00.000Z] initialization | Milestone 0 wiki log created",
       ready: true,
     }),
-    appendLog: vi.fn(),
+    appendLog: appendWikiLogMock,
     readPage: vi.fn(),
     ingest: ingestWikiMock,
     query: queryWikiMock,
     lint: lintWikiMock,
+    writePage: writeWikiPageMock,
   },
 }));
 
@@ -264,11 +267,37 @@ describe("App", () => {
           snippet: "preserve raw sources first",
         },
       ],
+      relatedPages: [
+        {
+          path: "wiki/sources/2026-05-05-client-meeting-notes.md",
+          summary: "preserve raw sources first",
+          reason: "Source summary shares query terms.",
+        },
+      ],
+      contradictions: [
+        {
+          primaryPath: "wiki/sources/2026-05-05-client-meeting-notes.md",
+          conflictingPath: "wiki/notes/raw-policy.md",
+          reason: "Multiple wiki index entries share the summary \"raw sources\" and should be reviewed together.",
+        },
+      ],
     });
     lintWikiMock.mockResolvedValue({
-      ok: true,
-      issues: [],
+      ok: false,
+      issues: [
+        {
+          code: "broken_link",
+          path: "wiki/sources/broken-source.md",
+          message: "Raw source reference is missing: raw/ingest/does-not-exist.md",
+          suggestion: "Fix the Raw path reference or restore the missing raw source.",
+        },
+      ],
       checkedAt: "2026-05-05T00:00:00.000Z",
+    });
+    writeWikiPageMock.mockResolvedValue({
+      path: "wiki/notes/wiki-brain-v2.md",
+      content: "# Wiki Brain v2\n\n- Safe write route active.",
+      ready: true,
     });
     createCodexRunMock.mockResolvedValue({ id: "codex-run-1" });
     getCodexRunMock.mockResolvedValue({
@@ -279,6 +308,12 @@ describe("App", () => {
           finalize: {
             runLog: "runs/2026-05-05-codex-worker-codex-run-1.md",
             finalizedAt: "2026-05-05T00:00:00.000Z",
+            evidence: {
+              completedSteps: 2,
+              totalSteps: 2,
+              changedFiles: ["apps/api/src/services/codex-worker.service.ts"],
+              testEvidence: ["pnpm test:web passed"],
+            },
           },
         },
       },
@@ -293,9 +328,25 @@ describe("App", () => {
           needsApproval: false,
           riskLevel: "low",
           command: "rg --files",
+          workingDirectory: ".",
           output: "Fake executor completed step.",
           stdoutPath: "runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stdout.log",
           stderrPath: "runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stderr.log",
+          evidence: {
+            summary: "Fake executor completed step.",
+            capturedAt: "2026-05-05T00:00:00.000Z",
+            command: "rg --files",
+            workingDirectory: ".",
+            notes: [
+              "Executed by the fake executor.",
+              "stdout written to runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stdout.log",
+              "stderr written to runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stderr.log",
+            ],
+            artifacts: [
+              { label: "stdout", path: "runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stdout.log" },
+              { label: "stderr", path: "runs/artifacts/2026-05-05-codex-worker-codex-run-1-step-1-step-1.stderr.log" },
+            ],
+          },
         },
         {
           id: "step-2",
@@ -304,6 +355,7 @@ describe("App", () => {
           needsApproval: true,
           riskLevel: "medium",
           command: "pnpm test:api",
+          workingDirectory: ".",
         },
       ],
     });
@@ -475,6 +527,47 @@ describe("App", () => {
         sourceType: "note",
       });
     });
+    expect(await screen.findByText(/related pages/i)).toBeInTheDocument();
+    expect(await screen.findByText(/possible contradictions/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /promote to draft/i }));
+    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toContain("wiki/decisions/query-");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Source");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Draft Provenance");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("Suggested page type: decision");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Suggested Structure");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Suggested Follow-ups");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Related Pages");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Review Notes");
+
+    await user.clear(screen.getByLabelText("Wiki path"));
+    await user.clear(screen.getByLabelText("Markdown content"));
+    await user.type(screen.getByLabelText("Wiki path"), "wiki/notes/wiki-brain-v2.md");
+    await user.type(screen.getByLabelText("Markdown content"), "# Wiki Brain v2\n\n- Safe write route active.");
+    await user.click(screen.getByRole("button", { name: /save wiki page/i }));
+
+    await waitFor(() => {
+      expect(writeWikiPageMock).toHaveBeenCalledWith({
+        path: "wiki/notes/wiki-brain-v2.md",
+        content: "# Wiki Brain v2\n\n- Safe write route active.",
+      });
+    });
+    await waitFor(() => {
+      expect(appendWikiLogMock).toHaveBeenCalledWith({
+        eventType: "wiki_write",
+        title: "Promoted wiki query result to draft",
+        summary: "Created draft from wiki/notes/wiki-brain-v2.md",
+        details: {
+          sourcePath: "wiki/sources/2026-05-05-client-meeting-notes.md",
+          query: "raw sources",
+          relatedPages: 1,
+          contradictions: 1,
+        },
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: /run wiki lint/i }));
+    expect(await screen.findByText(/Fix the Raw path reference or restore the missing raw source\./i)).toBeInTheDocument();
   });
 
   it("runs codex worker panel actions", async () => {
@@ -495,11 +588,13 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "Execute next" }));
     await waitFor(() => expect(executeNextCodexMock).toHaveBeenCalledWith("codex-run-1"));
-    expect(screen.getByText(/stdout:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Fake executor completed step\./i)).toBeInTheDocument();
+    expect(screen.getByText(/stdout written to/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Step output step-1/i)).toHaveTextContent("Fake executor completed step.");
 
     expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
     expect(screen.getByText(/Finalize blocked:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Finalize evidence:/i)).toBeInTheDocument();
+    expect(screen.getByText(/completed steps/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(cancelCodexMock).toHaveBeenCalledWith("codex-run-1"));

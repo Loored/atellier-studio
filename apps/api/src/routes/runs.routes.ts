@@ -118,8 +118,13 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
       reviewStatus: body.reviewStatus,
     };
 
-    const run = await services.runs.updateReviewStatus(id, input.reviewStatus);
-    return run ?? notFound(reply, "Run not found.");
+    try {
+      const run = await services.runs.updateReviewStatus(id, input.reviewStatus);
+      return run ?? notFound(reply, "Run not found.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to update run review status.";
+      return reply.code(409).send({ error: message });
+    }
   });
 
   fastify.patch("/runs/:id/promote-deliverable", async (request, reply) => {

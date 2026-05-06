@@ -8,7 +8,7 @@ Keep moving Atellier toward a private operating system for memory, execution, re
 
 The next cycle should not be another visual pass. The pixel office and Tailwind migration are useful, but the highest leverage work is making agent execution safer, more inspectable, and more wiki-native.
 
-## Status Snapshot (2026-05-05)
+## Status Snapshot (2026-05-06)
 
 Done in this cycle:
 
@@ -19,6 +19,8 @@ Done in this cycle:
   - `POST /wiki/ingest`
   - `POST /wiki/query`
   - `POST /wiki/lint`
+- Safe wiki page write/update route is now merged and available:
+  - `POST /wiki/page`
 - `docs/codex-worker.md` exists and Codex Worker control-plane v1 is implemented with:
   - create / plan / approve-step / execute-next / cancel / finalize
   - guardrails for invalid transitions
@@ -40,9 +42,9 @@ Target outcome:
 
 Scope:
 
-- persist richer step output metadata in codex worker run output
-- expose per-step output in codex worker panel
-- strengthen finalize summary/evidence structure
+- persist richer step evidence metadata in codex worker run output
+- expose per-step evidence in codex worker panel
+- strengthen finalize summary/evidence structure and counts
 - keep fake executor; no real Codex CLI integration yet
 
 ## Priority 2 - Wiki Brain v2 (Write Path Safety + Reuse)
@@ -100,13 +102,13 @@ Touch `MobileView.tsx` when:
 Read AGENTS.md, CODEX_MEMORY.md, docs/current-state-and-next-steps.md, and docs/next-work-plan.md.
 
 Goal:
-Close documentation drift and implement Codex Worker evidence improvements.
+Finish Codex Worker evidence pass v1.1.
 
 Tasks:
-1. Update docs to reflect completed executor safety, wiki brain MVP, and codex worker control-plane work.
-2. Extend codex worker run output with richer per-step evidence fields and render them in panel UI.
+1. Persist richer per-step evidence metadata in Codex Worker run output.
+2. Render step evidence and finalize evidence in the Codex Worker panel.
 3. Keep transition guardrails and finalize checks strict.
-4. Add focused API/web tests for new evidence rendering and payload behavior.
+4. Add focused API/web tests for evidence rendering and finalize payload behavior.
 
 Do not:
 - add MCP

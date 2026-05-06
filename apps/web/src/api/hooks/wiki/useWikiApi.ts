@@ -6,6 +6,7 @@ import type {
   WikiIngestResponse,
   WikiLintResponse,
   WikiPageResponse,
+  WikiWritePageInput,
   WikiQueryInput,
   WikiQueryResponse,
 } from "@atellier/shared";
@@ -109,6 +110,30 @@ export function useWikiLintApi(options: UseWikiLintApiOptions = {}) {
       onSuccess: async (result) => {
         notifySuccess(result.ok ? "Wiki lint passed" : "Wiki lint found issues");
         await queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log });
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type UseWikiWritePageApiOptions = UseMutationOptions<WikiPageResponse, Error, WikiWritePageInput>;
+
+export function useWikiWritePageApi(options: UseWikiWritePageApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<WikiPageResponse, Error, WikiWritePageInput>(
+    {
+      mutationFn: (input) => wikiService.writePage(input),
+      ...options,
+    },
+    {
+      onSuccess: async () => {
+        notifySuccess("Wiki page saved");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+        ]);
       },
       onError: (error) => notifyError(error),
     },

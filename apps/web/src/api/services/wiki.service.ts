@@ -5,6 +5,7 @@ import type {
   WikiIngestResponse,
   WikiLintResponse,
   WikiPageResponse,
+  WikiWritePageInput,
   WikiQueryInput,
   WikiQueryResponse,
 } from "@atellier/shared";
@@ -25,6 +26,11 @@ export const wikiService = {
     const response = await httpClient.get<WikiPageResponse>("/wiki/page", {
       params: { path },
     });
+    return response.data;
+  },
+
+  async writePage(input: WikiWritePageInput): Promise<WikiPageResponse> {
+    const response = await httpClient.post<WikiPageResponse>("/wiki/page", input);
     return response.data;
   },
 

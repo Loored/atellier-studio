@@ -1,4 +1,4 @@
-import type { Agent } from "./agent";
+import type { Agent, AgentRole } from "./agent";
 import type { AgentMessage } from "./message";
 import type { Run } from "./run";
 
@@ -11,12 +11,32 @@ export type OrchestrationStepRef = {
   nextAgentName?: string;
 };
 
+export type AgentValidationSeverity = "info" | "warn" | "error";
+
+export type AgentValidationIssue = {
+  code: string;
+  message: string;
+  severity: AgentValidationSeverity;
+};
+
+export type AgentValidationResult = {
+  role: AgentRole;
+  passed: boolean;
+  issues: AgentValidationIssue[];
+  verifiedRepoFiles: string[];
+  invalidReferencedFiles: string[];
+  referencedFiles: string[];
+  candidateFiles: string[];
+  changedFiles: string[];
+};
+
 export type RunAgentInput = {
   instruction: string;
   context?: string;
   handoffAgentId?: string;
   handoffInstruction?: string;
   recordDeliverable?: boolean;
+  verifiedRepoFiles?: string[];
   orchestrationStep?: OrchestrationStepRef;
 };
 

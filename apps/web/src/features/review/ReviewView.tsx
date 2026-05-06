@@ -11,6 +11,7 @@ import {
   TimerReset,
 } from "lucide-react";
 import { RUN_REVIEW_STATUSES } from "@atellier/shared";
+import { ValidationSummary } from "../../components/ValidationSummary";
 import { useRunsTimeline } from "../runs/hooks/useRunsTimeline";
 import { WikiPanel } from "../wiki/components/WikiPanel";
 
@@ -81,6 +82,19 @@ export function ReviewView() {
 
     return matchesTab && matchesSearch;
   });
+
+  const validationAlerts = runList
+    .map((run) => {
+      const validation = readRunValidation(run);
+      if (!validation || validation.passed) {
+        return null;
+      }
+      return validation;
+    })
+    .filter((validation): validation is NonNullable<ReturnType<typeof readRunValidation>> => Boolean(validation));
+
+  const validationAlertIssues = validationAlerts.flatMap((validation) => validation.issues ?? []);
+  const validationAlertInvalidRefs = validationAlerts.flatMap((validation) => validation.invalidReferencedFiles ?? []);
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -161,6 +175,26 @@ export function ReviewView() {
           </p>
         )}
 
+        {validationAlerts.length > 0 ? (
+          <div className="mb-4">
+            <div className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-ink-faint">
+              Validation alerts ({validationAlerts.length})
+            </div>
+            <ValidationSummary
+              validation={{
+                role: "builder",
+                passed: false,
+                issues: validationAlertIssues,
+                verifiedRepoFiles: [],
+                invalidReferencedFiles: validationAlertInvalidRefs,
+                referencedFiles: [],
+                candidateFiles: [],
+                changedFiles: [],
+              }}
+            />
+          </div>
+        ) : null}
+
         {/* Tabs */}
         <div className="review-tabs">
           {TABS.map(({ id, label }) => (
@@ -200,6 +234,8 @@ export function ReviewView() {
             const pendingLog = runLogMessages[run.id]?.trim() ?? "";
             const latestLog  = run.logs.at(-1);
             const isRunning  = run.status === "running";
+            const validation = readRunValidation(run);
+            const validationHasIssues = Boolean(validation && !validation.passed);
 
             return (
               <div
@@ -207,7 +243,9 @@ export function ReviewView() {
                 className={`border rounded-xl px-4 py-3 transition-all duration-150 ${
                   isRunning
                     ? "border-teal/[0.22] bg-teal/[0.03]"
-                    : "border-[var(--border-card)] bg-[var(--bg-card)] hover:border-purple/22"
+                    : validationHasIssues
+                      ? "run-item--validation-failed border-orange/35 bg-orange/[0.05] hover:border-orange/45"
+                      : "border-[var(--border-card)] bg-[var(--bg-card)] hover:border-purple/22"
                 }`}
               >
                 {/* Summary row */}
@@ -223,6 +261,11 @@ export function ReviewView() {
                         {run.reviewStatus}
                       </small>
                     )}
+                    {validationHasIssues ? (
+                      <small className="status-badge status-badge-review-changes-requested">
+                        validation failed
+                      </small>
+                    ) : null}
                   </div>
 
                   <span className="text-ink-faint text-[0.7rem] ml-auto tabular-nums">
@@ -235,6 +278,12 @@ export function ReviewView() {
                     {latestLog.level}: {latestLog.message}
                   </p>
                 )}
+
+                {validation ? (
+                  <div className="mt-2 ml-6">
+                    <ValidationSummary validation={validation} />
+                  </div>
+                ) : null}
 
                 {/* Running: append log + complete */}
                 {run.status !== "completed" && (
@@ -301,7 +350,8 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-green-400/35 text-green-400 bg-green-400/10 hover:bg-green-400/20"
                       onClick={() => setRunReview(run.id, "approved")}
-                      disabled={isUpdatingRunReview}
+                      disabled={isUpdatingRunReview || validationHasIssues}
+                      title={validationHasIssues ? "Validation failed. Resolve issues before approving." : "Approve run"}
                     >
                       <ShieldCheck size={13} />
                       Approve
@@ -344,4 +394,25 @@ export function ReviewView() {
       </aside>
     </div>
   );
+}
+
+function readRunValidation(run: {
+  output?: unknown;
+}) {
+  const output = run.output as
+    | {
+        validation?: {
+          role?: string;
+          passed?: boolean;
+          issues?: Array<{ code?: string; message?: string; severity?: string }>;
+          verifiedRepoFiles?: string[];
+          invalidReferencedFiles?: string[];
+          referencedFiles?: string[];
+          candidateFiles?: string[];
+          changedFiles?: string[];
+        };
+      }
+    | undefined;
+
+  return output?.validation ?? null;
 }
