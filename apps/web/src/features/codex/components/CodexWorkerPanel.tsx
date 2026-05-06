@@ -15,6 +15,7 @@ export function CodexWorkerPanel() {
     modelProfile,
     runLogPath,
     finalizedAt,
+    finalizeEvidence,
     runLogContent,
     actionError,
     steps,
@@ -166,6 +167,32 @@ export function CodexWorkerPanel() {
                 {step.stderrPath ? <p className="m-0">stderr: <span className="text-ink">{step.stderrPath}</span></p> : null}
               </div>
             ) : null}
+            {step.evidence ? (
+              <div className="mt-2 rounded-md border border-[var(--border-card)] bg-black/20 p-2 text-xs text-ink-muted">
+                <p className="m-0 text-ink">Evidence: {step.evidence.summary}</p>
+                <p className="m-0 mt-1">Captured: <span className="text-ink">{new Date(step.evidence.capturedAt).toLocaleString()}</span></p>
+                <p className="m-0 mt-1">Working dir: <span className="text-ink">{step.evidence.workingDirectory}</span></p>
+                <p className="m-0 mt-1">Command: <span className="text-ink">{step.evidence.command}</span></p>
+                {step.evidence.notes.length > 0 ? (
+                  <ul className="mt-1 mb-0 pl-4">
+                    {step.evidence.notes.map((note) => (
+                      <li key={note} className="text-ink-muted">
+                        {note}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {step.evidence.artifacts.length > 0 ? (
+                  <div className="mt-1">
+                    {step.evidence.artifacts.map((artifact) => (
+                      <p key={`${artifact.label}-${artifact.path}`} className="m-0">
+                        {artifact.label}: <span className="text-ink">{artifact.path}</span>
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -174,6 +201,13 @@ export function CodexWorkerPanel() {
           <p className="mb-2 text-xs text-ink-muted">
             Final run log: <span className="text-ink">{runLogPath}</span>
           </p>
+          {finalizeEvidence ? (
+            <p className="mb-2 text-xs text-ink-muted">
+              Finalize evidence: <span className="text-ink">{finalizeEvidence.completedSteps}/{finalizeEvidence.totalSteps}</span> completed steps,{" "}
+              <span className="text-ink">{finalizeEvidence.changedFiles.length}</span> changed file(s),{" "}
+              <span className="text-ink">{finalizeEvidence.testEvidence.length}</span> test evidence item(s)
+            </p>
+          ) : null}
           <button type="button" className="icon-only-button" onClick={() => void openRunLog()}>
             Open run log
           </button>
