@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  useAppendWikiLogApi,
   useWikiIndexApi,
   useWikiIngestApi,
   useWikiLintApi,
@@ -17,6 +18,7 @@ export function useWikiPanel() {
   const [querySourceType, setQuerySourceType] = useState<"all" | "note" | "research" | "client" | "decision" | "other">("all");
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const [selectedSummaryPath, setSelectedSummaryPath] = useState<string | null>(null);
+  const [queryDraftOriginPath, setQueryDraftOriginPath] = useState<string | null>(null);
   const [writePath, setWritePath] = useState("wiki/notes/my-note.md");
   const [writeContent, setWriteContent] = useState("");
 
@@ -51,6 +53,7 @@ export function useWikiPanel() {
     isPending: isWritingWikiPage,
     data: writeResult,
   } = useWikiWritePageApi();
+  const { mutateAsync: appendWikiLog } = useAppendWikiLogApi();
 
   const latestLog = wikiLog?.content
     .split("\n")
@@ -59,6 +62,8 @@ export function useWikiPanel() {
     .join("\n");
 
   const queryMatches = queryResult?.matches ?? [];
+  const relatedPages = queryResult?.relatedPages ?? [];
+  const contradictions = queryResult?.contradictions ?? [];
   const proposedTasks = ingestResult?.proposedTasks ?? [];
   const canRunIngest = ingestTitle.trim().length > 0 && ingestContent.trim().length > 0 && !isIngesting;
   const canRunQuery = queryInput.trim().length > 0;
@@ -110,8 +115,75 @@ export function useWikiPanel() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 48) || "query-note";
-    setWritePath(`wiki/notes/query-${slug}.md`);
-    setWriteContent([
+    const matchingRelated = relatedPages.filter((page) => page.path !== matchPath).slice(0, 3);
+    const matchingContradiction = contradictions[0];
+    const draftPageType = matchingContradiction
+      ? "decision"
+      : matchingRelated.length > 0
+        ? "note"
+        : "source";
+    const draftOutline = matchingContradiction
+      ? [
+          "## Suggested Structure",
+          "",
+          "- Problem statement",
+          "- Conflicting evidence",
+          "- Recommended interpretation",
+          "- Follow-up action",
+          "",
+        ]
+      : matchingRelated.length > 0
+        ? [
+            "## Suggested Structure",
+            "",
+            "- Context",
+            "- Related pages",
+            "- Notes",
+            "- Next steps",
+            "",
+        ]
+      : [
+          "## Suggested Structure",
+          "",
+          "- Context",
+          "- Notes",
+          "- Follow-up",
+          "",
+        ];
+    const draftFollowUps = matchingContradiction
+      ? [
+          "## Suggested Follow-ups",
+          "",
+          "- Review both conflicting pages together.",
+          "- Decide which page should be corrected or merged.",
+          "",
+        ]
+      : matchingRelated.length > 0
+        ? [
+            "## Suggested Follow-ups",
+            "",
+            "- Review related pages for overlapping context.",
+            "- Decide whether the draft should reference or merge with an existing note.",
+            "",
+          ]
+        : [
+            "## Suggested Follow-ups",
+            "",
+            "- Add one more source or note if the topic needs more context.",
+            "- Confirm whether this draft should become a durable page.",
+            "",
+          ];
+    const draftProvenance = [
+      "## Draft Provenance",
+      "",
+      `- Query: ${queryResult?.query ?? queryInput.trim()}`,
+      `- Source path: ${matchPath}`,
+      `- Suggested page type: ${draftPageType}`,
+      `- Related pages: ${matchingRelated.length}`,
+      `- Contradictions: ${matchingContradiction ? 1 : 0}`,
+      "",
+    ];
+    const draftContent = [
       `# Query Draft - ${matchPath}`,
       "",
       "## Source",
@@ -122,7 +194,30 @@ export function useWikiPanel() {
       "",
       snippet,
       "",
-    ].join("\n"));
+      ...draftProvenance,
+      ...draftOutline,
+      ...draftFollowUps,
+      "## Related Pages",
+      "",
+      ...(matchingRelated.length > 0
+        ? matchingRelated.map((page) => `- ${page.path}: ${page.reason}`)
+        : ["- none"]),
+      "",
+      "## Review Notes",
+      "",
+      matchingContradiction
+        ? `- Possible contradiction: ${matchingContradiction.primaryPath} vs ${matchingContradiction.conflictingPath}`
+        : "- none",
+      "",
+    ].join("\n");
+    const draftSegment = draftPageType === "decision"
+      ? "decisions"
+      : draftPageType === "source"
+        ? "sources"
+        : "notes";
+    setWritePath(`wiki/${draftSegment}/query-${slug}.md`);
+    setWriteContent(draftContent);
+    setQueryDraftOriginPath(matchPath);
   }
 
   async function runLint(): Promise<void> {
@@ -135,6 +230,20 @@ export function useWikiPanel() {
       path: writePath.trim(),
       content: writeContent.trim(),
     });
+    if (queryDraftOriginPath) {
+      await appendWikiLog({
+        eventType: "wiki_write",
+        title: "Promoted wiki query result to draft",
+        summary: `Created draft from ${result.path}`,
+        details: {
+          sourcePath: queryDraftOriginPath,
+          query: queryResult?.query ?? queryInput.trim(),
+          relatedPages: relatedPages.length,
+          contradictions: contradictions.length,
+        },
+      });
+      setQueryDraftOriginPath(null);
+    }
     setSelectedSummaryPath(result.path);
   }
 
@@ -157,6 +266,8 @@ export function useWikiPanel() {
     setQueryInput,
     setQuerySourceType,
     queryMatches,
+    relatedPages,
+    contradictions,
     isFetchingQuery,
     isIngesting,
     ingestResult,

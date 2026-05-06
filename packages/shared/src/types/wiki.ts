@@ -70,15 +70,30 @@ export type WikiQueryMatch = {
   snippet: string;
 };
 
+export type WikiRelatedPage = {
+  path: string;
+  summary: string;
+  reason: string;
+};
+
+export type WikiContradiction = {
+  primaryPath: string;
+  conflictingPath: string;
+  reason: string;
+};
+
 export type WikiQueryResponse = {
   query: string;
   matches: WikiQueryMatch[];
+  relatedPages: WikiRelatedPage[];
+  contradictions: WikiContradiction[];
 };
 
 export type WikiLintIssue = {
   code: "missing_page" | "broken_link" | "stale_index_entry";
   path: string;
   message: string;
+  suggestion?: string;
 };
 
 export type WikiLintResponse = {
