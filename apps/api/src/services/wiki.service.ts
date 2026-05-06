@@ -95,9 +95,9 @@ export class WikiService {
 
   async writePage(relativePath: string, content: string): Promise<WikiPageResponse> {
     await this.ensureWiki();
-    const { normalized, resolved } = this.resolveAtelierPath(relativePath);
-    await mkdir(path.dirname(resolved), { recursive: true });
-    await writeFile(resolved, content, "utf8");
+    this.assertWritableWikiMarkdownPath(relativePath);
+    await this.writeAtelierPage(relativePath, content);
+    const normalized = relativePath.trim();
     if (this.isDeliverableMarkdownPath(normalized)) {
       await this.refreshDeliverablesIndex();
     }
@@ -107,6 +107,12 @@ export class WikiService {
       content,
       ready: true,
     };
+  }
+
+  private async writeAtelierPage(relativePath: string, content: string): Promise<void> {
+    const { resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    await writeFile(resolved, content, "utf8");
   }
 
   async deletePage(relativePath: string): Promise<void> {
@@ -158,7 +164,7 @@ export class WikiService {
       content,
       "",
     ].join("\n");
-    await this.writePage(rawPath, rawBody);
+    await this.writeAtelierPage(rawPath, rawBody);
 
     const summaryPath = `wiki/sources/${datePrefix}-${slug}.md`;
     const summaryBody = [
@@ -175,7 +181,7 @@ export class WikiService {
       this.summarizeContent(content),
       "",
     ].join("\n");
-    await this.writePage(summaryPath, summaryBody);
+    await this.writeAtelierPage(summaryPath, summaryBody);
     await this.upsertSourceIndexEntry(summaryPath, sourceType, datePrefix);
 
     await this.appendLog({
@@ -355,6 +361,35 @@ export class WikiService {
     }
 
     return { normalized, resolved };
+  }
+
+  private assertWritableWikiMarkdownPath(relativePath: string): void {
+    const normalized = relativePath.trim().replace(/\\/g, "/");
+    const canonical = normalized.startsWith("atelier/") ? normalized.slice("atelier/".length) : normalized;
+    if (!canonical.startsWith("wiki/")) {
+      throw new Error("Writable wiki path must start with wiki/.");
+    }
+    if (!canonical.endsWith(".md")) {
+      throw new Error("Writable wiki path must be a markdown file.");
+    }
+    if (canonical === "wiki/index.md" || canonical === "wiki/log.md" || canonical === "wiki/deliverables/index.md") {
+      throw new Error("Writable wiki path is reserved.");
+    }
+    const segment = canonical.split("/")[1] ?? "";
+    const allowedSegments = new Set([
+      "clients",
+      "projects",
+      "entities",
+      "workflows",
+      "decisions",
+      "synthesis",
+      "sources",
+      "deliverables",
+      "notes",
+    ]);
+    if (!allowedSegments.has(segment)) {
+      throw new Error("Writable wiki path must target an allowed wiki category.");
+    }
   }
 
   private isDeliverableMarkdownPath(relativePath: string): boolean {

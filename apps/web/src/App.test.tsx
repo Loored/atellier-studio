@@ -15,6 +15,7 @@ const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
+const writeWikiPageMock = vi.hoisted(() => vi.fn());
 const createCodexRunMock = vi.hoisted(() => vi.fn());
 const getCodexRunMock = vi.hoisted(() => vi.fn());
 const planCodexRunMock = vi.hoisted(() => vi.fn());
@@ -147,6 +148,7 @@ vi.mock("./api/services/wiki.service", () => ({
     ingest: ingestWikiMock,
     query: queryWikiMock,
     lint: lintWikiMock,
+    writePage: writeWikiPageMock,
   },
 }));
 
@@ -269,6 +271,11 @@ describe("App", () => {
       ok: true,
       issues: [],
       checkedAt: "2026-05-05T00:00:00.000Z",
+    });
+    writeWikiPageMock.mockResolvedValue({
+      path: "wiki/notes/wiki-brain-v2.md",
+      content: "# Wiki Brain v2\n\n- Safe write route active.",
+      ready: true,
     });
     createCodexRunMock.mockResolvedValue({ id: "codex-run-1" });
     getCodexRunMock.mockResolvedValue({
@@ -473,6 +480,23 @@ describe("App", () => {
         query: "raw sources",
         limit: 5,
         sourceType: "note",
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: /promote to draft/i }));
+    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toContain("wiki/notes/query-");
+    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Source");
+
+    await user.clear(screen.getByLabelText("Wiki path"));
+    await user.clear(screen.getByLabelText("Markdown content"));
+    await user.type(screen.getByLabelText("Wiki path"), "wiki/notes/wiki-brain-v2.md");
+    await user.type(screen.getByLabelText("Markdown content"), "# Wiki Brain v2\n\n- Safe write route active.");
+    await user.click(screen.getByRole("button", { name: /save wiki page/i }));
+
+    await waitFor(() => {
+      expect(writeWikiPageMock).toHaveBeenCalledWith({
+        path: "wiki/notes/wiki-brain-v2.md",
+        content: "# Wiki Brain v2\n\n- Safe write route active.",
       });
     });
   });
