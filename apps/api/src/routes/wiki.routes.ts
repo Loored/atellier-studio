@@ -3,6 +3,7 @@ import {
   type AppendWikiLogInput,
   type WikiIngestInput,
   type WikiLogEventType,
+  type WikiWritePageInput,
   type WikiQueryInput,
 } from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
@@ -12,6 +13,7 @@ const WIKI_EVENT_TYPES = [
   "initialization",
   "ingest",
   "query",
+  "wiki_write",
   "run_completed",
   "run_log",
   "wiki_lint",
@@ -37,6 +39,37 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
         return reply.code(404).send({ error: "Wiki page not found." });
       }
       return badRequest(reply, error instanceof Error ? error.message : "Wiki page read failed.");
+    }
+  });
+
+  fastify.post("/wiki/page", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+    const wikiPath = stringField(body, "path");
+    const content = stringField(body, "content");
+    if (!wikiPath) {
+      return badRequest(reply, "Wiki page path is required.");
+    }
+    if (!content) {
+      return badRequest(reply, "Wiki page content is required.");
+    }
+    const input: WikiWritePageInput = { path: wikiPath, content };
+    try {
+      const page = await services.wiki.writePage(input.path, input.content);
+      await services.wiki.appendLog({
+        eventType: "wiki_write",
+        title: "Wiki page updated",
+        summary: `Saved ${page.path}`,
+        details: {
+          path: page.path,
+          contentBytes: Buffer.byteLength(page.content, "utf8"),
+        },
+      });
+      return reply.code(201).send(page);
+    } catch (error) {
+      return badRequest(reply, error instanceof Error ? error.message : "Wiki page write failed.");
     }
   });
 
