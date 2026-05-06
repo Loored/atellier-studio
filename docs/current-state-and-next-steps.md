@@ -42,9 +42,10 @@ The documentation/memory cleanup recommended below has started:
 - Local setup moved to `docs/operations/local-setup.md`.
 - README, architecture, agent protocol, and roadmap now describe the current stage instead of only Milestone 0.
 - Karpathy agentic-system insights were ingested into `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
+- Safe wiki page write/update route is now merged and wired into the wiki panel.
 - The next prioritized work is captured in `docs/next-work-plan.md`.
 
-The immediate implementation priority should now be executor/model safety visibility, then deterministic Wiki Brain MVP.
+The immediate implementation priority should now be the Codex Worker evidence pass, then deterministic Wiki Brain reuse/writeback.
 
 ## Original product vision
 

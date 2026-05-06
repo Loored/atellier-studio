@@ -120,6 +120,30 @@ Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, mul
   - durable finalize run artifact + wiki event
   - focused API and web tests
 
+### 2026-05-05 - Codex Worker evidence pass v1.1 started
+
+- Step evidence now persists on completed Codex Worker steps as structured metadata.
+- Codex Worker panel renders step evidence and finalize evidence counts.
+- Finalize run logs now include per-step evidence, changed-file counts, and test-evidence counts.
+
+### 2026-05-05 - Wiki lint suggestions added
+
+- Wiki lint issues now carry actionable suggestions in the API payload and wiki panel.
+- Broken links, missing pages, and stale index entries are easier to scan and fix during review.
+
+### 2026-05-05 - Wiki query contextual reuse added
+
+- Wiki query responses now include related pages and possible contradictions.
+- The wiki panel renders those hints so query results can feed reuse and review flows directly.
+
+### 2026-05-05 - Agent grounding validation v1.2
+
+- OpenAI-backed chat agents are treated as proposal agents, not file-editing agents.
+- Builder outputs should use `Candidate files` for proposed paths; `Changed files` is reserved for future diff-backed execution.
+- Agent validation now checks builder paths mentioned anywhere in the response against recursive verified repo file hints.
+- Review approval remains blocked when validation has critical errors.
+- Agent panel validation prefers the just-finished stream result before falling back to `/runs` refetch data.
+
 ### 2026-05-05 - Full UI redesign + Office pixel engine
 
 - Sidebar expanded from 64px icon-only to 220px icon+label rows. `--sidebar-w` updated.

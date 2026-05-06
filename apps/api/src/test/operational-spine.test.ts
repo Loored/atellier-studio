@@ -199,6 +199,61 @@ describe("operational spine routes", () => {
     expect(wikiLog.content).toContain(`Run ID: ${run.id}`);
   });
 
+  it("blocks approving runs with failed validation", async () => {
+    const createRunResponse = await server.inject({
+      method: "POST",
+      url: "/runs",
+      payload: {
+        type: "manual",
+        status: "running",
+      },
+    });
+
+    expect(createRunResponse.statusCode).toBe(201);
+    const run = createRunResponse.json<Run>();
+
+    const completeRunResponse = await server.inject({
+      method: "PATCH",
+      url: `/runs/${run.id}/complete`,
+      payload: {
+        summary: "Validation fixture",
+        output: {
+          validation: {
+            role: "builder",
+            passed: false,
+            issues: [
+              {
+                code: "builder.unverified_changed_file",
+                message: "Builder referenced an unverified file: apps/web/src/features/wiki/WikiView.tsx",
+                severity: "error",
+              },
+            ],
+            verifiedRepoFiles: ["apps/api/src/services/wiki.service.ts"],
+            invalidReferencedFiles: ["apps/web/src/features/wiki/WikiView.tsx"],
+            referencedFiles: ["apps/web/src/features/wiki/WikiView.tsx"],
+            candidateFiles: [],
+            changedFiles: ["apps/web/src/features/wiki/WikiView.tsx"],
+          },
+        },
+      },
+    });
+
+    expect(completeRunResponse.statusCode).toBe(200);
+
+    const approveResponse = await server.inject({
+      method: "PATCH",
+      url: `/runs/${run.id}/review`,
+      payload: {
+        reviewStatus: "approved",
+      },
+    });
+
+    expect(approveResponse.statusCode).toBe(409);
+    expect(approveResponse.json()).toMatchObject({
+      error: expect.stringContaining("Run validation blocked approval"),
+    });
+  });
+
   it("executes agent runs and persists agent chat messages", async () => {
     const createAgentResponse = await server.inject({
       method: "POST",
@@ -686,10 +741,17 @@ describe("operational spine routes", () => {
     });
 
     expect(queryResponse.statusCode).toBe(200);
-    const queryResult = queryResponse.json<{ query: string; matches: Array<{ path: string; snippet: string }> }>();
+    const queryResult = queryResponse.json<{
+      query: string;
+      matches: Array<{ path: string; snippet: string }>;
+      relatedPages: Array<{ path: string; summary: string; reason: string }>;
+      contradictions: Array<{ primaryPath: string; conflictingPath: string; reason: string }>;
+    }>();
     expect(queryResult.query).toBe("preserve raw sources");
     expect(queryResult.matches.length).toBeGreaterThan(0);
     expect(queryResult.matches.some((match) => match.path.startsWith("wiki/"))).toBe(true);
+    expect(Array.isArray(queryResult.relatedPages)).toBe(true);
+    expect(Array.isArray(queryResult.contradictions)).toBe(true);
   });
 
   it("writes a wiki page through the safe write route", async () => {
@@ -783,7 +845,11 @@ describe("operational spine routes", () => {
     });
 
     expect(queryResponse.statusCode).toBe(200);
-    const queryResult = queryResponse.json<{ matches: Array<{ path: string }> }>();
+    const queryResult = queryResponse.json<{
+      matches: Array<{ path: string }>;
+      relatedPages: Array<{ path: string }>;
+      contradictions: Array<{ primaryPath: string; conflictingPath: string }>;
+    }>();
     expect(queryResult.matches).toHaveLength(1);
     expect(queryResult.matches[0]?.path).toContain("alpha-deterministic-notes");
   });
@@ -828,13 +894,14 @@ describe("operational spine routes", () => {
     });
 
     expect(lintResponse.statusCode).toBe(200);
-    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string }> }>();
+    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string; suggestion?: string }> }>();
     expect(
       lint.issues.some(
         (issue) =>
           issue.code === "broken_link" &&
           issue.path === "wiki/sources/broken-source.md" &&
-          issue.message.includes("Raw source reference is missing"),
+          issue.message.includes("Raw source reference is missing") &&
+          issue.suggestion?.includes("Fix the Raw path reference"),
       ),
     ).toBe(true);
   });
@@ -861,13 +928,14 @@ describe("operational spine routes", () => {
     });
 
     expect(lintResponse.statusCode).toBe(200);
-    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string }> }>();
+    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string; suggestion?: string }> }>();
     expect(
       lint.issues.some(
         (issue) =>
           issue.code === "stale_index_entry" &&
           issue.path === "wiki/log.md" &&
-          issue.message.includes("duplicate entries"),
+          issue.message.includes("duplicate entries") &&
+          issue.suggestion?.includes("Deduplicate the index rows"),
       ),
     ).toBe(true);
   });
@@ -1016,11 +1084,21 @@ describe("operational spine routes", () => {
         status: string;
         stdoutPath?: string;
         stderrPath?: string;
+        evidence?: {
+          summary: string;
+          capturedAt: string;
+          command: string;
+          workingDirectory: string;
+          notes: string[];
+          artifacts: Array<{ label: string; path: string }>;
+        };
       }>;
     }>();
     const completedStep = view.steps.find((step) => step.status === "completed");
     expect(completedStep?.stdoutPath).toBeDefined();
     expect(completedStep?.stderrPath).toBeDefined();
+    expect(completedStep?.evidence?.summary).toBe("Fake executor completed step.");
+    expect(completedStep?.evidence?.artifacts.some((artifact) => artifact.label === "stdout")).toBe(true);
     if (completedStep?.stdoutPath) {
       const stdoutPage = await server.inject({
         method: "GET",
@@ -1107,6 +1185,8 @@ describe("operational spine routes", () => {
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("Codex worker finalized with durable memory.");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("apps/api/src/services/codex-worker.service.ts");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("pnpm test:api passed");
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("evidence: Fake executor completed step.");
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("Completed steps: 3/3");
   });
 
   it("rejects finalize when codex worker still has unresolved steps", async () => {
