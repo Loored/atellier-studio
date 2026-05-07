@@ -1,5 +1,8 @@
 # Atellier Studio — Current State and Next Steps
 
+> **2026-05-06 — direction updated.**
+> The strategic reframe and active priorities live in [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md). This file is still a useful product/architecture snapshot, but for *what to do next*, read the iteration plan first. See the new section [§ 2026-05-06 strategic reframe](#2026-05-06-strategic-reframe) below.
+
 This document captures the product/architecture review after the initial Atellier Studio implementation. It is intended for future Codex sessions so they understand what has already been built, what still matches the original vision, and what should happen next.
 
 Read this together with:
@@ -9,6 +12,8 @@ Read this together with:
 - `README.md`
 - `apps/web/AGENTS.md`
 - `apps/api/AGENTS.md`
+- [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (active plan)
+- [`docs/roadmap.md`](roadmap.md)
 
 ## Executive verdict
 
@@ -43,9 +48,40 @@ The documentation/memory cleanup recommended below has started:
 - README, architecture, agent protocol, and roadmap now describe the current stage instead of only Milestone 0.
 - Karpathy agentic-system insights were ingested into `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 - Safe wiki page write/update route is now merged and wired into the wiki panel.
-- The next prioritized work is captured in `docs/next-work-plan.md`.
+- The next prioritized work is captured in [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (supersedes `docs/next-work-plan.md` as of 2026-05-06).
 
-The immediate implementation priority should now be the Codex Worker evidence pass, then deterministic Wiki Brain reuse/writeback.
+The immediate implementation priority is **MCP server wrapper + Wiki Dream loop + Anthropic executor mode** — see the iteration plan for scope. Codex Worker evidence pass moved to P5.
+
+## 2026-05-06 strategic reframe
+
+The *Code with Claude 2026* keynote shipped capabilities that overlap heavily with Atellier's direction:
+
+- **Auto Dream** in Claude Code consolidates memory files (prune stale, resolve contradictions, reorganize) — same conceptual role as our `wiki-curator`.
+- **Claude Cowork** went GA on macOS/Windows — desktop app with isolated VM, local file access, native MCP. This is the desktop client we no longer need to build.
+- **Opus 4.7** improves coding + vision at the same price as 4.6 and supports native prompt caching.
+- **Skills 2.0** packages workflows with scripts + templates + reference materials.
+- **Multi-agent orchestration** in Managed Agents (leader/sub-agent) is now public beta.
+
+This validates the direction but **raises the bar**. The question is no longer *"are we building the right thing?"* but *"what does Atellier do that the platform doesn't?"*
+
+**Our answer:** Atellier is the **structured model of *your* work** — wiki, runs, tasks, deliverables, review — running on top of platform primitives. Not a competitor to Cowork. Not a runtime. Personal and local-first.
+
+What changes from the previous plan:
+
+- **MCP server wrapper** moves to P1 (was "Not Now"). Targeted at Cowork + Claude Code.
+- **Wiki Dream loop** becomes P2 (replaces vague "Wiki Brain v2"). Tailored to our structured wiki, not flat files.
+- **Anthropic executor mode** added as P3. `AGENT_EXECUTOR_MODE=anthropic`, Opus 4.7 default, prompt caching enabled.
+- **Skills 2.0 alignment** added as P4 to keep `.agents/skills/` from diverging from the platform format.
+- **Codex Worker Evidence Pass** moves to P5 (was P1).
+- **Pixel Office expansion** explicitly off the priority list — the *Pixel Agents* VS Code extension by Pablo Deuca shipped a pure-visualization version, validating the aesthetic. Don't double down on the visual layer; double down on the work model.
+
+What stays unchanged:
+
+- Local-first, personal, not a SaaS.
+- LLM Wiki philosophy (markdown as durable memory; MongoDB as operational state).
+- Frontend `services → API hooks → feature hooks → components` layering.
+- No real Codex/MCP/OpenAI/Anthropic in tests.
+- No dangerous Codex flags ever.
 
 ## Original product vision
 
@@ -215,12 +251,15 @@ Current stage is closer to:
 
 ```txt
 Operational Spine + Agent Orchestration + Deliverables + Review UI
++ Pixel Office + Wiki Brain MVP + Codex Worker control-plane v1
++ Executor cost safety
 ```
 
-Next stage should be:
+Next stage (per the 2026-05-06 reframe):
 
 ```txt
-Wiki Brain + Codex Worker + Cost Safety + MCP later
+MCP server wrapper + Wiki Dream loop + Anthropic executor
++ Skills 2.0 alignment + Codex Worker evidence pass
 ```
 
 Recommended ongoing action:
@@ -471,44 +510,41 @@ Next iteration should focus on:
 - strong approval/audit metadata across step transitions
 - tests for evidence rendering and finalize evidence behavior
 
-## Recommended Codex prompt for the next iteration
+## Recommended prompt for the next iteration
 
-Use this prompt for the next implementation pass:
+The actionable kickoff prompt now lives in [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) under *First concrete tasks*. Start there.
+
+Short version:
 
 ```txt
-Read AGENTS.md, CODEX_MEMORY.md, and docs/current-state-and-next-steps.md first.
+Read AGENTS.md, CODEX_MEMORY.md, docs/current-state-and-next-steps.md (§ 2026-05-06 strategic reframe), and docs/next-iteration-plan-2026-05-06.md.
 
-Goal:
-Bring Atellier Studio documentation and safety controls in line with the actual current implementation.
+Pick ONE of the following to start. Do not multitask:
 
-Tasks:
-1. Update README.md so it reflects the current stage:
-   Operational Spine + Agent Orchestration + Deliverables + Review UI.
-2. Add or update docs/architecture/current-state.md with the current architecture.
-3. Add or update docs/architecture/next-roadmap.md with next priorities:
-   Wiki Brain, cost/model safety, Codex Worker, MCP later.
-4. Keep CODEX_MEMORY.md compact. If needed, move long historical detail into docs/history/implementation-log.md.
-5. Verify /health exposes executor mode and model information. If model is missing, add it.
-6. Add or improve a visible frontend executor-mode/model badge if the current UI does not clearly show it.
-7. Add or update tests for any behavior changed.
+A) MCP server wrapper (P1)
+   - Stub a new package that exposes wiki/query as an MCP tool end-to-end.
+   - Document install in docs/mcp-server.md.
+
+B) Wiki Dream loop (P2)
+   - Draft the wiki-curator dream prompt (inputs, expected dream-report output).
+   - Wire a manual trigger button before adding cron.
+
+C) Anthropic executor mode (P3)
+   - Add ANTHROPIC_API_KEY / ANTHROPIC_MODEL env handling alongside OpenAI.
+   - Add an AnthropicExecutor that mirrors the OpenAI executor surface.
+   - Surface mode + model in /health and the header badge.
 
 Do not:
-- add MCP yet
-- add new pixel UI polish
-- add auth/cloud/multiplayer
-- call real OpenAI/Codex in tests
+- add MCP for everything (only the REST API wrapper)
+- polish the Pixel Office
+- call real OpenAI/Anthropic/Codex in tests
 - use dangerous Codex flags
+- add auth, multi-user, cloud deploy
 
 Run:
 - pnpm typecheck
 - pnpm test:api if API changed
 - pnpm test:web if web changed
-
-Final response must include:
-- files changed
-- commands run
-- what now matches the vision better
-- remaining gaps
 ```
 
 ## Product north star
