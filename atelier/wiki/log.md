@@ -9318,3 +9318,388 @@
 ## [2026-05-05T19:48:00.000Z] decision | Safe wiki write route and local browser artifact ignore added
 - Summary: Added a guarded wiki page write route with path restrictions, wired the wiki panel to promote query matches into draft pages, and ignored `.playwright-cli/` as a local browser automation artifact.
 - Run log: atelier/runs/2026-05-05-safe-wiki-write-route-and-playwright-cli-ignore.md
+
+## [2026-05-08T07:56:13.271Z] run_completed | Manual run completed from dashboard
+- Run ID: 8d862959-31ac-42dd-86fc-d3d07c380c0a
+- Summary: Manual run completed from dashboard
+- type: build
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/8d862959-31ac-42dd-86fc-d3d07c380c0a-manual-run-completed-from-dashboard.md
+
+## [2026-05-08T07:56:18.353Z] decision | Deliverable accepted
+- Run ID: 8d862959-31ac-42dd-86fc-d3d07c380c0a
+- Summary: Run marked as approved.
+- type: build
+- reviewStatus: approved
+- deliverablePath: wiki/deliverables/8d862959-31ac-42dd-86fc-d3d07c380c0a-manual-run-completed-from-dashboard.md
+
+## [2026-05-08T07:56:19.786Z] decision | Deliverable accepted
+- Run ID: 8d862959-31ac-42dd-86fc-d3d07c380c0a
+- Summary: Run marked as approved.
+- type: build
+- reviewStatus: approved
+- deliverablePath: wiki/deliverables/8d862959-31ac-42dd-86fc-d3d07c380c0a-manual-run-completed-from-dashboard.md
+
+## [2026-05-08T07:56:49.968Z] decision | Deliverable accepted
+- Run ID: 8d862959-31ac-42dd-86fc-d3d07c380c0a
+- Summary: Run marked as approved.
+- type: build
+- reviewStatus: approved
+- deliverablePath: wiki/deliverables/8d862959-31ac-42dd-86fc-d3d07c380c0a-manual-run-completed-from-dashboard.md
+
+## [2026-05-08T08:01:29.164Z] decision | Codex worker run finalized
+- Run ID: 11453b76-27e7-48c6-a1fe-9611fe2ffd11
+- Summary: Finalized from dashboard codex worker panel.
+- runLog: runs/2026-05-08-codex-worker-11453b76-27e7-48c6-a1fe-9611fe2ffd11.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: 
+- testEvidence: 
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T08:17:42.000Z] decision | Review memory capture slice added
+- Summary: Added a guarded Review action that captures completed run memory into wiki/synthesis, updates wiki index/log through the safe write path, and keeps the frontend API chain intact.
+- Run log: atelier/runs/2026-05-08-review-memory-capture.md
+- API route: POST /runs/:id/capture-memory
+- Pages updated: CODEX_MEMORY.md, docs/next-work-plan.md, README.md
+- Tests: pnpm -r typecheck; pnpm test:api; pnpm test:web
+
+## [2026-05-08T08:21:47.786Z] decision | Codex worker run finalized
+- Run ID: 58d946f2-e0f7-4d38-9396-d1a20becdd7c
+- Summary: Live flow demo completed successfully.
+- runLog: runs/2026-05-08-codex-worker-58d946f2-e0f7-4d38-9396-d1a20becdd7c.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: apps/api/src/routes/demo.routes.ts
+- testEvidence: pnpm test:api passed, pnpm typecheck passed
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T08:33:13.592Z] decision | Codex worker run finalized
+- Run ID: 1019fea2-cfe9-4e5d-9018-8c08818301c3
+- Summary: Live flow demo completed successfully.
+- runLog: runs/2026-05-08-codex-worker-1019fea2-cfe9-4e5d-9018-8c08818301c3.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: apps/api/src/routes/demo.routes.ts
+- testEvidence: pnpm test:api passed, pnpm typecheck passed
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T08:37:25.860Z] ingest | Tech constraints
+- Summary: Ingested source into wiki/sources/2026-05-08-tech-constraints.md
+- rawPath: raw/ingest/2026-05-08-tech-constraints.md
+- summaryPagePath: wiki/sources/2026-05-08-tech-constraints.md
+
+## [2026-05-08T08:37:25.876Z] ingest | Sprint goal: live dashboard
+- Summary: Ingested source into wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+- rawPath: raw/ingest/2026-05-08-sprint-goal-live-dashboard.md
+- summaryPagePath: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+
+## [2026-05-08T08:37:25.889Z] decision | Task proposal added from ingest
+- Summary: - [ ] Sprint goal: live dashboard (source: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md)
+- inboxPath: tasks/inbox.md
+
+## [2026-05-08T08:37:37.161Z] decision | Codex worker run finalized
+- Run ID: b2c8e465-2ee6-4c13-b883-d8ef0c00f3c5
+- Summary: Codex Worker completed all steps. Live demo.
+- runLog: runs/2026-05-08-codex-worker-b2c8e465-2ee6-4c13-b883-d8ef0c00f3c5.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: apps/api/src/routes/demo.routes.ts, apps/web/src/features/demo/Demo.tsx
+- testEvidence: pnpm test:api passed, pnpm typecheck passed
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T08:37:39.130Z] run_completed | Ivan Intake completed execution and requests review.
+- Run ID: f4fc17bd-7b30-4fba-9870-2d230a56d233
+- Agent ID: 2d33650c-8055-4c26-864e-047df0e908bc
+- Summary: Ivan Intake completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/f4fc17bd-7b30-4fba-9870-2d230a56d233-ivan-intake-completed-execution-and-requests-rev.md
+
+## [2026-05-08T08:37:44.281Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 2ec508ab-bb44-4869-b1fa-9d1d739427f9
+- Agent ID: 6d9331ec-e47a-4b7d-8ce2-c2a416bcd05d
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/2ec508ab-bb44-4869-b1fa-9d1d739427f9-pepe-pm-completed-execution-and-requests-review.md
+
+## [2026-05-08T08:37:47.415Z] run_completed | Bruno Builder completed handoff execution.
+- Run ID: 09ea4b9b-a0df-4d9f-904a-1a6cd51282d8
+- Agent ID: b812a8bf-48f1-46b5-9936-273b1845ee28
+- Summary: Bruno Builder completed handoff execution.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/09ea4b9b-a0df-4d9f-904a-1a6cd51282d8-bruno-builder-completed-handoff-execution.md
+
+## [2026-05-08T08:37:52.001Z] run_completed | Diana Designer completed execution and requests review.
+- Run ID: 1e1716bf-f142-43ee-aaa9-2d63a34ffc39
+- Agent ID: 1b95fc96-8947-4cc7-a00a-4f61594820b1
+- Summary: Diana Designer completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/1e1716bf-f142-43ee-aaa9-2d63a34ffc39-diana-designer-completed-execution-and-requests-.md
+
+## [2026-05-08T08:37:53.279Z] run_completed | Qara QA completed execution and requests review.
+- Run ID: 76751ef5-3608-4187-82d6-dfbf2df64408
+- Agent ID: 7f4ac291-557f-4d78-8de8-59b50c392b66
+- Summary: Qara QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/76751ef5-3608-4187-82d6-dfbf2df64408-qara-qa-completed-execution-and-requests-review.md
+
+## [2026-05-08T08:37:58.187Z] run_completed | Wiki Walter completed execution and requests review.
+- Run ID: e93318f3-8441-4df5-a9d1-2adc13591d99
+- Agent ID: aeae9924-1bec-4295-a827-22a5163daf32
+- Summary: Wiki Walter completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/e93318f3-8441-4df5-a9d1-2adc13591d99-wiki-walter-completed-execution-and-requests-rev.md
+
+## [2026-05-08T08:48:10.252Z] ingest | Tech constraints
+- Summary: Ingested source into wiki/sources/2026-05-08-tech-constraints.md
+- rawPath: raw/ingest/2026-05-08-tech-constraints.md
+- summaryPagePath: wiki/sources/2026-05-08-tech-constraints.md
+
+## [2026-05-08T08:48:10.253Z] ingest | Sprint goal: live dashboard
+- Summary: Ingested source into wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+- rawPath: raw/ingest/2026-05-08-sprint-goal-live-dashboard.md
+- summaryPagePath: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+
+## [2026-05-08T08:48:10.268Z] decision | Task proposal skipped as duplicate
+- Summary: - [ ] Sprint goal: live dashboard (source: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md)
+- inboxPath: tasks/inbox.md
+
+## [2026-05-08T08:48:21.533Z] decision | Codex worker run finalized
+- Run ID: 4c18b9b5-81be-4945-8e4c-ce5402330cbb
+- Summary: Codex Worker completed all steps. Live demo.
+- runLog: runs/2026-05-08-codex-worker-4c18b9b5-81be-4945-8e4c-ce5402330cbb.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: apps/api/src/routes/demo.routes.ts, apps/web/src/features/demo/Demo.tsx
+- testEvidence: pnpm test:api passed, pnpm typecheck passed
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T08:48:22.719Z] run_completed | Ivan Intake completed execution and requests review.
+- Run ID: 76d38bff-d9de-481c-a2ad-01c6bf73f143
+- Agent ID: e8063e0c-40f6-4ffa-8ba1-16215ca4f4f3
+- Summary: Ivan Intake completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/76d38bff-d9de-481c-a2ad-01c6bf73f143-ivan-intake-completed-execution-and-requests-rev.md
+
+## [2026-05-08T08:48:28.062Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: ae174fa8-96af-4157-8ca1-e5c42c6030e6
+- Agent ID: 5cda92be-9ad2-484c-8254-8860343d9ca7
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/ae174fa8-96af-4157-8ca1-e5c42c6030e6-pepe-pm-completed-execution-and-requests-review.md
+
+## [2026-05-08T08:48:29.665Z] run_completed | Bruno Builder completed handoff execution.
+- Run ID: 265bda5c-4357-40d4-89b7-34a938b54d1b
+- Agent ID: 74dcfd56-0142-4f32-8caa-ff4cd00a2067
+- Summary: Bruno Builder completed handoff execution.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/265bda5c-4357-40d4-89b7-34a938b54d1b-bruno-builder-completed-handoff-execution.md
+
+## [2026-05-08T08:48:33.480Z] run_completed | Qara QA completed execution and requests review.
+- Run ID: 517abbea-a368-4565-aa64-d20a0faa472a
+- Agent ID: cee571cd-b4b9-45cd-962e-2fbf397d374a
+- Summary: Qara QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/517abbea-a368-4565-aa64-d20a0faa472a-qara-qa-completed-execution-and-requests-review.md
+
+## [2026-05-08T08:48:34.162Z] run_completed | Diana Designer completed execution and requests review.
+- Run ID: 214bfcfd-d218-4fda-a68c-493b84b9c658
+- Agent ID: 91cf97bf-e860-4290-9dd7-aab359f357a2
+- Summary: Diana Designer completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/214bfcfd-d218-4fda-a68c-493b84b9c658-diana-designer-completed-execution-and-requests-.md
+
+## [2026-05-08T08:48:38.662Z] run_completed | Wiki Walter completed execution and requests review.
+- Run ID: fe31af43-5cca-4c26-9c46-7c541efa3a14
+- Agent ID: 3503c44a-622d-4d99-b197-460b3ef0c9f8
+- Summary: Wiki Walter completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/fe31af43-5cca-4c26-9c46-7c541efa3a14-wiki-walter-completed-execution-and-requests-rev.md
+
+## [2026-05-08T09:00:21.646Z] ingest | Sprint goal: live dashboard
+- Summary: Ingested source into wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+- rawPath: raw/ingest/2026-05-08-sprint-goal-live-dashboard.md
+- summaryPagePath: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+
+## [2026-05-08T09:00:21.649Z] ingest | Tech constraints
+- Summary: Ingested source into wiki/sources/2026-05-08-tech-constraints.md
+- rawPath: raw/ingest/2026-05-08-tech-constraints.md
+- summaryPagePath: wiki/sources/2026-05-08-tech-constraints.md
+
+## [2026-05-08T09:00:21.660Z] decision | Task proposal skipped as duplicate
+- Summary: - [ ] Sprint goal: live dashboard (source: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md)
+- inboxPath: tasks/inbox.md
+
+## [2026-05-08T09:00:29.737Z] run_completed | Ivan Intake completed execution and requests review.
+- Run ID: 8ad4f1d2-b0f3-4ff4-8ea7-2e0b2ae54170
+- Agent ID: 3da99bf6-613c-482e-8f99-faab460de9c3
+- Summary: Ivan Intake completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/8ad4f1d2-b0f3-4ff4-8ea7-2e0b2ae54170-ivan-intake-completed-execution-and-requests-rev.md
+
+## [2026-05-08T09:00:32.932Z] decision | Codex worker run finalized
+- Run ID: f2f2f880-e8a7-4b99-9394-5d7eb14a5c60
+- Summary: Codex Worker completed all steps. Live demo.
+- runLog: runs/2026-05-08-codex-worker-f2f2f880-e8a7-4b99-9394-5d7eb14a5c60.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: apps/api/src/routes/demo.routes.ts, apps/web/src/features/demo/Demo.tsx
+- testEvidence: pnpm test:api passed, pnpm typecheck passed
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T09:00:37.177Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: ff98ad1d-8698-4eb1-9619-03541c535a2f
+- Agent ID: f713e534-c5fd-4490-9180-43a31174c3c0
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/ff98ad1d-8698-4eb1-9619-03541c535a2f-pepe-pm-completed-execution-and-requests-review.md
+
+## [2026-05-08T09:00:39.602Z] run_completed | Bruno Builder completed handoff execution.
+- Run ID: a3a228bb-c48f-45cd-86cf-3a984250ea39
+- Agent ID: e7f70dc9-872e-47b4-87d3-43caf4c6356f
+- Summary: Bruno Builder completed handoff execution.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/a3a228bb-c48f-45cd-86cf-3a984250ea39-bruno-builder-completed-handoff-execution.md
+
+## [2026-05-08T09:00:43.494Z] run_completed | Qara QA completed execution and requests review.
+- Run ID: 4ac15f17-a0e5-42f8-97ab-e9327c60f946
+- Agent ID: 6f303e36-273c-4073-8df1-0ac27cd3ea77
+- Summary: Qara QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/4ac15f17-a0e5-42f8-97ab-e9327c60f946-qara-qa-completed-execution-and-requests-review.md
+
+## [2026-05-08T09:00:45.411Z] run_completed | Diana Designer completed execution and requests review.
+- Run ID: 4a0be8a0-d7be-4ae8-8222-1540cbf38ad6
+- Agent ID: e651665d-d754-4e7c-b077-44804805f374
+- Summary: Diana Designer completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/4a0be8a0-d7be-4ae8-8222-1540cbf38ad6-diana-designer-completed-execution-and-requests-.md
+
+## [2026-05-08T09:00:52.428Z] run_completed | Wiki Walter completed execution and requests review.
+- Run ID: f47f1b4c-7d30-4ba3-bead-eff811123edb
+- Agent ID: a39653d0-478c-4006-ae89-e031023ca9c2
+- Summary: Wiki Walter completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/f47f1b4c-7d30-4ba3-bead-eff811123edb-wiki-walter-completed-execution-and-requests-rev.md
+
+## [2026-05-08T09:01:07.014Z] ingest | Sprint goal: live dashboard
+- Summary: Ingested source into wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+- rawPath: raw/ingest/2026-05-08-sprint-goal-live-dashboard.md
+- summaryPagePath: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md
+
+## [2026-05-08T09:01:07.026Z] ingest | Tech constraints
+- Summary: Ingested source into wiki/sources/2026-05-08-tech-constraints.md
+- rawPath: raw/ingest/2026-05-08-tech-constraints.md
+- summaryPagePath: wiki/sources/2026-05-08-tech-constraints.md
+
+## [2026-05-08T09:01:07.027Z] decision | Task proposal skipped as duplicate
+- Summary: - [ ] Sprint goal: live dashboard (source: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md)
+- inboxPath: tasks/inbox.md
+
+## [2026-05-08T09:01:13.719Z] run_completed | Ivan Intake completed execution and requests review.
+- Run ID: 1898c589-fefb-4c77-a9a8-93a5a600a8e6
+- Agent ID: 7490a124-d194-48f6-a598-8a80086ae455
+- Summary: Ivan Intake completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/1898c589-fefb-4c77-a9a8-93a5a600a8e6-ivan-intake-completed-execution-and-requests-rev.md
+
+## [2026-05-08T09:01:18.298Z] decision | Codex worker run finalized
+- Run ID: 22536a37-bfd0-4203-ab42-088681a2fc66
+- Summary: Codex Worker completed all steps. Live demo.
+- runLog: runs/2026-05-08-codex-worker-22536a37-bfd0-4203-ab42-088681a2fc66.md
+- completedSteps: 3
+- totalSteps: 3
+- changedFiles: apps/api/src/routes/demo.routes.ts, apps/web/src/features/demo/Demo.tsx
+- testEvidence: pnpm test:api passed, pnpm typecheck passed
+- evidenceCompletedSteps: 3
+- evidenceTotalSteps: 3
+
+## [2026-05-08T09:01:21.945Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 7ae25551-abcd-42fd-9ea0-f5daaebf351e
+- Agent ID: 470b8a75-31af-401d-9dc4-05ca806581cf
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/7ae25551-abcd-42fd-9ea0-f5daaebf351e-pepe-pm-completed-execution-and-requests-review.md
+
+## [2026-05-08T09:01:24.490Z] run_completed | Bruno Builder completed handoff execution.
+- Run ID: c7c013b4-4e16-42af-bbd2-a769e0b4bcac
+- Agent ID: 4c02049c-e7b7-4d4c-98fe-73be038d12b7
+- Summary: Bruno Builder completed handoff execution.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/c7c013b4-4e16-42af-bbd2-a769e0b4bcac-bruno-builder-completed-handoff-execution.md
+
+## [2026-05-08T09:01:29.336Z] run_completed | Qara QA completed execution and requests review.
+- Run ID: 90c9d637-e74a-4ce2-ab3d-efc61e208135
+- Agent ID: 83ddeb00-c832-423d-a175-91d9b7be355e
+- Summary: Qara QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/90c9d637-e74a-4ce2-ab3d-efc61e208135-qara-qa-completed-execution-and-requests-review.md
+
+## [2026-05-08T09:01:30.564Z] run_completed | Diana Designer completed execution and requests review.
+- Run ID: 8386e9e6-3cbe-4ed1-968b-46bfecb95790
+- Agent ID: c9520fb5-6ac4-425a-ba25-76cc967f769e
+- Summary: Diana Designer completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/8386e9e6-3cbe-4ed1-968b-46bfecb95790-diana-designer-completed-execution-and-requests-.md
+
+## [2026-05-08T09:01:36.493Z] run_completed | Wiki Walter completed execution and requests review.
+- Run ID: 1c6a1fdd-381e-4421-83e0-896fc391d668
+- Agent ID: 3de78960-d055-4003-9dfe-cfe6faf562c5
+- Summary: Wiki Walter completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/1c6a1fdd-381e-4421-83e0-896fc391d668-wiki-walter-completed-execution-and-requests-rev.md
