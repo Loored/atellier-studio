@@ -6,9 +6,11 @@ import {
   Clock,
   Loader2,
   TimerReset,
+  Terminal,
 } from "lucide-react";
 import type { Agent } from "@atellier/shared";
 import { useRunsApi } from "../../api/hooks/runs/useRunsApi";
+import { useActiveCodexRun } from "../../api/hooks/codex/useCodexWorkerApi";
 import { cn } from "../../lib/cn";
 
 const ACTIVE_STATUSES = new Set([
@@ -40,6 +42,7 @@ type Props = {
 export function LiveProcessesPanel({ agents }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const { data: runs = [] } = useRunsApi();
+  const { data: activeCodexRun } = useActiveCodexRun();
 
   const activeAgents  = agents.filter((a) => ACTIVE_STATUSES.has(a.status));
   const waitingAgents = agents.filter((a) => a.status === "needs-human");
@@ -47,8 +50,12 @@ export function LiveProcessesPanel({ agents }: Props) {
   const activeRuns    = runs.filter((r) => r.status === "running");
   const pendingRuns   = runs.filter((r) => r.reviewStatus === "pending" && r.status === "completed");
 
-  const totalProcesses = activeAgents.length + activeRuns.length;
-  const totalAttention = waitingAgents.length + blockedAgents.length + pendingRuns.length;
+  const codexSteps     = activeCodexRun?.steps ?? [];
+  const codexCompleted = codexSteps.filter((s) => s.status === "completed").length;
+  const codexPending   = codexSteps.filter((s) => s.needsApproval && s.status === "pending").length;
+
+  const totalProcesses = activeAgents.length + activeRuns.length + (activeCodexRun ? 1 : 0);
+  const totalAttention = waitingAgents.length + blockedAgents.length + pendingRuns.length + codexPending;
 
   const hasAnything = totalProcesses > 0 || totalAttention > 0;
 
@@ -236,6 +243,38 @@ export function LiveProcessesPanel({ agents }: Props) {
                 </span>
                 <span className="text-[0.62rem] text-ink-faint">→ Review</span>
               </div>
+            )}
+
+            {/* ── Codex Worker ── */}
+            {activeCodexRun && (
+              <section>
+                <p className="text-[0.57rem] font-bold tracking-[0.1em] uppercase text-ink-faint mb-1.5 px-1">
+                  Codex Worker
+                </p>
+                <div className={cn(
+                  "flex items-start gap-2 px-2.5 py-2 rounded-lg border",
+                  codexPending > 0
+                    ? "bg-gold/[0.05] border-gold/[0.18]"
+                    : "bg-teal/[0.05] border-teal/[0.12]",
+                )}>
+                  <Terminal size={12} className={cn("mt-[1px] flex-shrink-0", codexPending > 0 ? "text-gold" : "text-teal")} />
+                  <div className="min-w-0 flex-1">
+                    <p className="m-0 text-[0.78rem] font-semibold text-ink truncate">
+                      {activeCodexRun.goal}
+                    </p>
+                    <p className="m-0 mt-0.5 text-[0.68rem] text-ink-muted">
+                      {codexSteps.length === 0
+                        ? "Awaiting plan"
+                        : `${codexCompleted}/${codexSteps.length} steps complete`}
+                    </p>
+                    {codexPending > 0 && (
+                      <p className="m-0 mt-1 text-[0.68rem] text-gold font-semibold">
+                        {codexPending} step{codexPending > 1 ? "s" : ""} need approval
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
             )}
           </div>
         )}
