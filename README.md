@@ -152,12 +152,14 @@ pnpm codex:wiki-lint
 
 ## Next Work
 
-1. Review Queue Triage UI: surface captured memory paths per run, group by `pending / approved / changes-requested`, and make validation blockers and missing evidence easier to clear.
-2. Codex Worker v1.2: stronger per-step command/test evidence, approval audit metadata across step transitions, and preparation for a real Codex CLI adapter (still no real Codex calls in tests).
-3. Wiki Brain v2 polish: richer synthesis page templates, deterministic cross-linking, and contradiction handling on capture.
-4. Orchestration template modularization: split skill templates into their own modules once a third workflow is needed.
-5. MCP Layer later: only after Wiki Brain and Codex Worker evidence loops are stable.
+Active plan: [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-MCP, auth, cloud deploy, multiplayer, and vector search are intentionally out of scope until Wiki Brain and Codex Worker evidence loops are stable. Pixel office exists as a visualization layer, but it is not the next product priority.
+1. **MCP server wrapper** over the REST API: expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get` as MCP tools. Local-only auth. Targeted at Cowork + Claude Code.
+2. **Wiki Dream loop**: scheduled `wiki-curator` that prunes stale, resolves contradictions via `/wiki/lint`, links orphans, and reorganizes the index. v1 produces *proposed* changes the operator approves.
+3. **Anthropic executor mode** (`AGENT_EXECUTOR_MODE=anthropic`): Opus 4.7 default, native prompt caching, `/health` exposes new mode/model.
+4. **Skills 2.0 alignment**: audit `.agents/skills/` against the new format and migrate `atellier-build-loop` and `llm-wiki-ingest-loop` if compatible.
+5. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata. No real Codex CLI integration yet.
 
-Read `docs/current-state-and-next-steps.md`, `docs/next-work-plan.md`, and `CODEX_MEMORY.md` before starting an implementation pass.
+Auth, cloud deploy, multiplayer, vector search, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
+
+Read `CODEX_MEMORY.md`, `docs/next-iteration-plan-2026-05-06.md`, `docs/roadmap.md`, and `docs/current-state-and-next-steps.md` before starting an implementation pass.
