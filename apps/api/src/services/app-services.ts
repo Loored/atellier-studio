@@ -33,6 +33,9 @@ export type CreateAppServicesOptions = {
   openaiApiKey?: string;
   openaiModel?: string;
   openaiModelProfile?: ModelProfile;
+  anthropicApiKey?: string;
+  anthropicModel?: string;
+  anthropicModelProfile?: ModelProfile;
   maxHandoffDepth?: number;
   executionTimeoutMs?: number;
 };
@@ -84,6 +87,12 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
       ? {
           apiKey: options.openaiApiKey,
           model: options.openaiModel ?? "gpt-4.1-mini",
+        }
+      : undefined,
+    anthropic: options.anthropicApiKey
+      ? {
+          apiKey: options.anthropicApiKey,
+          model: options.anthropicModel ?? "claude-opus-4-7",
         }
       : undefined,
     repoFileHints,

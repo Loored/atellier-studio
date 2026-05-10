@@ -55,7 +55,7 @@ describe("operational spine routes", () => {
       service: "atellier-api",
       storageMode: "memory",
       executorMode: "mock",
-      executorModel: "gpt-4.1-mini",
+      executorModel: "mock",
       modelProfile: "standard",
       mongo: {
         connected: false,

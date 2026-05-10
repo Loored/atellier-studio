@@ -11,9 +11,15 @@ export type ExecuteAgentInstructionResult = {
   needsHuman: boolean;
 };
 
-export type AgentExecutorMode = "mock" | "openai";
+export type AgentExecutorMode = "mock" | "openai" | "anthropic";
 
 export type OpenAiAgentExecutorConfig = {
+  apiKey: string;
+  model: string;
+  repoFileHints?: string[];
+};
+
+export type AnthropicAgentExecutorConfig = {
   apiKey: string;
   model: string;
   repoFileHints?: string[];
@@ -300,9 +306,24 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
   }
 }
 
+// P3.a stub — accepts config and validates env wiring, but every execute() call
+// throws. The real implementation (Opus 4.7 + prompt caching) lands in P3.b.
+export class AnthropicAgentExecutorService implements AgentExecutorService {
+  constructor(private readonly config: AnthropicAgentExecutorConfig) {}
+
+  async execute(_input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    throw new Error(
+      `Anthropic executor (model=${this.config.model}) is wired but not yet implemented. ` +
+        "P3.a delivered the stub only — real calls land in P3.b. " +
+        "Switch to AGENT_EXECUTOR_MODE=mock or =openai to run executions today.",
+    );
+  }
+}
+
 export function createAgentExecutorService(options: {
   mode: AgentExecutorMode;
   openai?: OpenAiAgentExecutorConfig;
+  anthropic?: AnthropicAgentExecutorConfig;
   repoFileHints?: string[];
 }): AgentExecutorService {
   if (options.mode === "openai") {
@@ -311,6 +332,16 @@ export function createAgentExecutorService(options: {
     }
     return new OpenAiAgentExecutorService({
       ...options.openai,
+      repoFileHints: options.repoFileHints,
+    });
+  }
+
+  if (options.mode === "anthropic") {
+    if (!options.anthropic?.apiKey) {
+      throw new Error("ANTHROPIC_API_KEY is required when AGENT_EXECUTOR_MODE=anthropic.");
+    }
+    return new AnthropicAgentExecutorService({
+      ...options.anthropic,
       repoFileHints: options.repoFileHints,
     });
   }

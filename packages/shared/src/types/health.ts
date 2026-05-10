@@ -1,4 +1,4 @@
-export type ExecutorMode = "mock" | "openai";
+export type ExecutorMode = "mock" | "openai" | "anthropic";
 
 export type ModelProfile = "cheap" | "standard" | "deep";
 

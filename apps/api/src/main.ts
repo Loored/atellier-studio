@@ -11,20 +11,29 @@ const host = process.env.API_HOST ?? "127.0.0.1";
 const mongoUri = process.env.MONGO_URI ?? "mongodb://localhost:27017/atellier_studio";
 const storageMode: StorageMode = process.env.API_STORAGE === "memory" ? "memory" : "mongo";
 const isTestEnv = process.env.NODE_ENV === "test";
-const forceMockExecutor = process.env.AGENT_EXECUTOR_MODE === "mock";
-const requireRealExecutor = !isTestEnv && !forceMockExecutor;
-const agentExecutorMode: AgentExecutorMode = forceMockExecutor
-  ? "mock"
-  : process.env.OPENAI_API_KEY
-    ? "openai"
-    : "mock";
+
+const explicitExecutorMode = process.env.AGENT_EXECUTOR_MODE;
+const agentExecutorMode: AgentExecutorMode =
+  explicitExecutorMode === "mock"
+    ? "mock"
+    : explicitExecutorMode === "openai"
+      ? "openai"
+      : explicitExecutorMode === "anthropic"
+        ? "anthropic"
+        : process.env.OPENAI_API_KEY
+          ? "openai"
+          : "mock";
+const requireRealExecutor = !isTestEnv && agentExecutorMode !== "mock";
+
 const maxHandoffDepth = Number(process.env.AGENT_MAX_HANDOFF_DEPTH ?? 1);
 const executionTimeoutMs = Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 45_000);
-const modelProfile: ModelProfile = process.env.OPENAI_MODEL_PROFILE === "cheap"
-  ? "cheap"
-  : process.env.OPENAI_MODEL_PROFILE === "deep"
-    ? "deep"
-    : "standard";
+
+function parseModelProfile(raw: string | undefined): ModelProfile {
+  return raw === "cheap" ? "cheap" : raw === "deep" ? "deep" : "standard";
+}
+
+const openaiModelProfile = parseModelProfile(process.env.OPENAI_MODEL_PROFILE);
+const anthropicModelProfile = parseModelProfile(process.env.ANTHROPIC_MODEL_PROFILE);
 
 type HealthPayload = {
   status?: string;
@@ -54,11 +63,19 @@ async function isAtellierApiRunning(targetHost: string, targetPort: number): Pro
 }
 
 async function main(): Promise<void> {
-  if (requireRealExecutor && !process.env.OPENAI_API_KEY) {
-    throw new Error(
-      "[atellier-api] OPENAI_API_KEY is required for real executor mode. " +
-        "Set OPENAI_API_KEY or explicitly opt into mock mode with AGENT_EXECUTOR_MODE=mock.",
-    );
+  if (requireRealExecutor) {
+    if (agentExecutorMode === "openai" && !process.env.OPENAI_API_KEY) {
+      throw new Error(
+        "[atellier-api] OPENAI_API_KEY is required when AGENT_EXECUTOR_MODE=openai. " +
+          "Set OPENAI_API_KEY or opt into mock mode with AGENT_EXECUTOR_MODE=mock.",
+      );
+    }
+    if (agentExecutorMode === "anthropic" && !process.env.ANTHROPIC_API_KEY) {
+      throw new Error(
+        "[atellier-api] ANTHROPIC_API_KEY is required when AGENT_EXECUTOR_MODE=anthropic. " +
+          "Set ANTHROPIC_API_KEY or opt into mock mode with AGENT_EXECUTOR_MODE=mock.",
+      );
+    }
   }
 
   if (storageMode === "mongo") {
@@ -72,7 +89,10 @@ async function main(): Promise<void> {
     agentExecutorMode,
     openaiApiKey: process.env.OPENAI_API_KEY,
     openaiModel: process.env.OPENAI_MODEL,
-    openaiModelProfile: modelProfile,
+    openaiModelProfile,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    anthropicModel: process.env.ANTHROPIC_MODEL,
+    anthropicModelProfile,
     maxHandoffDepth,
     executionTimeoutMs,
   });

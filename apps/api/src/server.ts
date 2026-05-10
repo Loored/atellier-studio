@@ -19,7 +19,15 @@ export type BuildServerOptions = {
   services?: AppServices;
 } & Pick<
   CreateAppServicesOptions,
-  "agentExecutorMode" | "openaiApiKey" | "openaiModel" | "openaiModelProfile" | "maxHandoffDepth" | "executionTimeoutMs"
+  | "agentExecutorMode"
+  | "openaiApiKey"
+  | "openaiModel"
+  | "openaiModelProfile"
+  | "anthropicApiKey"
+  | "anthropicModel"
+  | "anthropicModelProfile"
+  | "maxHandoffDepth"
+  | "executionTimeoutMs"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -41,12 +49,24 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       callback(null, isAllowedLocalOrigin(origin));
     },
   });
+  const agentExecutorMode = options.agentExecutorMode ?? "mock";
+  const executorModel =
+    agentExecutorMode === "anthropic"
+      ? options.anthropicModel ?? "claude-opus-4-7"
+      : agentExecutorMode === "openai"
+        ? options.openaiModel ?? "gpt-4.1-mini"
+        : "mock";
+  const modelProfile =
+    agentExecutorMode === "anthropic"
+      ? options.anthropicModelProfile ?? "standard"
+      : options.openaiModelProfile ?? "standard";
+
   await fastify.register(async (instance) =>
     healthRoutes(instance, services, {
       storageMode: options.storageMode ?? "mongo",
-      agentExecutorMode: options.agentExecutorMode ?? "mock",
-      executorModel: options.openaiModel ?? "gpt-4.1-mini",
-      modelProfile: options.openaiModelProfile ?? "standard",
+      agentExecutorMode,
+      executorModel,
+      modelProfile,
     }),
   );
   await fastify.register(async (instance) => agentsRoutes(instance, services));
