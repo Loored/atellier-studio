@@ -11,10 +11,37 @@ export type ExecuteAgentInstructionResult = {
   needsHuman: boolean;
 };
 
-export type AgentExecutorMode = "mock" | "openai" | "anthropic";
+export type AgentExecutorMode = "mock" | "openai" | "anthropic" | "groq" | "ollama";
 
+// Generic config for any OpenAI-compatible Chat Completions endpoint
+// (OpenAI, Groq, Ollama's OpenAI-compat surface, OpenRouter, Together, etc.).
+export type OpenAiCompatibleExecutorConfig = {
+  /** Full POST URL for chat completions, e.g. https://api.openai.com/v1/chat/completions */
+  baseUrl: string;
+  /** Bearer token; omit for providers that don't require auth (e.g. local Ollama). */
+  apiKey?: string;
+  model: string;
+  repoFileHints?: string[];
+  /** Provider label used in error messages; defaults to "OpenAI-compatible". */
+  providerLabel?: string;
+};
+
+// Back-compat alias for callers that historically referenced the OpenAI-only shape.
 export type OpenAiAgentExecutorConfig = {
   apiKey: string;
+  model: string;
+  repoFileHints?: string[];
+};
+
+export type GroqAgentExecutorConfig = {
+  apiKey: string;
+  model: string;
+  repoFileHints?: string[];
+};
+
+export type OllamaAgentExecutorConfig = {
+  /** Default: http://127.0.0.1:11434 */
+  baseUrl?: string;
   model: string;
   repoFileHints?: string[];
 };
@@ -267,19 +294,28 @@ type ChatCompletionResponse = {
   };
 };
 
-export class OpenAiAgentExecutorService implements AgentExecutorService {
-  constructor(private readonly config: OpenAiAgentExecutorConfig) {}
+// Single implementation that talks to any OpenAI-compatible /v1/chat/completions
+// surface: OpenAI itself, Groq, Ollama (OpenAI-compat endpoint), OpenRouter, etc.
+// Provider-specific behavior is captured in the config (baseUrl, optional apiKey,
+// providerLabel for human-readable error messages).
+export class OpenAiCompatibleAgentExecutorService implements AgentExecutorService {
+  constructor(private readonly config: OpenAiCompatibleExecutorConfig) {}
 
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
     const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
     const userPrompt = buildExecutorUserPrompt(input);
+    const label = this.config.providerLabel ?? "OpenAI-compatible";
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.config.apiKey) {
+      headers.Authorization = `Bearer ${this.config.apiKey}`;
+    }
+
+    const response = await fetch(this.config.baseUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         model: this.config.model,
         messages: [
@@ -293,19 +329,19 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`OpenAI execution failed (${response.status}): ${errorBody}`);
+      throw new Error(`${label} execution failed (${response.status}): ${errorBody}`);
     }
 
     const data = (await response.json()) as ChatCompletionResponse;
 
     if (data.error?.message) {
-      throw new Error(`OpenAI error: ${data.error.message}`);
+      throw new Error(`${label} error: ${data.error.message}`);
     }
 
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) {
       throw new Error(
-        `OpenAI returned an empty response (finish_reason: ${data.choices?.[0]?.finish_reason ?? "unknown"}).`,
+        `${label} returned an empty response (finish_reason: ${data.choices?.[0]?.finish_reason ?? "unknown"}).`,
       );
     }
 
@@ -313,6 +349,20 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
       response: content,
       needsHuman: true,
     };
+  }
+}
+
+// Back-compat alias: existing call sites that imported the OpenAI-only name keep
+// working. Construction goes through the generic class with the OpenAI base URL.
+export class OpenAiAgentExecutorService extends OpenAiCompatibleAgentExecutorService {
+  constructor(config: OpenAiAgentExecutorConfig) {
+    super({
+      baseUrl: "https://api.openai.com/v1/chat/completions",
+      apiKey: config.apiKey,
+      model: config.model,
+      repoFileHints: config.repoFileHints,
+      providerLabel: "OpenAI",
+    });
   }
 }
 
@@ -404,10 +454,43 @@ export class AnthropicAgentExecutorService implements AgentExecutorService {
   }
 }
 
+// Groq exposes an OpenAI-compatible Chat Completions endpoint under
+// https://api.groq.com/openai/v1, so we reuse the generic compat class.
+export class GroqAgentExecutorService extends OpenAiCompatibleAgentExecutorService {
+  constructor(config: GroqAgentExecutorConfig) {
+    super({
+      baseUrl: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey: config.apiKey,
+      model: config.model,
+      repoFileHints: config.repoFileHints,
+      providerLabel: "Groq",
+    });
+  }
+}
+
+// Ollama runs locally and exposes an OpenAI-compatible endpoint at
+// <baseUrl>/v1/chat/completions. No API key is required (loopback only).
+const OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434";
+
+export class OllamaAgentExecutorService extends OpenAiCompatibleAgentExecutorService {
+  constructor(config: OllamaAgentExecutorConfig) {
+    const root = (config.baseUrl ?? OLLAMA_DEFAULT_BASE_URL).replace(/\/+$/, "");
+    super({
+      baseUrl: `${root}/v1/chat/completions`,
+      apiKey: undefined,
+      model: config.model,
+      repoFileHints: config.repoFileHints,
+      providerLabel: "Ollama",
+    });
+  }
+}
+
 export function createAgentExecutorService(options: {
   mode: AgentExecutorMode;
   openai?: OpenAiAgentExecutorConfig;
   anthropic?: AnthropicAgentExecutorConfig;
+  groq?: GroqAgentExecutorConfig;
+  ollama?: OllamaAgentExecutorConfig;
   repoFileHints?: string[];
 }): AgentExecutorService {
   if (options.mode === "openai") {
@@ -426,6 +509,26 @@ export function createAgentExecutorService(options: {
     }
     return new AnthropicAgentExecutorService({
       ...options.anthropic,
+      repoFileHints: options.repoFileHints,
+    });
+  }
+
+  if (options.mode === "groq") {
+    if (!options.groq?.apiKey) {
+      throw new Error("GROQ_API_KEY is required when AGENT_EXECUTOR_MODE=groq.");
+    }
+    return new GroqAgentExecutorService({
+      ...options.groq,
+      repoFileHints: options.repoFileHints,
+    });
+  }
+
+  if (options.mode === "ollama") {
+    if (!options.ollama?.model) {
+      throw new Error("OLLAMA_MODEL is required when AGENT_EXECUTOR_MODE=ollama.");
+    }
+    return new OllamaAgentExecutorService({
+      ...options.ollama,
       repoFileHints: options.repoFileHints,
     });
   }

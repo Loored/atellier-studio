@@ -36,6 +36,12 @@ export type CreateAppServicesOptions = {
   anthropicApiKey?: string;
   anthropicModel?: string;
   anthropicModelProfile?: ModelProfile;
+  groqApiKey?: string;
+  groqModel?: string;
+  groqModelProfile?: ModelProfile;
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  ollamaModelProfile?: ModelProfile;
   maxHandoffDepth?: number;
   executionTimeoutMs?: number;
 };
@@ -93,6 +99,18 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
       ? {
           apiKey: options.anthropicApiKey,
           model: options.anthropicModel ?? "claude-opus-4-7",
+        }
+      : undefined,
+    groq: options.groqApiKey
+      ? {
+          apiKey: options.groqApiKey,
+          model: options.groqModel ?? "llama-3.3-70b-versatile",
+        }
+      : undefined,
+    ollama: options.ollamaModel
+      ? {
+          baseUrl: options.ollamaBaseUrl,
+          model: options.ollamaModel,
         }
       : undefined,
     repoFileHints,

@@ -26,6 +26,12 @@ export type BuildServerOptions = {
   | "anthropicApiKey"
   | "anthropicModel"
   | "anthropicModelProfile"
+  | "groqApiKey"
+  | "groqModel"
+  | "groqModelProfile"
+  | "ollamaBaseUrl"
+  | "ollamaModel"
+  | "ollamaModelProfile"
   | "maxHandoffDepth"
   | "executionTimeoutMs"
 >;
@@ -55,11 +61,19 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       ? options.anthropicModel ?? "claude-opus-4-7"
       : agentExecutorMode === "openai"
         ? options.openaiModel ?? "gpt-4.1-mini"
-        : "mock";
+        : agentExecutorMode === "groq"
+          ? options.groqModel ?? "llama-3.3-70b-versatile"
+          : agentExecutorMode === "ollama"
+            ? options.ollamaModel ?? "llama3.2"
+            : "mock";
   const modelProfile =
     agentExecutorMode === "anthropic"
       ? options.anthropicModelProfile ?? "standard"
-      : options.openaiModelProfile ?? "standard";
+      : agentExecutorMode === "groq"
+        ? options.groqModelProfile ?? "standard"
+        : agentExecutorMode === "ollama"
+          ? options.ollamaModelProfile ?? "standard"
+          : options.openaiModelProfile ?? "standard";
 
   await fastify.register(async (instance) =>
     healthRoutes(instance, services, {

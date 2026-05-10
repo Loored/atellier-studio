@@ -20,9 +20,13 @@ const agentExecutorMode: AgentExecutorMode =
       ? "openai"
       : explicitExecutorMode === "anthropic"
         ? "anthropic"
-        : process.env.OPENAI_API_KEY
-          ? "openai"
-          : "mock";
+        : explicitExecutorMode === "groq"
+          ? "groq"
+          : explicitExecutorMode === "ollama"
+            ? "ollama"
+            : process.env.OPENAI_API_KEY
+              ? "openai"
+              : "mock";
 const requireRealExecutor = !isTestEnv && agentExecutorMode !== "mock";
 
 const maxHandoffDepth = Number(process.env.AGENT_MAX_HANDOFF_DEPTH ?? 1);
@@ -34,6 +38,8 @@ function parseModelProfile(raw: string | undefined): ModelProfile {
 
 const openaiModelProfile = parseModelProfile(process.env.OPENAI_MODEL_PROFILE);
 const anthropicModelProfile = parseModelProfile(process.env.ANTHROPIC_MODEL_PROFILE);
+const groqModelProfile = parseModelProfile(process.env.GROQ_MODEL_PROFILE);
+const ollamaModelProfile = parseModelProfile(process.env.OLLAMA_MODEL_PROFILE);
 
 type HealthPayload = {
   status?: string;
@@ -76,6 +82,18 @@ async function main(): Promise<void> {
           "Set ANTHROPIC_API_KEY or opt into mock mode with AGENT_EXECUTOR_MODE=mock.",
       );
     }
+    if (agentExecutorMode === "groq" && !process.env.GROQ_API_KEY) {
+      throw new Error(
+        "[atellier-api] GROQ_API_KEY is required when AGENT_EXECUTOR_MODE=groq. " +
+          "Get a free key at https://console.groq.com/keys.",
+      );
+    }
+    if (agentExecutorMode === "ollama" && !process.env.OLLAMA_MODEL) {
+      throw new Error(
+        "[atellier-api] OLLAMA_MODEL is required when AGENT_EXECUTOR_MODE=ollama. " +
+          "Pull a model first (e.g. `ollama pull llama3.2`) and set OLLAMA_MODEL=llama3.2.",
+      );
+    }
   }
 
   if (storageMode === "mongo") {
@@ -93,6 +111,12 @@ async function main(): Promise<void> {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     anthropicModel: process.env.ANTHROPIC_MODEL,
     anthropicModelProfile,
+    groqApiKey: process.env.GROQ_API_KEY,
+    groqModel: process.env.GROQ_MODEL,
+    groqModelProfile,
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
+    ollamaModel: process.env.OLLAMA_MODEL,
+    ollamaModelProfile,
     maxHandoffDepth,
     executionTimeoutMs,
   });
