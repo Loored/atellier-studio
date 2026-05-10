@@ -32,6 +32,7 @@ export type BuildServerOptions = {
   | "ollamaBaseUrl"
   | "ollamaModel"
   | "ollamaModelProfile"
+  | "ollamaModelByRole"
   | "maxHandoffDepth"
   | "executionTimeoutMs"
 >;
@@ -75,12 +76,26 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
           ? options.ollamaModelProfile ?? "standard"
           : options.openaiModelProfile ?? "standard";
 
+  // Per-role overrides only apply when ollama is the active executor; for any
+  // other mode we report no overrides regardless of what the env declares,
+  // which matches the runtime behavior in app-services.
+  const executorRoleOverrides =
+    agentExecutorMode === "ollama" && options.ollamaModelByRole
+      ? Object.fromEntries(
+          Object.entries(options.ollamaModelByRole).filter(([, model]) => Boolean(model)),
+        )
+      : undefined;
+
   await fastify.register(async (instance) =>
     healthRoutes(instance, services, {
       storageMode: options.storageMode ?? "mongo",
       agentExecutorMode,
       executorModel,
       modelProfile,
+      executorRoleOverrides:
+        executorRoleOverrides && Object.keys(executorRoleOverrides).length > 0
+          ? executorRoleOverrides
+          : undefined,
     }),
   );
   await fastify.register(async (instance) => agentsRoutes(instance, services));

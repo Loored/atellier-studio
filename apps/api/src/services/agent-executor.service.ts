@@ -232,6 +232,21 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
   return sections[role] ?? `[${role}] ${name} processed the instruction.\nTask: ${taskSnippet}`;
 }
 
+// Dispatches each agent to a role-specific executor when one is configured,
+// falling back to a global executor otherwise. The interface is identical to
+// any other AgentExecutorService, so callers never see the routing.
+export class RoleAwareAgentExecutorService implements AgentExecutorService {
+  constructor(
+    private readonly fallback: AgentExecutorService,
+    private readonly perRole: Partial<Record<AgentRole, AgentExecutorService>> = {},
+  ) {}
+
+  async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    const executor = this.perRole[input.agent.role] ?? this.fallback;
+    return executor.execute(input);
+  }
+}
+
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
     if (MOCK_STEP_DELAY_MS > 0) {
