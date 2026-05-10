@@ -15,6 +15,11 @@ export async function codexRoutes(fastify: FastifyInstance, services: AppService
     return reply.code(201).send(run);
   });
 
+  fastify.get("/codex/runs/active", async (_request, reply) => {
+    const result = await services.codexWorkers.latestActive();
+    return reply.send(result);
+  });
+
   fastify.get("/codex/runs/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!isValidObjectId(id)) return badRequest(reply, "Run id is invalid.");

@@ -284,6 +284,19 @@ export class CodexWorkerService {
     });
   }
 
+  async latestActive(): Promise<CodexWorkerRunView | null> {
+    const runs = await this.runs.list();
+    const active = runs.find((r) => {
+      const hasCodex = !!(
+        (r.input as Record<string, unknown> | undefined)?.codexWorker ??
+        (r.output as Record<string, unknown> | undefined)?.codexWorker
+      );
+      return hasCodex && r.status !== "completed" && r.status !== "blocked";
+    });
+    if (!active) return null;
+    return this.getById(active.id);
+  }
+
   private step(summary: string, command: string, riskLevel: "low" | "medium" | "high", needsApproval: boolean): CodexWorkerStep {
     return { id: randomUUID(), summary, command, workingDirectory: ".", riskLevel, needsApproval, status: "pending" };
   }

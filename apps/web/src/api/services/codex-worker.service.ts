@@ -23,6 +23,10 @@ export const codexWorkerService = {
     const response = await httpClient.get<CodexWorkerView>(`/codex/runs/${runId}`);
     return response.data;
   },
+  async getActive(): Promise<CodexWorkerView | null> {
+    const response = await httpClient.get<CodexWorkerView | null>("/codex/runs/active");
+    return response.data ?? null;
+  },
   async plan(runId: string) {
     const response = await httpClient.post(`/codex/runs/${runId}/plan`);
     return response.data;
