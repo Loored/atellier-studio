@@ -1262,4 +1262,309 @@ describe("operational spine routes", () => {
     });
     expect(retryResponse.statusCode).toBe(400);
   });
+
+  it("lists tasks and supports full task update", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/tasks",
+      payload: { title: "Draft pipeline spec", priority: "medium" },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const task = createResponse.json<Task>();
+
+    const listResponse = await server.inject({ method: "GET", url: "/tasks" });
+    expect(listResponse.statusCode).toBe(200);
+    const list = listResponse.json<Task[]>();
+    expect(list.some((t) => t.id === task.id)).toBe(true);
+
+    const updateResponse = await server.inject({
+      method: "PATCH",
+      url: `/tasks/${task.id}`,
+      payload: { title: "Finalize pipeline spec", status: "active", priority: "high" },
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    const updated = updateResponse.json<Task>();
+    expect(updated.title).toBe("Finalize pipeline spec");
+    expect(updated.status).toBe("active");
+    expect(updated.priority).toBe("high");
+  });
+
+  it("rejects task update with invalid status and priority", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/tasks",
+      payload: { title: "Guard task" },
+    });
+    const task = createResponse.json<Task>();
+
+    const badStatusResponse = await server.inject({
+      method: "PATCH",
+      url: `/tasks/${task.id}`,
+      payload: { status: "in-progress" },
+    });
+    expect(badStatusResponse.statusCode).toBe(400);
+    expect(badStatusResponse.json()).toEqual({ error: "Task status is invalid." });
+
+    const badPriorityResponse = await server.inject({
+      method: "PATCH",
+      url: `/tasks/${task.id}`,
+      payload: { priority: "turbo" },
+    });
+    expect(badPriorityResponse.statusCode).toBe(400);
+    expect(badPriorityResponse.json()).toEqual({ error: "Task priority is invalid." });
+  });
+
+  it("lists agents and supports agent status update", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: { name: "Status Watcher", role: "qa" },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const agent = createResponse.json<Agent>();
+
+    const listResponse = await server.inject({ method: "GET", url: "/agents" });
+    expect(listResponse.statusCode).toBe(200);
+    const list = listResponse.json<Agent[]>();
+    expect(list.some((a) => a.id === agent.id)).toBe(true);
+
+    const statusResponse = await server.inject({
+      method: "PATCH",
+      url: `/agents/${agent.id}/status`,
+      payload: { status: "idle" },
+    });
+    expect(statusResponse.statusCode).toBe(200);
+    expect(statusResponse.json<Agent>().status).toBe("idle");
+  });
+
+  it("returns 404 when running a non-existent agent", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/agents/00000000-0000-4000-a000-000000000099/run",
+      payload: { instruction: "Do something." },
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "Agent not found." });
+  });
+
+  it("streams agent run events as SSE with typed chunk and result events", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: { name: "Stream QA", role: "qa" },
+    });
+    const agent = createResponse.json<Agent>();
+
+    const streamResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run/stream`,
+      payload: { instruction: "Review the implementation plan." },
+    });
+
+    expect(streamResponse.statusCode).toBe(200);
+    expect(streamResponse.headers["content-type"]).toContain("text/event-stream");
+
+    const events = streamResponse.body
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)) as { type: string; status?: string; content?: string; result?: RunAgentResult });
+
+    expect(events.some((e) => e.type === "status" && e.status === "queued")).toBe(true);
+    expect(events.some((e) => e.type === "status" && e.status === "running")).toBe(true);
+    expect(events.some((e) => e.type === "chunk" && typeof e.content === "string" && e.content.length > 0)).toBe(true);
+    expect(events.some((e) => e.type === "status" && e.status === "finalizing")).toBe(true);
+
+    const resultEvent = events.find((e) => e.type === "result");
+    expect(resultEvent).toBeDefined();
+    expect(resultEvent?.result?.run.status).toBe("completed");
+    expect(resultEvent?.result?.agent.id).toBe(agent.id);
+    expect(resultEvent?.result?.agent.status).toBe("needs-human");
+  });
+
+  it("runs llm-wiki-ingest-loop skill to completion", async () => {
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/llm-wiki-ingest-loop/run",
+      payload: {
+        goal: "Ingest client meeting notes about the new dashboard feature.",
+        context: "Source: client-meeting-2026-05-08.md",
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(202);
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    expect(started.runId).toEqual(expect.any(String));
+
+    let status: OrchestrationStatusResult | null = null;
+    for (let attempt = 0; attempt < 20 && status?.status !== "completed"; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const statusResponse = await server.inject({
+        method: "GET",
+        url: `/orchestrations/${started.runId}/status`,
+      });
+      if (statusResponse.statusCode === 200) {
+        status = statusResponse.json<OrchestrationStatusResult>();
+      }
+    }
+
+    expect(status?.status).toBe("completed");
+    expect(status?.skillId).toBe("llm-wiki-ingest-loop");
+    expect(status?.steps).toHaveLength(5);
+    expect(status?.steps.every((s) => s.status === "completed" || s.status === "running")).toBe(true);
+
+    const wikiLogResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    expect(wikiLogResponse.json<WikiPageResponse>().content).toContain("run_completed");
+  });
+
+  it("rejects approving a codex step that does not require approval", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: { goal: "Approve guard check", mode: "approved_step", profile: "standard" },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+
+    const viewResponse = await server.inject({ method: "GET", url: `/codex/runs/${run.id}` });
+    const view = viewResponse.json<{ steps: Array<{ id: string; needsApproval: boolean }> }>();
+    const noApprovalStep = view.steps.find((s) => !s.needsApproval);
+    expect(noApprovalStep).toBeDefined();
+
+    const approveResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/approve-step`,
+      payload: { stepId: noApprovalStep?.id },
+    });
+    expect(approveResponse.statusCode).toBe(400);
+    expect(approveResponse.json()).toEqual({ error: "This step does not require approval." });
+  });
+
+  it("rejects approving an already completed codex step", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/codex/runs",
+      payload: { goal: "Completed approve guard", mode: "approved_step", profile: "standard" },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/plan` });
+
+    // Execute step 0 (no approval needed) — completes automatically
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
+
+    // Approve step 1 (needsApproval=true) then execute it
+    const viewResponse = await server.inject({ method: "GET", url: `/codex/runs/${run.id}` });
+    const view = viewResponse.json<{ steps: Array<{ id: string; needsApproval: boolean; status: string }> }>();
+    const approvalStep = view.steps.find((s) => s.needsApproval && s.status === "pending");
+    expect(approvalStep).toBeDefined();
+
+    await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/approve-step`,
+      payload: { stepId: approvalStep?.id },
+    });
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
+
+    // Try to re-approve the now-completed step
+    const reApproveResponse = await server.inject({
+      method: "POST",
+      url: `/codex/runs/${run.id}/approve-step`,
+      payload: { stepId: approvalStep?.id },
+    });
+    expect(reApproveResponse.statusCode).toBe(400);
+    expect(reApproveResponse.json()).toEqual({ error: "Completed steps cannot be approved again." });
+  });
+
+  it("executes qa and wiki-curator agents and produces role-specific output", async () => {
+    const qaAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: { name: "Jaco QA", role: "qa" },
+    });
+    const qaAgent = qaAgentResponse.json<Agent>();
+
+    const qaRunResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${qaAgent.id}/run`,
+      payload: { instruction: "Validate the implementation against acceptance criteria." },
+    });
+    expect(qaRunResponse.statusCode).toBe(200);
+    const qaResult = qaRunResponse.json<RunAgentResult>();
+    expect(qaResult.assistantMessage.content).toContain("QA Review");
+    expect(qaResult.assistantMessage.content).toContain("APPROVED");
+    expect(qaResult.assistantMessage.content).toContain("Handoff");
+
+    const wikiAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: { name: "Wiki Curator", role: "wiki-curator" },
+    });
+    const wikiAgent = wikiAgentResponse.json<Agent>();
+
+    const wikiRunResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${wikiAgent.id}/run`,
+      payload: { instruction: "File operational memory after this session." },
+    });
+    expect(wikiRunResponse.statusCode).toBe(200);
+    const wikiResult = wikiRunResponse.json<RunAgentResult>();
+    expect(wikiResult.assistantMessage.content).toContain("Wiki Update");
+    expect(wikiResult.assistantMessage.content).toContain("wiki/log.md");
+    expect(wikiResult.assistantMessage.content).toContain("Operational memory is current");
+  });
+
+  it("returns 404 for log and complete operations on non-existent runs", async () => {
+    const phantomId = "00000000-0000-4000-a000-000000000099";
+
+    const logResponse = await server.inject({
+      method: "PATCH",
+      url: `/runs/${phantomId}/log`,
+      payload: { message: "ghost log" },
+    });
+    expect(logResponse.statusCode).toBe(404);
+    expect(logResponse.json()).toEqual({ error: "Run not found." });
+
+    const completeResponse = await server.inject({
+      method: "PATCH",
+      url: `/runs/${phantomId}/complete`,
+      payload: { summary: "ghost complete" },
+    });
+    expect(completeResponse.statusCode).toBe(404);
+    expect(completeResponse.json()).toEqual({ error: "Run not found." });
+
+    const reviewResponse = await server.inject({
+      method: "PATCH",
+      url: `/runs/${phantomId}/review`,
+      payload: { reviewStatus: "approved" },
+    });
+    expect(reviewResponse.statusCode).toBe(404);
+    expect(reviewResponse.json()).toEqual({ error: "Run not found." });
+  });
+
+  it("skips handoff silently when handoff target is the same agent", async () => {
+    const agentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: { name: "Solo PM", role: "pm" },
+    });
+    const agent = agentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run`,
+      payload: {
+        instruction: "Plan the sprint.",
+        handoffAgentId: agent.id,
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(200);
+    const result = runResponse.json<RunAgentResult>();
+    expect(result.run.status).toBe("completed");
+
+    // Same-agent handoff is skipped silently (no second run created)
+    const runsResponse = await server.inject({ method: "GET", url: "/runs" });
+    const allRuns = runsResponse.json<Run[]>();
+    const agentRuns = allRuns.filter((r) => r.agentId === agent.id);
+    expect(agentRuns).toHaveLength(1);
+  });
 });
