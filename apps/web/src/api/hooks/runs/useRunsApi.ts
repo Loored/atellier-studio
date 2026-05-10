@@ -1,6 +1,8 @@
 import { useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
 import type {
   AppendRunLogInput,
+  CaptureRunMemoryInput,
+  CaptureRunMemoryResponse,
   CompleteRunInput,
   CreateRunInput,
   Run,
@@ -177,6 +179,38 @@ export function useUnlinkRunDeliverableApi(options: UseUnlinkRunDeliverableApiOp
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page("wiki/deliverables/index.md") }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type CaptureRunMemoryVariables = {
+  runId: string;
+  input?: CaptureRunMemoryInput;
+};
+
+export type UseCaptureRunMemoryApiOptions = UseMutationOptions<CaptureRunMemoryResponse, Error, CaptureRunMemoryVariables>;
+
+export function useCaptureRunMemoryApi(options: UseCaptureRunMemoryApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<CaptureRunMemoryResponse, Error, CaptureRunMemoryVariables>(
+    {
+      mutationFn: ({ runId, input }) => runsService.captureMemory(runId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (result) => {
+        notifySuccess("Run memory captured");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page(result.wikiPath) }),
         ]);
       },
       onError: (error) => notifyError(error),

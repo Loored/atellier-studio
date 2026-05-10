@@ -97,11 +97,12 @@ export class WikiService {
 
   async writePage(relativePath: string, content: string): Promise<WikiPageResponse> {
     await this.ensureWiki();
-    this.assertWritableWikiMarkdownPath(relativePath);
-    await this.writeAtelierPage(relativePath, content);
-    const normalized = relativePath.trim();
+    const normalized = this.normalizeWritableWikiMarkdownPath(relativePath);
+    await this.writeAtelierPage(normalized, content);
     if (this.isDeliverableMarkdownPath(normalized)) {
       await this.refreshDeliverablesIndex();
+    } else {
+      await this.upsertWikiIndexEntry(normalized, content);
     }
 
     return {
@@ -453,7 +454,7 @@ export class WikiService {
     return { normalized, resolved };
   }
 
-  private assertWritableWikiMarkdownPath(relativePath: string): void {
+  private normalizeWritableWikiMarkdownPath(relativePath: string): string {
     const normalized = relativePath.trim().replace(/\\/g, "/");
     const canonical = normalized.startsWith("atelier/") ? normalized.slice("atelier/".length) : normalized;
     if (!canonical.startsWith("wiki/")) {
@@ -480,6 +481,7 @@ export class WikiService {
     if (!allowedSegments.has(segment)) {
       throw new Error("Writable wiki path must target an allowed wiki category.");
     }
+    return canonical;
   }
 
   private isDeliverableMarkdownPath(relativePath: string): boolean {
@@ -523,6 +525,49 @@ export class WikiService {
     await writeFile(indexPath, content, "utf8");
   }
 
+  private async upsertWikiIndexEntry(wikiPath: string, content: string): Promise<void> {
+    if (!wikiPath.startsWith("wiki/") || wikiPath === "wiki/index.md") {
+      return;
+    }
+
+    const indexContent = await readFile(this.indexPath, "utf8");
+    const relativeWikiPath = wikiPath.replace(/^wiki\//, "");
+    const linkPath = `./${relativeWikiPath}`;
+    const category = relativeWikiPath.split("/")[0] ?? "notes";
+    const date = new Date().toISOString().slice(0, 10);
+    const summary = this.sanitizeTableCell(this.summarizeContent(content.replace(/^# .*\n?/, "")));
+    const row = `| [${relativeWikiPath}](${linkPath}) | ${summary || "Wiki page updated through safe write path."} | ${category} | ${date} | 0 |`;
+
+    const lines = indexContent.split("\n");
+    const headerIndex = lines.findIndex((line) => line.trim() === "| Path | Summary | Category | Last updated | Source count |");
+    if (headerIndex < 0 || headerIndex + 1 >= lines.length) {
+      return;
+    }
+
+    const firstRowIndex = headerIndex + 2;
+    let tableEndIndex = lines.findIndex((line, index) => index >= firstRowIndex && line.trim() === "");
+    if (tableEndIndex < 0) {
+      tableEndIndex = lines.length;
+    }
+
+    const rowMatcher = new RegExp(`\\]\\(${this.escapeRegExp(linkPath)}\\)`);
+    const tableRows = lines.slice(firstRowIndex, tableEndIndex);
+    const existingRowIndex = tableRows.findIndex((tableRow) => rowMatcher.test(tableRow));
+    if (existingRowIndex >= 0) {
+      tableRows[existingRowIndex] = row;
+    } else {
+      tableRows.push(row);
+    }
+
+    const updated = [
+      ...lines.slice(0, firstRowIndex),
+      ...tableRows,
+      ...lines.slice(tableEndIndex),
+    ].join("\n");
+
+    await writeFile(this.indexPath, updated, "utf8");
+  }
+
   private formatEntry(input: AppendWikiLogInput): string {
     const lines = [`## [${new Date().toISOString()}] ${input.eventType} | ${input.title}`];
 
@@ -561,6 +606,10 @@ export class WikiService {
       return line;
     }
     return `${line.slice(0, 217)}...`;
+  }
+
+  private sanitizeTableCell(value: string): string {
+    return value.replace(/\|/g, "\\|").replace(/\n+/g, " ").trim();
   }
 
   private slugify(value: string): string {

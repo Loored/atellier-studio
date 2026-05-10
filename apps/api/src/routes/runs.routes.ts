@@ -6,6 +6,7 @@ import {
   RUN_STATUSES,
   RUN_TYPES,
   type AppendRunLogInput,
+  type CaptureRunMemoryInput,
   type CompleteRunInput,
   type CreateRunInput,
   type UpdateRunReviewInput,
@@ -145,5 +146,25 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
 
     const run = await services.runs.unlinkDeliverable(id);
     return run ?? notFound(reply, "Run not found.");
+  });
+
+  fastify.post("/runs/:id/capture-memory", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+
+    const body = bodyRecord(request.body) ?? {};
+    const input: CaptureRunMemoryInput = {
+      summary: optionalStringField(body, "summary"),
+    };
+
+    try {
+      const result = await services.runs.captureMemory(id, input);
+      return result ? reply.code(201).send(result) : notFound(reply, "Run not found.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to capture run memory.";
+      return reply.code(409).send({ error: message });
+    }
   });
 }

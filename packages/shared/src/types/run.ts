@@ -61,3 +61,13 @@ export type CompleteRunInput = {
 export type UpdateRunReviewInput = {
   reviewStatus: RunReviewStatus;
 };
+
+export type CaptureRunMemoryInput = {
+  summary?: string;
+};
+
+export type CaptureRunMemoryResponse = {
+  run: Run;
+  wikiPath: string;
+  logPath: string;
+};

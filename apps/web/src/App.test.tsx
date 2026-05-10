@@ -11,6 +11,7 @@ const appendLogMock = vi.hoisted(() => vi.fn());
 const updateRunReviewMock = vi.hoisted(() => vi.fn());
 const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
+const captureRunMemoryMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
@@ -97,6 +98,7 @@ vi.mock("./api/services/runs.service", () => ({
     updateReview: updateRunReviewMock,
     promoteDeliverable: promoteDeliverableMock,
     unlinkDeliverable: unlinkDeliverableMock,
+    captureMemory: captureRunMemoryMock,
   },
 }));
 
@@ -239,6 +241,19 @@ describe("App", () => {
       logs: [],
       createdAt: "2026-05-04T00:00:00.000Z",
       updatedAt: "2026-05-04T00:00:00.000Z",
+    });
+    captureRunMemoryMock.mockResolvedValue({
+      run: {
+        id: "run-2",
+        type: "review",
+        status: "completed",
+        reviewStatus: "pending",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      wikiPath: "wiki/synthesis/run-run-2-review-memory-captured-from-dashboard.md",
+      logPath: "wiki/log.md",
     });
     startSkillOrchestrationMock.mockResolvedValue({
       skillId: "atellier-build-loop",
@@ -455,6 +470,22 @@ describe("App", () => {
     await waitFor(() => {
       expect(unlinkDeliverableMock).toHaveBeenCalledWith("run-3");
     });
+  });
+
+  it("captures completed review run memory to the wiki", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    const captureButtons = await screen.findAllByRole("button", { name: /capture memory/i });
+    await user.click(captureButtons[0]);
+
+    await waitFor(() => {
+      expect(captureRunMemoryMock).toHaveBeenCalledWith("run-2", {
+        summary: "Review memory captured from dashboard.",
+      });
+    });
+    expect(await screen.findByText(/Captured memory: wiki\/synthesis\/run-run-2-review-memory-captured-from-dashboard\.md/i)).toBeInTheDocument();
   });
 
   it("filters deliverables by type and review", async () => {
