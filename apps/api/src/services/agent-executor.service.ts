@@ -217,6 +217,42 @@ export class MockAgentExecutorService implements AgentExecutorService {
   }
 }
 
+function buildExecutorSystemPrompt(
+  input: ExecuteAgentInstructionInput,
+  repoFileHints: string[] | undefined,
+): string {
+  const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
+  const customInstructions = input.agent.instructions?.trim();
+
+  return [
+    `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
+    "",
+    roleExpertise,
+    "This chat executor cannot edit repository files. Be truthful about that boundary.",
+    "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
+    "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
+    repoFileHints?.length
+      ? [
+          "Verified repository files you may reference:",
+          ...repoFileHints.map((filePath) => `- ${filePath}`),
+        ].join("\n")
+      : "",
+    customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function buildExecutorUserPrompt(input: ExecuteAgentInstructionInput): string {
+  return [
+    `Instruction:\n${input.instruction.trim()}`,
+    input.context?.trim() ? `Context:\n${input.context.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
@@ -235,34 +271,8 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
   constructor(private readonly config: OpenAiAgentExecutorConfig) {}
 
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
-    const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
-    const customInstructions = input.agent.instructions?.trim();
-
-    const systemPrompt = [
-      `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
-      "",
-      roleExpertise,
-      "This chat executor cannot edit repository files. Be truthful about that boundary.",
-      "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
-      "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
-      this.config.repoFileHints?.length
-        ? [
-            "Verified repository files you may reference:",
-            ...this.config.repoFileHints.map((filePath) => `- ${filePath}`),
-          ].join("\n")
-        : "",
-      customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-
-    const userPrompt = [
-      `Instruction:\n${input.instruction.trim()}`,
-      input.context?.trim() ? `Context:\n${input.context.trim()}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
+    const userPrompt = buildExecutorUserPrompt(input);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -306,17 +316,91 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
   }
 }
 
-// P3.a stub — accepts config and validates env wiring, but every execute() call
-// throws. The real implementation (Opus 4.7 + prompt caching) lands in P3.b.
+type AnthropicMessagesResponse = {
+  id?: string;
+  type?: string;
+  role?: string;
+  model?: string;
+  stop_reason?: string;
+  content?: Array<{
+    type?: string;
+    text?: string;
+  }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+  error?: {
+    type?: string;
+    message?: string;
+  };
+};
+
+const ANTHROPIC_API_VERSION = "2023-06-01";
+const ANTHROPIC_MAX_TOKENS = 1024;
+const ANTHROPIC_TEMPERATURE = 0.4;
+
 export class AnthropicAgentExecutorService implements AgentExecutorService {
   constructor(private readonly config: AnthropicAgentExecutorConfig) {}
 
-  async execute(_input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
-    throw new Error(
-      `Anthropic executor (model=${this.config.model}) is wired but not yet implemented. ` +
-        "P3.a delivered the stub only — real calls land in P3.b. " +
-        "Switch to AGENT_EXECUTOR_MODE=mock or =openai to run executions today.",
-    );
+  async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
+    const userPrompt = buildExecutorUserPrompt(input);
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": this.config.apiKey,
+        "anthropic-version": ANTHROPIC_API_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        max_tokens: ANTHROPIC_MAX_TOKENS,
+        temperature: ANTHROPIC_TEMPERATURE,
+        // Naive prompt caching: the system prompt (role expertise + repo hints)
+        // is stable across runs of the same agent, so cache it ephemerally.
+        // Per-run instruction/context stays uncached in the user message.
+        system: [
+          {
+            type: "text",
+            text: systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Anthropic execution failed (${response.status}): ${errorBody}`);
+    }
+
+    const data = (await response.json()) as AnthropicMessagesResponse;
+
+    if (data.error?.message) {
+      throw new Error(`Anthropic error: ${data.error.message}`);
+    }
+
+    const text = data.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("")
+      .trim();
+
+    if (!text) {
+      throw new Error(
+        `Anthropic returned an empty response (stop_reason: ${data.stop_reason ?? "unknown"}).`,
+      );
+    }
+
+    return {
+      response: text,
+      needsHuman: true,
+    };
   }
 }
 
