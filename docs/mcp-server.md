@@ -4,7 +4,7 @@ The MCP server (`apps/mcp-server`) wraps the Atellier REST API as a [Model Conte
 
 This is the highest-leverage move from the post-keynote plan: Atellier exposes its **structured work model** (wiki / runs / orchestration / review) over MCP, and consumes the platform's agent runtime via Cowork. We do not reinvent the agent runtime.
 
-Status: **P1.b — full first-cut surface live**. Eight tools cover the wiki, orchestration, and runs surfaces; an MCP client can drive an Atellier session end-to-end without ever opening the FED.
+Status: **P1.c — operator-ready surface**. Nine tools cover the wiki (query / ingest / read / write / log append), orchestration (skills list, run, status), and runs (list); an MCP client can drive an Atellier session end-to-end without ever opening the FED.
 
 ## How it works
 
@@ -54,7 +54,20 @@ Add an entry to your Claude Code MCP config — typically `~/.claude.json` for u
 }
 ```
 
-Restart Claude Code. The tool `wiki_query` should appear in the tools palette.
+Restart Claude Code. All nine tools (`wiki_query`, `wiki_ingest`, `wiki_page_read`, `wiki_page_write`, `wiki_log_append`, `orchestration_skills_list`, `orchestration_run`, `orchestration_status`, `runs_list`) should appear in the tools palette under the `atellier` server.
+
+### Verify the connection
+
+After restart, ask Claude Code:
+
+> Use the atellier MCP server to list orchestration skills.
+
+It should call `orchestration_skills_list` and show the two skills (`atellier-build-loop`, `llm-wiki-ingest-loop`) with their step layouts. If you don't see the tools, check:
+
+1. **API is running** — the MCP server needs `ATELLIER_API_URL` reachable. Quick check: `curl -s http://127.0.0.1:4000/health`.
+2. **`cwd` is absolute** — relative paths break when Claude Code spawns the subprocess from a different working directory.
+3. **`pnpm` is on PATH** — if not, hardcode it: `"command": "/opt/homebrew/bin/pnpm"` (mac) or wherever `which pnpm` reports.
+4. **Server stderr** — Claude Code surfaces stderr in its MCP logs. The server prints `[atellier-mcp-server] listening on stdio (api=…, tools=9)` on startup.
 
 ## Connect from Claude Cowork
 
@@ -70,6 +83,7 @@ All tools are 1:1 adapters over existing REST endpoints. The MCP layer translate
 | `wiki_ingest` | `POST /wiki/ingest` | Preserve a raw source + write summary page + log entry + propose tasks |
 | `wiki_page_read` | `GET /wiki/page?path=…` | Read a wiki page by path |
 | `wiki_page_write` | `POST /wiki/page` | Create or replace a wiki page (auto-logs the write) |
+| `wiki_log_append` | `POST /wiki/append-log` | Append an operational event to `atelier/wiki/log.md` |
 | `orchestration_skills_list` | `GET /orchestrations/skills` | List skills available on this Atellier (with their step layout) |
 | `orchestration_run` | `POST /orchestrations/skills/:id/run` | Start a skill in the background, returns a `runId` |
 | `orchestration_status` | `GET /orchestrations/:id/status` | Poll per-step progress for a running orchestration |
@@ -83,6 +97,7 @@ All tools are 1:1 adapters over existing REST endpoints. The MCP layer translate
 | `wiki_ingest` | `title`, `content` | `sourceType`, `sourcePathHint` |
 | `wiki_page_read` | `path` | — |
 | `wiki_page_write` | `path`, `content` | — |
+| `wiki_log_append` | `eventType` (initialization \| ingest \| query \| wiki_write \| run_completed \| run_log \| wiki_lint \| decision \| manual), `title` | `summary`, `runId`, `taskId`, `agentId` |
 | `orchestration_skills_list` | — | — |
 | `orchestration_run` | `skillId`, `goal` | `context`, `taskId` |
 | `orchestration_status` | `runId` | — |

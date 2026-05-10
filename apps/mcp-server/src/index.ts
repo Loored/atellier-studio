@@ -32,6 +32,8 @@ import {
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import type {
+  AppendWikiLogInput,
+  AppendWikiLogResponse,
   OrchestrationSkillSummary,
   OrchestrationStatusResult,
   Run,
@@ -39,11 +41,24 @@ import type {
   StartSkillOrchestrationResponse,
   WikiIngestInput,
   WikiIngestResponse,
+  WikiLogEventType,
   WikiPageResponse,
   WikiQueryInput,
   WikiQueryResponse,
   WikiWritePageInput,
 } from "@atellier/shared";
+
+const WIKI_LOG_EVENT_TYPES: WikiLogEventType[] = [
+  "initialization",
+  "ingest",
+  "query",
+  "wiki_write",
+  "run_completed",
+  "run_log",
+  "wiki_lint",
+  "decision",
+  "manual",
+];
 
 const ATELLIER_API_URL = process.env.ATELLIER_API_URL ?? "http://127.0.0.1:4000";
 
@@ -159,6 +174,37 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "wiki_log_append",
+    description:
+      "Append an event to the chronological wiki log (atelier/wiki/log.md). Use this when an MCP client " +
+      "wants to record a manual decision, an external ingest, a meeting outcome, or any operational " +
+      "moment that should be preserved in operational memory without writing a full page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventType: {
+          type: "string",
+          enum: WIKI_LOG_EVENT_TYPES,
+          description:
+            "Event category. Use 'manual' for client-driven entries that don't fit a more specific type.",
+        },
+        title: {
+          type: "string",
+          description: "Short human-readable title for the log entry.",
+        },
+        summary: {
+          type: "string",
+          description: "Optional one-paragraph summary of what happened.",
+        },
+        runId: { type: "string", description: "Optional Atellier run id this entry relates to." },
+        taskId: { type: "string", description: "Optional Atellier task id this entry relates to." },
+        agentId: { type: "string", description: "Optional agent id this entry relates to." },
+      },
+      required: ["eventType", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "orchestration_skills_list",
     description:
       "List the orchestration skills available on this Atellier instance. Each skill describes the multi-agent " +
@@ -259,6 +305,26 @@ async function handleWikiPageWrite(args: Record<string, unknown>): Promise<CallT
   return ok(await callApi<WikiPageResponse>("POST", "/wiki/page", input));
 }
 
+async function handleWikiLogAppend(args: Record<string, unknown>): Promise<CallToolResult> {
+  const eventType = asString(args.eventType) as WikiLogEventType | undefined;
+  const title = asString(args.title);
+  if (!eventType || !WIKI_LOG_EVENT_TYPES.includes(eventType)) {
+    return fail(
+      `wiki_log_append requires 'eventType' to be one of: ${WIKI_LOG_EVENT_TYPES.join(", ")}.`,
+    );
+  }
+  if (!title) return fail("wiki_log_append requires a non-empty 'title' string.");
+  const input: AppendWikiLogInput = {
+    eventType,
+    title,
+    summary: asString(args.summary),
+    runId: asString(args.runId),
+    taskId: asString(args.taskId),
+    agentId: asString(args.agentId),
+  };
+  return ok(await callApi<AppendWikiLogResponse>("POST", "/wiki/append-log", input));
+}
+
 async function handleOrchestrationSkillsList(): Promise<CallToolResult> {
   return ok(await callApi<OrchestrationSkillSummary[]>("GET", "/orchestrations/skills"));
 }
@@ -305,6 +371,7 @@ const HANDLERS: Record<
   wiki_ingest: handleWikiIngest,
   wiki_page_read: handleWikiPageRead,
   wiki_page_write: handleWikiPageWrite,
+  wiki_log_append: handleWikiLogAppend,
   orchestration_skills_list: handleOrchestrationSkillsList,
   orchestration_run: handleOrchestrationRun,
   orchestration_status: handleOrchestrationStatus,
