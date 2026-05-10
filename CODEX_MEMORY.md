@@ -91,14 +91,34 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 ## Current Priorities
 
-1. Codex Worker evidence pass: strengthen per-step output evidence and finalize review payloads.
-2. Wiki Brain v2: add safe wiki write/update flows and improve contradiction reuse workflow.
-3. Orchestration reliability: keep templates readable and avoid growing one huge orchestration service.
-4. MCP later: only after Wiki Brain and Codex Worker execution evidence are stable.
+API foundation for Wiki Brain MVP, Review Memory Capture, Codex Worker control-plane, and agent grounding validation are done as of 2026-05-10. Next focus is on UI surface and execution evidence depth.
+
+1. Review Queue Triage UI: group runs by pending/approved/changes-requested; surface captured-memory paths per run; make validation blockers and missing evidence easy to clear from `ReviewView`.
+2. Codex Worker v1.2: strengthen per-step command/test evidence, add approval audit metadata across step transitions, prepare for a real Codex CLI adapter. Do not call real Codex in tests.
+3. Wiki Brain v2 polish: richer synthesis page templates, deterministic cross-linking, and contradiction handling at capture time.
+4. Orchestration template modularization: only when a third workflow is added; until then keep `SkillOrchestrationService` small and readable.
+5. MCP later: only after Codex Worker v1.2 and Review Triage UI ship.
 
 Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, multiplayer, or broad MCP.
 
 ## Recent Operational Notes
+
+### 2026-05-10 - Branch state and test coverage snapshot
+
+- Active branch `feat/codex-worker-evidence-pass` is 4 commits ahead of `main` and ready for merge:
+  - `eafb94f feat(codex): persist worker evidence`
+  - `9048007 feat(wiki): surface reusable query context`
+  - `cde9959 feat(agents): validate grounded responses`
+  - `9e32a02 test: cover evidence and grounding flows`
+- API operational-spine test now covers 48 cases (55 total with `agent-response-validator`). New coverage: task list/update + invalid status/priority guards, agent list + status update, agent 404 on run, SSE stream typed events (queued/running/chunk/finalizing/result), `llm-wiki-ingest-loop` end-to-end, codex worker approve guards (no-approval-needed, already-completed), QA + wiki-curator role outputs, run 404 guards, same-agent handoff skip.
+- Run `pnpm --filter @atellier/api test` for the focused suite.
+
+### 2026-05-08 - Codex Worker evidence v1.1 done
+
+- Persisted Codex Worker step evidence (stdout/stderr paths, command, working dir, notes, artifacts).
+- Wiki query now returns related pages and possible contradictions to feed reuse and review flows.
+- Agent grounding validation v1.2 lands: builder/QA responses validated against verified repo files; approval blocked on critical validation errors.
+- Run memory capture lands: `POST /runs/:id/capture-memory` writes a `wiki/synthesis/` page with run metadata, review status, deliverable path, latest logs, validation evidence, and output snapshot. Frontend chain `runs.service -> useRunsApi -> useRunsTimeline -> ReviewView` is wired.
 
 ### 2026-05-05 - Safety + Wiki Brain + Codex Worker control-plane
 
@@ -125,6 +145,13 @@ Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, mul
 - Step evidence now persists on completed Codex Worker steps as structured metadata.
 - Codex Worker panel renders step evidence and finalize evidence counts.
 - Finalize run logs now include per-step evidence, changed-file counts, and test-evidence counts.
+
+### 2026-05-08 - Review memory capture slice
+
+- Review can capture completed runs into `wiki/synthesis/` through `POST /runs/:id/capture-memory`.
+- Captured run memory includes run metadata, review status, deliverable path, latest logs, validation evidence, and output snapshot.
+- Safe wiki page writes now upsert non-deliverable pages into `wiki/index.md`.
+- Frontend capture follows the API chain: run service -> run API hook -> `useRunsTimeline` -> `ReviewView`.
 
 ### 2026-05-05 - Wiki lint suggestions added
 
