@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Archive,
   Check,
   CircleSlash,
   FilePlus2,
@@ -40,6 +41,8 @@ export function ReviewView() {
     isUpdatingRunReview,
     isPromotingRunDeliverable,
     isUnlinkingRunDeliverable,
+    isCapturingRunMemory,
+    capturedMemoryPath,
     isAppendingRunLog,
     isCompletingRun,
     setAgentFilter,
@@ -51,6 +54,7 @@ export function ReviewView() {
     setRunReview,
     promoteRunDeliverable,
     unlinkRunDeliverable,
+    captureRunMemory,
   } = useRunsTimeline();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -193,6 +197,12 @@ export function ReviewView() {
               }}
             />
           </div>
+        ) : null}
+
+        {capturedMemoryPath ? (
+          <p className="mb-4 m-0 border border-teal/25 rounded-lg px-2.5 py-2 text-[0.74rem] text-teal bg-teal/10 overflow-wrap-anywhere">
+            Captured memory: {capturedMemoryPath}
+          </p>
         ) : null}
 
         {/* Tabs */}
@@ -365,6 +375,17 @@ export function ReviewView() {
                     >
                       <CircleSlash size={13} />
                       Request changes
+                    </button>
+
+                    <button
+                      type="button"
+                      className="h-7 px-2.5 text-[0.75rem] border-teal/35 text-teal bg-teal/10 hover:bg-teal/20"
+                      onClick={() => captureRunMemory(run.id)}
+                      disabled={isCapturingRunMemory}
+                      title="Capture review memory to wiki"
+                    >
+                      <Archive size={13} />
+                      Capture memory
                     </button>
 
                     <button

@@ -1,5 +1,7 @@
 import type {
   AppendRunLogInput,
+  CaptureRunMemoryInput,
+  CaptureRunMemoryResponse,
   CompleteRunInput,
   CreateRunInput,
   Run,
@@ -40,6 +42,11 @@ export const runsService = {
 
   async unlinkDeliverable(runId: string): Promise<Run> {
     const response = await httpClient.patch<Run>(`/runs/${runId}/unlink-deliverable`);
+    return response.data;
+  },
+
+  async captureMemory(runId: string, input: CaptureRunMemoryInput = {}): Promise<CaptureRunMemoryResponse> {
+    const response = await httpClient.post<CaptureRunMemoryResponse>(`/runs/${runId}/capture-memory`, input);
     return response.data;
   },
 };

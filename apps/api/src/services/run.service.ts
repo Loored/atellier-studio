@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import {
   type AppendRunLogInput,
+  type CaptureRunMemoryInput,
+  type CaptureRunMemoryResponse,
   type CompleteRunInput,
   type CreateRunInput,
   type AgentValidationResult,
@@ -258,6 +260,41 @@ export class RunService {
     return next;
   }
 
+  async captureMemory(id: string, input: CaptureRunMemoryInput = {}): Promise<CaptureRunMemoryResponse | null> {
+    const run = await this.getById(id);
+    if (!run) {
+      return null;
+    }
+    if (run.status !== "completed") {
+      throw new Error("Only completed runs can be captured as wiki memory.");
+    }
+
+    const summary = input.summary?.trim() || this.inferRunMemorySummary(run);
+    const wikiPath = this.buildRunMemoryPath(run, summary);
+    const content = this.buildRunMemoryMarkdown(run, summary);
+    const page = await this.wikiService.writePage(wikiPath, content);
+    const log = await this.wikiService.appendLog({
+      eventType: "decision",
+      title: "Run memory captured",
+      summary: `Captured review memory for run ${run.id}.`,
+      runId: run.id,
+      taskId: run.taskId,
+      agentId: run.agentId,
+      details: {
+        memoryPath: page.path,
+        type: run.type,
+        reviewStatus: run.reviewStatus ?? "none",
+        deliverablePath: run.deliverablePath ?? "none",
+      },
+    });
+
+    return {
+      run,
+      wikiPath: page.path,
+      logPath: log.path,
+    };
+  }
+
   private readValidation(output: unknown): AgentValidationResult | null {
     const validation = (output as { validation?: AgentValidationResult } | undefined)?.validation;
     return validation ?? null;
@@ -411,6 +448,106 @@ export class RunService {
       .slice(0, 48);
     const suffix = safeSlug.length > 0 ? safeSlug : run.type;
     return path.posix.join("wiki", "deliverables", `${run.id}-${suffix}.md`);
+  }
+
+  private buildRunMemoryPath(run: Run, summary: string): string {
+    const slug = this.slugify(summary).slice(0, 48) || run.type;
+    return path.posix.join("wiki", "synthesis", `run-${run.id}-${slug}.md`);
+  }
+
+  private inferRunMemorySummary(run: Run): string {
+    const latestLog = run.logs.at(-1)?.message;
+    if (latestLog?.trim()) {
+      return latestLog.trim();
+    }
+    if (run.deliverablePath) {
+      return `Review memory for ${run.deliverablePath}`;
+    }
+    return `Review memory for ${run.type} run`;
+  }
+
+  private buildRunMemoryMarkdown(run: Run, summary: string): string {
+    const validation = this.readValidation(run.output);
+    const latestLogs = run.logs.slice(-5);
+    const outputText = this.stringifyUnknown(run.output);
+
+    return [
+      `# Run Memory - ${summary}`,
+      "",
+      "## Run",
+      "",
+      `- Run ID: ${run.id}`,
+      `- Type: ${run.type}`,
+      `- Status: ${run.status}`,
+      `- Review: ${run.reviewStatus ?? "none"}`,
+      `- Deliverable: ${run.deliverablePath ?? "none"}`,
+      `- Created: ${run.createdAt}`,
+      `- Updated: ${run.updatedAt}`,
+      "",
+      "## Review Summary",
+      "",
+      summary,
+      "",
+      "## Evidence",
+      "",
+      "### Latest Logs",
+      "",
+      ...(latestLogs.length > 0
+        ? latestLogs.map((log) => `- ${log.timestamp} ${log.level}: ${log.message}`)
+        : ["_No run logs captured._"]),
+      "",
+      "### Validation",
+      "",
+      ...(validation
+        ? [
+            `- Role: ${validation.role}`,
+            `- Passed: ${validation.passed ? "yes" : "no"}`,
+            `- Candidate files: ${validation.candidateFiles.length}`,
+            `- Changed files: ${validation.changedFiles.length}`,
+            `- Invalid references: ${validation.invalidReferencedFiles.length}`,
+            ...(validation.issues.length > 0
+              ? [
+                  "",
+                  "Issues:",
+                  ...validation.issues.map((issue) => `- ${issue.severity}: ${issue.message}`),
+                ]
+              : []),
+          ]
+        : ["_No validation payload captured._"]),
+      "",
+      "### Output Snapshot",
+      "",
+      "```json",
+      outputText,
+      "```",
+      "",
+      "## Memory Decision",
+      "",
+      "This page captures reusable review context from a completed run so future work can reference the result without relying only on MongoDB state or chat history.",
+      "",
+    ].join("\n");
+  }
+
+  private stringifyUnknown(value: unknown): string {
+    if (value === undefined) {
+      return "null";
+    }
+    try {
+      const serialized = JSON.stringify(value, null, 2);
+      if (!serialized) {
+        return "null";
+      }
+      return serialized.length > 6000 ? `${serialized.slice(0, 5997)}...` : serialized;
+    } catch {
+      return JSON.stringify({ unstringifiable: true }, null, 2);
+    }
+  }
+
+  private slugify(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
   }
 
   private async writeDeliverable(run: Run, summary: string | undefined, deliverablePath: string): Promise<void> {
