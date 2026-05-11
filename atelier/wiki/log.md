@@ -9951,3 +9951,121 @@
 ## [2026-05-10T10:13:29.547Z] query | Wiki query: executor
 - Summary: Returned 3 matches
 - limit: 3
+
+## [2026-05-10T10:26:17.233Z] manual | P1.c smoke test
+- Summary: Validating wiki_log_append from MCP roundtrip during P1.c.
+
+## [2026-05-10T10:41:31.479Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: a9b84e58-e713-434a-9bf0-5fe1b6961b33
+- Agent ID: aa746686-7cb5-4b22-b42c-5adccdd4c638
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:41:46.769Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 31b29987-dfc8-4f61-899a-52ff11f5215f
+- Agent ID: ae6020e4-f5ec-455f-97a5-2676b6f3fdd1
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:42:02.669Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: cfdacffd-9f00-4a46-9cd5-af7768816f7a
+- Agent ID: e7d0b9e3-a68b-4726-9082-7042f95ac9c4
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:42:17.925Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: bb1df3f5-d801-4698-be7f-5e1582496bbb
+- Agent ID: 20aa304a-a1ba-41dd-a320-e5785da818bc
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:42:35.658Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 539f6275-142b-4845-bcb4-102630f0d3be
+- Agent ID: ae6020e4-f5ec-455f-97a5-2676b6f3fdd1
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:42:53.716Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 1346a793-43fd-4187-adbd-647c02ace819
+- Agent ID: 20aa304a-a1ba-41dd-a320-e5785da818bc
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:43:09.683Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 68957543-ceb7-4791-b25e-923c0cfd7b92
+- Agent ID: ebce02f1-c27e-4182-b840-f2c2d8ecb668
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:43:10.214Z] run_completed | Atellier Build Loop completed
+- Run ID: aaf09061-3b5d-4882-9722-fa9d7cfe3e15
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/aaf09061-3b5d-4882-9722-fa9d7cfe3e15-atellier-build-loop-completed.md
+
+## [2026-05-10T10:44:52.376Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: ebfb48a4-9f7c-4639-aba1-9cea64bf07d1
+- Agent ID: ebce02f1-c27e-4182-b840-f2c2d8ecb668
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:45:11.879Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: a9daeb65-4042-4437-9c5c-c337a1abd361
+- Agent ID: ebce02f1-c27e-4182-b840-f2c2d8ecb668
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:45:31.950Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 276fdc10-e1e8-49df-a4c0-9c6a3fb70b13
+- Agent ID: ebce02f1-c27e-4182-b840-f2c2d8ecb668
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:45:49.973Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: f5f494b9-f1b1-409f-bdc0-386a19507b57
+- Agent ID: aa746686-7cb5-4b22-b42c-5adccdd4c638
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-10T10:45:50.085Z] run_completed | Wiki Dream Loop completed
+- Run ID: becf6f25-2b45-4dde-a4da-9a775e835817
+- Summary: Wiki Dream Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/becf6f25-2b45-4dde-a4da-9a775e835817-wiki-dream-loop-completed.md
