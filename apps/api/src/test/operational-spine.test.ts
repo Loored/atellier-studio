@@ -55,7 +55,7 @@ describe("operational spine routes", () => {
       service: "atellier-api",
       storageMode: "memory",
       executorMode: "mock",
-      executorModel: "gpt-4.1-mini",
+      executorModel: "mock",
       modelProfile: "standard",
       mongo: {
         connected: false,
@@ -1414,6 +1414,49 @@ describe("operational spine routes", () => {
 
     const wikiLogResponse = await server.inject({ method: "GET", url: "/wiki/log" });
     expect(wikiLogResponse.json<WikiPageResponse>().content).toContain("run_completed");
+  });
+
+  it("runs wiki-dream-loop skill to completion and never silently writes wiki pages", async () => {
+    // Capture the wiki page count before so we can prove the dream loop did
+    // not auto-apply changes (it must produce a *proposed* report only).
+    const indexBefore = await server.inject({ method: "GET", url: "/wiki/index" });
+    const indexBeforeContent = indexBefore.json<WikiPageResponse>().content;
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/wiki-dream-loop/run",
+      payload: {
+        goal: "Periodic curator pass — propose tidy-ups but apply nothing.",
+        context: "First scheduled dream of the iteration.",
+      },
+    });
+    expect(startResponse.statusCode).toBe(202);
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+
+    let status: OrchestrationStatusResult | null = null;
+    for (let attempt = 0; attempt < 20 && status?.status !== "completed"; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const statusResponse = await server.inject({
+        method: "GET",
+        url: `/orchestrations/${started.runId}/status`,
+      });
+      if (statusResponse.statusCode === 200) {
+        status = statusResponse.json<OrchestrationStatusResult>();
+      }
+    }
+
+    expect(status?.status).toBe("completed");
+    expect(status?.skillId).toBe("wiki-dream-loop");
+    expect(status?.steps).toHaveLength(4);
+    expect(status?.steps.map((s) => s.stepId)).toEqual([
+      "audit",
+      "propose-changes",
+      "draft-report",
+      "task-followup",
+    ]);
+
+    const indexAfter = await server.inject({ method: "GET", url: "/wiki/index" });
+    expect(indexAfter.json<WikiPageResponse>().content).toBe(indexBeforeContent);
   });
 
   it("rejects approving a codex step that does not require approval", async () => {

@@ -13,6 +13,7 @@
 | [../../.agents/skills/atellier-agent-orchestrator/SKILL.md](../../.agents/skills/atellier-agent-orchestrator/SKILL.md) | Codex skill contract for multi-agent build/fix/validate and wiki-ingest orchestration. | workflows | 2026-05-05 | 0 |
 | [sources/2026-05-08-tech-constraints.md](./sources/2026-05-08-tech-constraints.md) | Source summary generated from deterministic ingest. | note | 2026-05-08 | 1 |
 | [sources/2026-05-08-sprint-goal-live-dashboard.md](./sources/2026-05-08-sprint-goal-live-dashboard.md) | Source summary generated from deterministic ingest. | note | 2026-05-08 | 1 |
+| [synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md](./synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md) | ## Run - Run ID: 21725b8f-0f36-48ec-b9e4-c8db6a96bb16 - Type: manual - Status: completed - Review: pending - Deliverable: none - Created: 2026-05-10T10:03:53.728Z - Updated: 2026-05-10T10:04:06.487Z ## Review Summary ... | synthesis | 2026-05-10 | 0 |
 
 ## Categories
 

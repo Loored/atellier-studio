@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-05-06 — realigned after the *Code with Claude 2026* keynote.
-**Active plan:** [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md)
+**Last updated:** 2026-05-11 — P1–P4 from the 2026-05-06 plan landed.
+**Active plan:** [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (P1–P4 marked complete; new candidates under "Now planning" below).
 
 ## Strategic stance
 
@@ -12,54 +12,49 @@ Atellier is **the model of *your* work** — wiki, runs, tasks, deliverables, re
 - Local MongoDB
 - Fastify API
 - Agents, tasks, runs, run logs
-- Skill-triggered orchestration runs (`atellier-build-loop`, `llm-wiki-ingest-loop`)
-- Wiki Brain MVP routes (`/wiki/ingest`, `/wiki/query`, `/wiki/lint`, `/wiki/page`)
+- Skill-triggered orchestration runs (`atellier-build-loop`, `llm-wiki-ingest-loop`, `wiki-dream-loop`)
+- Wiki Brain MVP routes (`/wiki/ingest`, `/wiki/query`, `/wiki/lint`, `/wiki/page`, `/wiki/append-log`)
 - Deliverable generation, preview, promotion, unlink, review states
 - Dashboard + 7 views
 - Pixel office visualization layer
 - Tailwind CSS v4 dashboard/shell migration
-- Executor safety visibility (`/health` exposes `executorMode`, `executorModel`, `modelProfile`; UI badge)
+- Executor safety visibility (`/health` exposes `executorMode`, `executorModel`, `modelProfile`, and optional `executorRoleOverrides`)
 - OpenAI cost-warning patterns across orchestration, runs, office live mode, codex worker
 - Codex Worker control-plane v1 (create/plan/approve/execute/cancel/finalize, guardrails, durable finalize logs, web + API tests)
 - Codex Worker evidence pass groundwork (commits 9adfcd8, 8d68eed)
 
-## Next 1 — MCP server wrapper over the REST API
+## Shipped 2026-05-10/11 — P1–P4 from the 2026-05-06 plan
 
-**Why:** Cowork is the desktop client we no longer have to build. Wrapping the existing REST API as an MCP server makes Atellier callable as a tool from Cowork *and* Claude Code.
+All four post-keynote priorities landed on `feat/multi-provider-executors`. Tests: 71 api + 11 web. Validated live against Ollama (llama3.1:8b on M3 Pro): `atellier-build-loop` 7/7, `llm-wiki-ingest-loop` 5/5, `wiki-dream-loop` 4/4. Documented per area in `docs/mcp-server.md`, `docs/wiki-dream.md`, `docs/skills.md`.
 
-- Expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get`
-- Local-only auth (loopback / token in env)
-- Document install + Cowork connection in `docs/mcp-server.md`
-- Out of scope: remote hosting, rate limiting
+- **P1 — MCP server wrapper.** New package `apps/mcp-server` exposes the Atellier REST API as an MCP server over stdio. 9 tools: `wiki_query`, `wiki_ingest`, `wiki_page_read`, `wiki_page_write`, `wiki_log_append`, `orchestration_skills_list`, `orchestration_run`, `orchestration_status`, `runs_list`. Wired for Claude Code / Cowork via `~/.claude.json`.
+- **P2 — Wiki Dream loop.** New orchestration skill `wiki-dream-loop` (audit → propose-changes → draft-report → task-followup, all read-only at the LLM layer). Produces a *proposed* dream report; the operator persists it manually via `wiki_page_write`. No silent merges.
+- **P3 — Multi-provider executors.** `OpenAiCompatibleAgentExecutorService` base + `OpenAi`, `Anthropic` (with `cache_control: ephemeral`), `Groq` (free cloud tier), `Ollama` (local, no key). Plus **P3.c** per-agent-role routing for Ollama via `OLLAMA_MODEL_<ROLE>` env vars (e.g. `qwen2.5-coder:7b` for `builder`, `llama3.1:8b` for the rest).
+- **P4 — Skills 2.0 alignment.** Audit landed: the 8 skills in `.agents/skills/` already satisfy Skills 2.0 minimum (folder + `SKILL.md` with `name`/`description` frontmatter). No migration required; future enhancements (`allowed-tools`, `scripts/`, `references/`, `templates/`) noted in `docs/skills.md`.
 
-## Next 2 — Wiki Dream loop
+## Now planning — candidates for the next iteration
 
-**Why:** Auto Dream in Claude Code validates the pattern. Atellier's wiki is structured (sources, notes, contradictions, links), so a Dream loop tailored to that structure compounds memory in a way flat-file Auto Dream can't.
+Ordered by leverage based on what the validation runs uncovered.
 
-- Scheduled `wiki-curator` run via scheduled tasks: prune stale, resolve contradictions (via existing `/wiki/lint`), link orphans, reorganize index
-- Output: a "dream report" wiki entry per run for operator audit
-- Manual trigger button in Wiki view
-- v1 produces *proposed* changes that the operator approves — no silent rewrites
+### P2.b — Wiki Dream grounding (recommended next)
 
-## Next 3 — Anthropic executor mode
+The live smoke test showed `wiki-dream-loop` running clean but the Wiki Curator (llama3.1:8b) alucinating page paths because the skill does not pre-load real wiki state into the prompt. Pre-load `POST /wiki/lint` output and a fresh listing of `atelier/wiki/*` paths into the `audit` step's context. Skill structure stays unchanged; only the orchestration call site grows.
 
-**Why:** Today the executor supports `mock` and `openai`. Adding `anthropic` gives Opus 4.7, native prompt caching (significant cost reduction), and avoids vendor lock-in.
+### P2.c — UI surface for the Wiki Dream
 
-- New executor class alongside existing OpenAI executor
-- New env: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-4-7`), `ANTHROPIC_MODEL_PROFILE`
-- `/health` exposes mode + model for the new path
-- Reuse existing OpenAI cost-warning pattern
-- Default executor stays `mock`. Switching is env-only in v1; per-run override deferred.
+- "Dream now" button in the Wiki view that fires `orchestration_run skillId: wiki-dream-loop`.
+- Inline preview of the latest dream report, with a one-click "save as wiki page" action that calls `POST /wiki/page` using the suggested filename.
+- Keeps the no-silent-merges invariant — the click *is* the explicit approval.
 
-## Next 4 — Skills 2.0 alignment
+### Open question #1 from the plan — per-run executor override in Settings
 
-**Why:** Anthropic's Skills 2.0 (scripts + templates + reference materials) is close to where `.agents/skills/` was heading. Aligning early avoids divergence.
+Today the executor is env-only; switching requires restarting the API. A Settings UI toggle (and a per-run override on orchestration start) was deferred in the original plan. Worth revisiting now that 4 providers exist.
 
-- Audit `.agents/skills/` against Skills 2.0 schema
-- Migrate `atellier-build-loop` and `llm-wiki-ingest-loop` to the new format if compatible
-- Document the format in `docs/skills.md`
+### Auto-persist toggle for the dream report
 
-## Next 5 — Codex Worker Evidence Pass v1.1 (deferred from previous P1)
+Optional env flag `WIKI_DREAM_AUTO_PERSIST=true` that saves the draft report to `wiki/dreams/<YYYY-MM-DD>-dream-report.md` automatically. Opt-in only — default stays manual to preserve the approval pattern.
+
+## Next 5 — Codex Worker Evidence Pass v1.1 (deferred from the previous plan)
 
 - Persist richer per-step evidence metadata in run output
 - Render step + finalize evidence in the Codex Worker panel

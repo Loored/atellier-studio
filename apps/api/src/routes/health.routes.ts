@@ -20,6 +20,8 @@ export async function healthRoutes(
     agentExecutorMode: AgentExecutorMode;
     executorModel: string;
     modelProfile: ModelProfile;
+    /** Per-agent-role model overrides (currently Ollama-only). Omit when empty. */
+    executorRoleOverrides?: Record<string, string>;
   },
 ): Promise<void> {
   fastify.get("/health", async () => {
@@ -36,6 +38,9 @@ export async function healthRoutes(
       executorMode: options.agentExecutorMode,
       executorModel: options.executorModel,
       modelProfile: options.modelProfile,
+      ...(options.executorRoleOverrides
+        ? { executorRoleOverrides: options.executorRoleOverrides }
+        : {}),
       mongo: {
         connected: mongoose.connection.readyState === 1,
         state: mongoState,

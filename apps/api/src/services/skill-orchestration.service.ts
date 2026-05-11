@@ -160,6 +160,54 @@ const SKILL_TEMPLATES: SkillTemplate[] = [
       },
     ],
   },
+  {
+    id: "wiki-dream-loop",
+    name: "Wiki Dream Loop",
+    description:
+      "Periodic curator pass over the wiki: surfaces lint issues, stale pages, contradictions, and orphan notes; proposes (never silently applies) reorganizations as a dream report the operator approves before any other page is touched.",
+    steps: [
+      {
+        id: "audit",
+        label: "Audit the wiki",
+        phase: "wiki",
+        agentRole: "wiki-curator",
+        agentName: "Wiki Curator",
+        objective: "Surface structural issues and outdated content from the lint output and a recency review.",
+        instruction:
+          "Review the wiki/lint findings, the most recent wiki/log entries, and the current index. List concrete issues by category: stale pages, contradictions, orphan notes, broken cross-references, overgrown index sections. Name paths explicitly. Do not propose fixes yet — only surface what is wrong.",
+      },
+      {
+        id: "propose-changes",
+        label: "Propose changes",
+        phase: "wiki",
+        agentRole: "wiki-curator",
+        agentName: "Wiki Curator",
+        objective: "Turn each audit finding into a single concrete resolution proposal.",
+        instruction:
+          "For each issue raised in the audit, propose exactly ONE specific action: 'archive page X', 'merge X and Y into Z', 'add link from A to B', 'rewrite index section N'. Do not apply anything. The operator approves each proposal manually before any wiki change lands.",
+      },
+      {
+        id: "draft-report",
+        label: "Draft the dream report",
+        phase: "wiki",
+        agentRole: "wiki-curator",
+        agentName: "Wiki Curator",
+        objective: "Consolidate the audit and proposals into a single page-shaped dream report.",
+        instruction:
+          "Produce a markdown report with three sections: 'Summary' (≤5 bullets), 'Findings' (one bullet per audit issue with the path), and 'Proposed actions' (numbered list, each with rationale and risk). At the top of the report include a suggested filename: wiki/dreams/<YYYY-MM-DD>-dream-report.md. The operator (or an MCP client) is expected to save this output via wiki_page_write or POST /wiki/page once approved — the dream loop never writes pages itself.",
+      },
+      {
+        id: "task-followup",
+        label: "Optional task follow-up",
+        phase: "plan",
+        agentRole: "pm",
+        agentName: "Pepe PM",
+        objective: "Open a task if the proposals warrant tracked work; otherwise state none is needed.",
+        instruction:
+          "Decide if the proposed actions justify a tracked task (e.g. more than 5 changes, breaking-link risk, or a restructure of a major page). If yes, propose a single task with title, scope, and acceptance criteria. If no, state explicitly that no task is needed and why.",
+      },
+    ],
+  },
 ];
 
 export class SkillOrchestrationService {
