@@ -1,7 +1,7 @@
 # Next Iteration Plan — Claude Platform Alignment
 
 **Date:** 2026-05-06
-**Status:** Plan, not yet executed.
+**Status (2026-05-11):** P1, P2, P3 (a/b/c), and P4 are **complete** on `feat/multi-provider-executors`. P5 (Codex Worker Evidence Pass v1.1) remains deferred. New candidates for the next iteration live in `docs/roadmap.md` under "Now planning" — top pick is **P2.b — grounding the Wiki Dream**.
 **Supersedes:** Priority order in `docs/next-work-plan.md` (kept for history; do not delete).
 
 ## Context
@@ -35,7 +35,7 @@ Concretely:
 
 Previous plan had Codex Worker Evidence Pass as P1. After the keynote, the order changes:
 
-### P1 — MCP server wrapper over the REST API
+### P1 — MCP server wrapper over the REST API ✅ shipped 2026-05-10/11
 
 **Why now:** Cowork is the desktop client we no longer have to build. Wrapping the existing REST API as MCP makes Atellier callable from Cowork *and* Claude Code as a tool. Highest leverage move.
 
@@ -49,7 +49,7 @@ Previous plan had Codex Worker Evidence Pass as P1. After the keynote, the order
 
 **Out of scope:** remote hosting, auth tokens beyond local secret, rate limiting.
 
-### P2 — Wiki Dream loop
+### P2 — Wiki Dream loop ✅ shipped 2026-05-10/11
 
 **Why now:** Auto Dream validates the pattern conceptually but operates on flat memory files. Atellier's wiki is structured (sources, notes, contradictions, links). A Dream loop tailored to that structure is the *compounding memory* feature the previous plan asked for, with a clearer reference point now.
 
@@ -65,7 +65,9 @@ Previous plan had Codex Worker Evidence Pass as P1. After the keynote, the order
 
 **Out of scope:** silent merges. Dreams produce *proposed* changes that the operator approves, at least in v1.
 
-### P3 — Anthropic executor mode (`AGENT_EXECUTOR_MODE=anthropic`)
+### P3 — Anthropic executor mode (`AGENT_EXECUTOR_MODE=anthropic`) ✅ shipped 2026-05-10/11
+
+> P3 grew during execution: in addition to the Anthropic path we added **Groq** (free cloud tier) and **Ollama** (local, no key) under a shared `OpenAiCompatibleAgentExecutorService`, plus **P3.c — per-agent-role routing for Ollama** (e.g. `qwen2.5-coder:7b` for `builder`, `llama3.1:8b` for the rest) exposed in `/health` as `executorRoleOverrides`.
 
 **Why now:** Today the executor supports `mock` and `openai`. Adding `anthropic` gives us:
 - Opus 4.7 (better coding + vision, same price as previous flagship)
@@ -88,7 +90,7 @@ Previous plan had Codex Worker Evidence Pass as P1. After the keynote, the order
 - Migration of historical run logs.
 - Tool-use parity audit between executors (track separately).
 
-### P4 — Skills 2.0 alignment
+### P4 — Skills 2.0 alignment ✅ audited 2026-05-11 (no migration required; see `docs/skills.md`)
 
 **Why now:** Anthropic's Skills 2.0 format (scripts + templates + reference materials) is close to where `.agents/skills/` was heading. Aligning early avoids divergence.
 
@@ -99,7 +101,7 @@ Previous plan had Codex Worker Evidence Pass as P1. After the keynote, the order
 
 **Out of scope:** writing brand-new skills.
 
-### P5 — Codex Worker Evidence Pass v1.1 (deferred)
+### P5 — Codex Worker Evidence Pass v1.1 (still deferred as of 2026-05-11)
 
 Still important. Scope unchanged from `docs/next-work-plan.md`. Lower leverage than P1–P4 right now.
 
