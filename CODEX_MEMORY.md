@@ -91,14 +91,31 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 ## Current Priorities
 
-1. Codex Worker evidence pass: strengthen per-step output evidence and finalize review payloads.
-2. Wiki Brain v2: add safe wiki write/update flows and improve contradiction reuse workflow.
-3. Orchestration reliability: keep templates readable and avoid growing one huge orchestration service.
-4. MCP later: only after Wiki Brain and Codex Worker execution evidence are stable.
+Active plan: [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md). The 2026-05-06 strategic reframe (post *Code with Claude 2026* keynote) reorders previous priorities. API foundation for Wiki Brain MVP, Review Memory Capture, Codex Worker control-plane v1.1, and agent grounding v1.2 are done — the work model is in place; next leverage is in exposing it to the platform and compounding wiki memory.
 
-Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, multiplayer, or broad MCP.
+1. **MCP server wrapper** over the REST API: expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get`. Local-only auth. Targeted at Cowork + Claude Code as a callable tool.
+2. **Wiki Dream loop**: scheduled `wiki-curator` run that prunes stale, resolves contradictions (via `/wiki/lint`), links orphans, reorganizes the index. v1 produces *proposed* changes the operator approves — no silent rewrites.
+3. **Anthropic executor mode** (`AGENT_EXECUTOR_MODE=anthropic`): Opus 4.7 default, native prompt caching, `/health` exposes mode/model. Default executor stays `mock`.
+4. **Skills 2.0 alignment**: audit `.agents/skills/` against the new format; migrate `atellier-build-loop` and `llm-wiki-ingest-loop` if compatible.
+5. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata, no real Codex CLI yet.
+
+Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-05-10 - Branch state, test coverage, and reframe alignment
+
+- Branch `feat/codex-worker-evidence-pass` packages capture-memory (API + frontend chain), the `GET /codex/runs/active` surface, the Codex section in `LiveProcessesPanel` + Codex character in `OfficeView`, broader operational-spine test coverage, and curated wiki refresh.
+- API operational-spine test now covers 48 cases (55 total with `agent-response-validator`). New coverage: task list/update + invalid status/priority guards, agent list + status update, agent 404 on run, SSE stream typed events (queued/running/chunk/finalizing/result), `llm-wiki-ingest-loop` end-to-end, codex worker approve guards (no-approval-needed, already-completed), QA + wiki-curator role outputs, run 404 guards, same-agent handoff skip.
+- Run `pnpm --filter @atellier/api test` for the focused suite.
+- Priority reorder note: this branch's docs (`README.md`, `CODEX_MEMORY.md`) were written before merging the 2026-05-06 strategic reframe; "Current Priorities" and "Next Work" have since been re-aligned to the active plan in [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md).
+
+### 2026-05-08 - Codex Worker evidence v1.1 done
+
+- Persisted Codex Worker step evidence (stdout/stderr paths, command, working dir, notes, artifacts).
+- Wiki query now returns related pages and possible contradictions to feed reuse and review flows.
+- Agent grounding validation v1.2 lands: builder/QA responses validated against verified repo files; approval blocked on critical validation errors.
+- Run memory capture lands: `POST /runs/:id/capture-memory` writes a `wiki/synthesis/` page with run metadata, review status, deliverable path, latest logs, validation evidence, and output snapshot. Frontend chain `runs.service -> useRunsApi -> useRunsTimeline -> ReviewView` is wired.
 
 ### 2026-05-05 - Safety + Wiki Brain + Codex Worker control-plane
 
@@ -125,6 +142,13 @@ Do not spend the next cycle polishing pixel sprites, auth, cloud deployment, mul
 - Step evidence now persists on completed Codex Worker steps as structured metadata.
 - Codex Worker panel renders step evidence and finalize evidence counts.
 - Finalize run logs now include per-step evidence, changed-file counts, and test-evidence counts.
+
+### 2026-05-08 - Review memory capture slice
+
+- Review can capture completed runs into `wiki/synthesis/` through `POST /runs/:id/capture-memory`.
+- Captured run memory includes run metadata, review status, deliverable path, latest logs, validation evidence, and output snapshot.
+- Safe wiki page writes now upsert non-deliverable pages into `wiki/index.md`.
+- Frontend capture follows the API chain: run service -> run API hook -> `useRunsTimeline` -> `ReviewView`.
 
 ### 2026-05-05 - Wiki lint suggestions added
 

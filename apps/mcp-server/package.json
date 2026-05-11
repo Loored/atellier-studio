@@ -1,0 +1,22 @@
+{
+  "name": "@atellier/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server that wraps the Atellier REST API so Cowork and Claude Code can use Atellier as a tool.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@atellier/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

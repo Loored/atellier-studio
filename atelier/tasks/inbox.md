@@ -24,3 +24,5 @@ Draft tasks that still need triage.
    - Migrate Office/Mobile legacy CSS only when a real feature or regression requires it.
 
 - [ ] Wiki Curator 05 may (source: wiki/sources/2026-05-05-wiki-curator-05-may.md)
+
+- [ ] Sprint goal: live dashboard (source: wiki/sources/2026-05-08-sprint-goal-live-dashboard.md)

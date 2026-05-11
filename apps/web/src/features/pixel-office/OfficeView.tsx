@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { Plus, Zap, Maximize2 } from "lucide-react";
 import { AGENT_ROLES } from "@atellier/shared";
-import type { AgentRole, Agent } from "@atellier/shared";
+import type { AgentRole, AgentStatus, Agent } from "@atellier/shared";
 import { useAgentsApi, useCreateAgentApi } from "../../api/hooks/agents/useAgentsApi";
 import { useHealthApi } from "../../api/hooks/system/useSystemApi";
+import { useActiveCodexRun } from "../../api/hooks/codex/useCodexWorkerApi";
 import { agentsToPixelCharacters } from "./hooks/usePixelOffice";
 import { useOrchestrationLive } from "./hooks/useOrchestrationLive";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
 import { AgentSidePanel } from "./AgentSidePanel";
 import { LiveProcessesPanel } from "./LiveProcessesPanel";
 import { cn } from "../../lib/cn";
+import type { PixelCharacter, PixelCharacterState } from "./engine/types";
 
 type StatusFilter = "all" | "running" | "waiting" | "inactive";
 
@@ -38,11 +40,59 @@ function getStatusFilter(agent: Agent): StatusFilter {
   return "inactive";
 }
 
+const CODEX_DESK = { x: 580, y: 430 };
+const CODEX_WORK = { x: 476, y: 320 };
+
+function buildCodexCharacter(view: { run: { id: string; status: string }; steps: Array<{ needsApproval: boolean; status: string }> }): PixelCharacter {
+  const { run, steps } = view;
+  const hasPendingApproval = steps.some((s) => s.needsApproval && s.status === "pending");
+  const hasSteps = steps.length > 0;
+
+  let state: PixelCharacterState;
+  let status: AgentStatus;
+  if (!hasSteps) {
+    state = "idle";
+    status = "idle";
+  } else if (hasPendingApproval) {
+    state = "waiting";
+    status = "needs-human";
+  } else if (run.status === "running") {
+    state = "working";
+    status = "executing";
+  } else {
+    state = "working";
+    status = "idle";
+  }
+
+  return {
+    id: "codex-worker",
+    name: "Codex Worker",
+    role: "builder",
+    status,
+    lastRunId: run.id,
+    state,
+    deskX: CODEX_DESK.x,
+    deskY: CODEX_DESK.y,
+    workX: CODEX_WORK.x,
+    workY: CODEX_WORK.y,
+    currentX: CODEX_DESK.x,
+    currentY: CODEX_DESK.y,
+    targetX: CODEX_DESK.x,
+    targetY: CODEX_DESK.y,
+    direction: "down",
+    isMoving: false,
+    frame: 0,
+  };
+}
+
 export function OfficeView() {
   const { data: agents = [], isLoadingWithoutCache } = useAgentsApi({ livePolling: true });
   const { data: healthStatus } = useHealthApi();
+  const { data: activeCodexRun } = useActiveCodexRun();
   const createAgent = useCreateAgentApi();
-  const characters = agentsToPixelCharacters(agents);
+  const agentCharacters = agentsToPixelCharacters(agents);
+  const codexCharacter = activeCodexRun ? buildCodexCharacter(activeCodexRun) : null;
+  const characters = codexCharacter ? [...agentCharacters, codexCharacter] : agentCharacters;
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
@@ -188,7 +238,7 @@ export function OfficeView() {
         <div className="flex-1 relative overflow-hidden bg-(--bg-base)">
           {isLoadingWithoutCache ? (
             <div className="office-loading">Loading office…</div>
-          ) : agents.length === 0 ? (
+          ) : characters.length === 0 ? (
             <div className="office-loading">No agents — add one to populate the office.</div>
           ) : (
             <div className="office-canvas-scroll">

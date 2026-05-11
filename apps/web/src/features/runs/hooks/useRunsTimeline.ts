@@ -4,6 +4,7 @@ import { useAgentsApi } from "../../../api/hooks/agents/useAgentsApi";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
   useAppendRunLogApi,
+  useCaptureRunMemoryApi,
   useCompleteRunApi,
   useCreateRunApi,
   usePromoteRunDeliverableApi,
@@ -26,6 +27,7 @@ export function useRunsTimeline() {
   const updateRunReview = useUpdateRunReviewApi();
   const promoteRunDeliverable = usePromoteRunDeliverableApi();
   const unlinkRunDeliverable = useUnlinkRunDeliverableApi();
+  const captureRunMemory = useCaptureRunMemoryApi();
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
@@ -105,6 +107,8 @@ export function useRunsTimeline() {
     isUpdatingRunReview: updateRunReview.isPending,
     isPromotingRunDeliverable: promoteRunDeliverable.isPending,
     isUnlinkingRunDeliverable: unlinkRunDeliverable.isPending,
+    isCapturingRunMemory: captureRunMemory.isPending,
+    capturedMemoryPath: captureRunMemory.data?.wikiPath ?? null,
     setRunLogMessage,
     setAgentFilter,
     setReviewFilter,
@@ -147,5 +151,12 @@ export function useRunsTimeline() {
         runId,
       }),
     unlinkRunDeliverable: handleUnlinkRunDeliverable,
+    captureRunMemory: (runId: string) =>
+      captureRunMemory.mutate({
+        runId,
+        input: {
+          summary: "Review memory captured from dashboard.",
+        },
+      }),
   };
 }

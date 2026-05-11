@@ -19,7 +19,22 @@ export type BuildServerOptions = {
   services?: AppServices;
 } & Pick<
   CreateAppServicesOptions,
-  "agentExecutorMode" | "openaiApiKey" | "openaiModel" | "openaiModelProfile" | "maxHandoffDepth" | "executionTimeoutMs"
+  | "agentExecutorMode"
+  | "openaiApiKey"
+  | "openaiModel"
+  | "openaiModelProfile"
+  | "anthropicApiKey"
+  | "anthropicModel"
+  | "anthropicModelProfile"
+  | "groqApiKey"
+  | "groqModel"
+  | "groqModelProfile"
+  | "ollamaBaseUrl"
+  | "ollamaModel"
+  | "ollamaModelProfile"
+  | "ollamaModelByRole"
+  | "maxHandoffDepth"
+  | "executionTimeoutMs"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -41,12 +56,46 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       callback(null, isAllowedLocalOrigin(origin));
     },
   });
+  const agentExecutorMode = options.agentExecutorMode ?? "mock";
+  const executorModel =
+    agentExecutorMode === "anthropic"
+      ? options.anthropicModel ?? "claude-opus-4-7"
+      : agentExecutorMode === "openai"
+        ? options.openaiModel ?? "gpt-4.1-mini"
+        : agentExecutorMode === "groq"
+          ? options.groqModel ?? "llama-3.3-70b-versatile"
+          : agentExecutorMode === "ollama"
+            ? options.ollamaModel ?? "llama3.2"
+            : "mock";
+  const modelProfile =
+    agentExecutorMode === "anthropic"
+      ? options.anthropicModelProfile ?? "standard"
+      : agentExecutorMode === "groq"
+        ? options.groqModelProfile ?? "standard"
+        : agentExecutorMode === "ollama"
+          ? options.ollamaModelProfile ?? "standard"
+          : options.openaiModelProfile ?? "standard";
+
+  // Per-role overrides only apply when ollama is the active executor; for any
+  // other mode we report no overrides regardless of what the env declares,
+  // which matches the runtime behavior in app-services.
+  const executorRoleOverrides =
+    agentExecutorMode === "ollama" && options.ollamaModelByRole
+      ? Object.fromEntries(
+          Object.entries(options.ollamaModelByRole).filter(([, model]) => Boolean(model)),
+        )
+      : undefined;
+
   await fastify.register(async (instance) =>
     healthRoutes(instance, services, {
       storageMode: options.storageMode ?? "mongo",
-      agentExecutorMode: options.agentExecutorMode ?? "mock",
-      executorModel: options.openaiModel ?? "gpt-4.1-mini",
-      modelProfile: options.openaiModelProfile ?? "standard",
+      agentExecutorMode,
+      executorModel,
+      modelProfile,
+      executorRoleOverrides:
+        executorRoleOverrides && Object.keys(executorRoleOverrides).length > 0
+          ? executorRoleOverrides
+          : undefined,
     }),
   );
   await fastify.register(async (instance) => agentsRoutes(instance, services));

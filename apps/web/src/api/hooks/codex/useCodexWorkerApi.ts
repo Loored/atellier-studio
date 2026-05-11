@@ -1,6 +1,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { codexWorkerService } from "../../services/codex-worker.service";
 
+export function useActiveCodexRun() {
+  return useQuery({
+    queryKey: ["codex-worker", "active"],
+    queryFn: () => codexWorkerService.getActive(),
+    refetchInterval: 2_000,
+  });
+}
+
 export function useCodexWorkerApi(runId: string | null) {
   const codexWorkerQuery = useQuery({
     queryKey: ["codex-worker", runId],

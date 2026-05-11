@@ -11,9 +11,42 @@ export type ExecuteAgentInstructionResult = {
   needsHuman: boolean;
 };
 
-export type AgentExecutorMode = "mock" | "openai";
+export type AgentExecutorMode = "mock" | "openai" | "anthropic" | "groq" | "ollama";
 
+// Generic config for any OpenAI-compatible Chat Completions endpoint
+// (OpenAI, Groq, Ollama's OpenAI-compat surface, OpenRouter, Together, etc.).
+export type OpenAiCompatibleExecutorConfig = {
+  /** Full POST URL for chat completions, e.g. https://api.openai.com/v1/chat/completions */
+  baseUrl: string;
+  /** Bearer token; omit for providers that don't require auth (e.g. local Ollama). */
+  apiKey?: string;
+  model: string;
+  repoFileHints?: string[];
+  /** Provider label used in error messages; defaults to "OpenAI-compatible". */
+  providerLabel?: string;
+};
+
+// Back-compat alias for callers that historically referenced the OpenAI-only shape.
 export type OpenAiAgentExecutorConfig = {
+  apiKey: string;
+  model: string;
+  repoFileHints?: string[];
+};
+
+export type GroqAgentExecutorConfig = {
+  apiKey: string;
+  model: string;
+  repoFileHints?: string[];
+};
+
+export type OllamaAgentExecutorConfig = {
+  /** Default: http://127.0.0.1:11434 */
+  baseUrl?: string;
+  model: string;
+  repoFileHints?: string[];
+};
+
+export type AnthropicAgentExecutorConfig = {
   apiKey: string;
   model: string;
   repoFileHints?: string[];
@@ -199,6 +232,21 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
   return sections[role] ?? `[${role}] ${name} processed the instruction.\nTask: ${taskSnippet}`;
 }
 
+// Dispatches each agent to a role-specific executor when one is configured,
+// falling back to a global executor otherwise. The interface is identical to
+// any other AgentExecutorService, so callers never see the routing.
+export class RoleAwareAgentExecutorService implements AgentExecutorService {
+  constructor(
+    private readonly fallback: AgentExecutorService,
+    private readonly perRole: Partial<Record<AgentRole, AgentExecutorService>> = {},
+  ) {}
+
+  async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    const executor = this.perRole[input.agent.role] ?? this.fallback;
+    return executor.execute(input);
+  }
+}
+
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
     if (MOCK_STEP_DELAY_MS > 0) {
@@ -209,6 +257,42 @@ export class MockAgentExecutorService implements AgentExecutorService {
       needsHuman: true,
     };
   }
+}
+
+function buildExecutorSystemPrompt(
+  input: ExecuteAgentInstructionInput,
+  repoFileHints: string[] | undefined,
+): string {
+  const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
+  const customInstructions = input.agent.instructions?.trim();
+
+  return [
+    `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
+    "",
+    roleExpertise,
+    "This chat executor cannot edit repository files. Be truthful about that boundary.",
+    "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
+    "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
+    repoFileHints?.length
+      ? [
+          "Verified repository files you may reference:",
+          ...repoFileHints.map((filePath) => `- ${filePath}`),
+        ].join("\n")
+      : "",
+    customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function buildExecutorUserPrompt(input: ExecuteAgentInstructionInput): string {
+  return [
+    `Instruction:\n${input.instruction.trim()}`,
+    input.context?.trim() ? `Context:\n${input.context.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 type ChatCompletionResponse = {
@@ -225,45 +309,28 @@ type ChatCompletionResponse = {
   };
 };
 
-export class OpenAiAgentExecutorService implements AgentExecutorService {
-  constructor(private readonly config: OpenAiAgentExecutorConfig) {}
+// Single implementation that talks to any OpenAI-compatible /v1/chat/completions
+// surface: OpenAI itself, Groq, Ollama (OpenAI-compat endpoint), OpenRouter, etc.
+// Provider-specific behavior is captured in the config (baseUrl, optional apiKey,
+// providerLabel for human-readable error messages).
+export class OpenAiCompatibleAgentExecutorService implements AgentExecutorService {
+  constructor(private readonly config: OpenAiCompatibleExecutorConfig) {}
 
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
-    const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
-    const customInstructions = input.agent.instructions?.trim();
+    const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
+    const userPrompt = buildExecutorUserPrompt(input);
+    const label = this.config.providerLabel ?? "OpenAI-compatible";
 
-    const systemPrompt = [
-      `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
-      "",
-      roleExpertise,
-      "This chat executor cannot edit repository files. Be truthful about that boundary.",
-      "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
-      "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
-      this.config.repoFileHints?.length
-        ? [
-            "Verified repository files you may reference:",
-            ...this.config.repoFileHints.map((filePath) => `- ${filePath}`),
-          ].join("\n")
-        : "",
-      customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.config.apiKey) {
+      headers.Authorization = `Bearer ${this.config.apiKey}`;
+    }
 
-    const userPrompt = [
-      `Instruction:\n${input.instruction.trim()}`,
-      input.context?.trim() ? `Context:\n${input.context.trim()}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(this.config.baseUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         model: this.config.model,
         messages: [
@@ -277,19 +344,19 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`OpenAI execution failed (${response.status}): ${errorBody}`);
+      throw new Error(`${label} execution failed (${response.status}): ${errorBody}`);
     }
 
     const data = (await response.json()) as ChatCompletionResponse;
 
     if (data.error?.message) {
-      throw new Error(`OpenAI error: ${data.error.message}`);
+      throw new Error(`${label} error: ${data.error.message}`);
     }
 
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) {
       throw new Error(
-        `OpenAI returned an empty response (finish_reason: ${data.choices?.[0]?.finish_reason ?? "unknown"}).`,
+        `${label} returned an empty response (finish_reason: ${data.choices?.[0]?.finish_reason ?? "unknown"}).`,
       );
     }
 
@@ -300,9 +367,145 @@ export class OpenAiAgentExecutorService implements AgentExecutorService {
   }
 }
 
+// Back-compat alias: existing call sites that imported the OpenAI-only name keep
+// working. Construction goes through the generic class with the OpenAI base URL.
+export class OpenAiAgentExecutorService extends OpenAiCompatibleAgentExecutorService {
+  constructor(config: OpenAiAgentExecutorConfig) {
+    super({
+      baseUrl: "https://api.openai.com/v1/chat/completions",
+      apiKey: config.apiKey,
+      model: config.model,
+      repoFileHints: config.repoFileHints,
+      providerLabel: "OpenAI",
+    });
+  }
+}
+
+type AnthropicMessagesResponse = {
+  id?: string;
+  type?: string;
+  role?: string;
+  model?: string;
+  stop_reason?: string;
+  content?: Array<{
+    type?: string;
+    text?: string;
+  }>;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+  error?: {
+    type?: string;
+    message?: string;
+  };
+};
+
+const ANTHROPIC_API_VERSION = "2023-06-01";
+const ANTHROPIC_MAX_TOKENS = 1024;
+const ANTHROPIC_TEMPERATURE = 0.4;
+
+export class AnthropicAgentExecutorService implements AgentExecutorService {
+  constructor(private readonly config: AnthropicAgentExecutorConfig) {}
+
+  async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
+    const userPrompt = buildExecutorUserPrompt(input);
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": this.config.apiKey,
+        "anthropic-version": ANTHROPIC_API_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        max_tokens: ANTHROPIC_MAX_TOKENS,
+        temperature: ANTHROPIC_TEMPERATURE,
+        // Naive prompt caching: the system prompt (role expertise + repo hints)
+        // is stable across runs of the same agent, so cache it ephemerally.
+        // Per-run instruction/context stays uncached in the user message.
+        system: [
+          {
+            type: "text",
+            text: systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Anthropic execution failed (${response.status}): ${errorBody}`);
+    }
+
+    const data = (await response.json()) as AnthropicMessagesResponse;
+
+    if (data.error?.message) {
+      throw new Error(`Anthropic error: ${data.error.message}`);
+    }
+
+    const text = data.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("")
+      .trim();
+
+    if (!text) {
+      throw new Error(
+        `Anthropic returned an empty response (stop_reason: ${data.stop_reason ?? "unknown"}).`,
+      );
+    }
+
+    return {
+      response: text,
+      needsHuman: true,
+    };
+  }
+}
+
+// Groq exposes an OpenAI-compatible Chat Completions endpoint under
+// https://api.groq.com/openai/v1, so we reuse the generic compat class.
+export class GroqAgentExecutorService extends OpenAiCompatibleAgentExecutorService {
+  constructor(config: GroqAgentExecutorConfig) {
+    super({
+      baseUrl: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey: config.apiKey,
+      model: config.model,
+      repoFileHints: config.repoFileHints,
+      providerLabel: "Groq",
+    });
+  }
+}
+
+// Ollama runs locally and exposes an OpenAI-compatible endpoint at
+// <baseUrl>/v1/chat/completions. No API key is required (loopback only).
+const OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434";
+
+export class OllamaAgentExecutorService extends OpenAiCompatibleAgentExecutorService {
+  constructor(config: OllamaAgentExecutorConfig) {
+    const root = (config.baseUrl ?? OLLAMA_DEFAULT_BASE_URL).replace(/\/+$/, "");
+    super({
+      baseUrl: `${root}/v1/chat/completions`,
+      apiKey: undefined,
+      model: config.model,
+      repoFileHints: config.repoFileHints,
+      providerLabel: "Ollama",
+    });
+  }
+}
+
 export function createAgentExecutorService(options: {
   mode: AgentExecutorMode;
   openai?: OpenAiAgentExecutorConfig;
+  anthropic?: AnthropicAgentExecutorConfig;
+  groq?: GroqAgentExecutorConfig;
+  ollama?: OllamaAgentExecutorConfig;
   repoFileHints?: string[];
 }): AgentExecutorService {
   if (options.mode === "openai") {
@@ -311,6 +514,36 @@ export function createAgentExecutorService(options: {
     }
     return new OpenAiAgentExecutorService({
       ...options.openai,
+      repoFileHints: options.repoFileHints,
+    });
+  }
+
+  if (options.mode === "anthropic") {
+    if (!options.anthropic?.apiKey) {
+      throw new Error("ANTHROPIC_API_KEY is required when AGENT_EXECUTOR_MODE=anthropic.");
+    }
+    return new AnthropicAgentExecutorService({
+      ...options.anthropic,
+      repoFileHints: options.repoFileHints,
+    });
+  }
+
+  if (options.mode === "groq") {
+    if (!options.groq?.apiKey) {
+      throw new Error("GROQ_API_KEY is required when AGENT_EXECUTOR_MODE=groq.");
+    }
+    return new GroqAgentExecutorService({
+      ...options.groq,
+      repoFileHints: options.repoFileHints,
+    });
+  }
+
+  if (options.mode === "ollama") {
+    if (!options.ollama?.model) {
+      throw new Error("OLLAMA_MODEL is required when AGENT_EXECUTOR_MODE=ollama.");
+    }
+    return new OllamaAgentExecutorService({
+      ...options.ollama,
       repoFileHints: options.repoFileHints,
     });
   }

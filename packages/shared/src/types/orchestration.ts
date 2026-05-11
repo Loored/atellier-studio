@@ -4,6 +4,7 @@ import type { Run, RunStatus } from "./run";
 export const ORCHESTRATION_SKILL_IDS = [
   "atellier-build-loop",
   "llm-wiki-ingest-loop",
+  "wiki-dream-loop",
 ] as const;
 
 export type OrchestrationSkillId = (typeof ORCHESTRATION_SKILL_IDS)[number];

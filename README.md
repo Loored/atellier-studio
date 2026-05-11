@@ -6,17 +6,24 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Agent Orchestration + Deliverables + Review UI
+Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + Codex Worker control-plane + Review Memory Capture.
 
-- Local MongoDB
-- Fastify API
-- React dashboard
-- Skill-triggered agent orchestration runs
-- Agent run logs and handoffs
+Implemented:
+
+- Local MongoDB and in-memory storage mode for tests
+- Fastify API with thin routes and service-owned business logic
+- React dashboard on Tailwind CSS v4 (only `MobileView.tsx` still on legacy CSS)
+- Skill-triggered agent orchestration (`atellier-build-loop`, `llm-wiki-ingest-loop`)
+- Agent run logs, handoffs, circular-handoff and depth guards
 - Deliverable generation, preview, promotion, unlink, and review states
-- Markdown wiki index and log
-- Minimal API and UI tests
-- Tailwind CSS v4 dashboard/shell migration in progress
+- Markdown wiki index, log, deliverables index, and synthesis pages
+- Wiki Brain MVP: deterministic `POST /wiki/ingest`, `POST /wiki/query`, `POST /wiki/lint`, safe `POST /wiki/page`
+- Wiki query surfaces related pages and possible contradictions
+- Review memory capture: `POST /runs/:id/capture-memory` writes durable `wiki/synthesis/` pages
+- Codex Worker control-plane: create / plan / approve-step / execute-next / cancel / retry-step / finalize, with persisted per-step evidence artifacts
+- Agent grounding validation: builder/QA responses are checked against verified repo files; review approval is blocked on validation errors
+- Executor/model safety: `/health` exposes `executorMode`, `executorModel`, `modelProfile`; UI badge + warnings before OpenAI-backed runs
+- Focused API and web tests (no real OpenAI/Codex calls in tests)
 
 ## Setup
 
@@ -145,9 +152,14 @@ pnpm codex:wiki-lint
 
 ## Next Work
 
-1. Codex Worker evidence pass (step output artifacts + stronger finalize review payloads)
-2. Wiki Brain v2 (safe page write/update + stronger contradiction reuse loop)
-3. Orchestration template modularization as workflows grow
-4. MCP Layer later
+Active plan: [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-MCP, auth, cloud deploy, multiplayer, and vector search are intentionally out of scope until Wiki Brain and Codex Worker evidence loops are stable. Pixel office exists as a visualization layer, but it is not the next product priority.
+1. **MCP server wrapper** over the REST API: expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get` as MCP tools. Local-only auth. Targeted at Cowork + Claude Code.
+2. **Wiki Dream loop**: scheduled `wiki-curator` that prunes stale, resolves contradictions via `/wiki/lint`, links orphans, and reorganizes the index. v1 produces *proposed* changes the operator approves.
+3. **Anthropic executor mode** (`AGENT_EXECUTOR_MODE=anthropic`): Opus 4.7 default, native prompt caching, `/health` exposes new mode/model.
+4. **Skills 2.0 alignment**: audit `.agents/skills/` against the new format and migrate `atellier-build-loop` and `llm-wiki-ingest-loop` if compatible.
+5. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata. No real Codex CLI integration yet.
+
+Auth, cloud deploy, multiplayer, vector search, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
+
+Read `CODEX_MEMORY.md`, `docs/next-iteration-plan-2026-05-06.md`, `docs/roadmap.md`, and `docs/current-state-and-next-steps.md` before starting an implementation pass.

@@ -1,7 +1,7 @@
 # Atellier Studio — Current State and Next Steps
 
-> **2026-05-06 — direction updated.**
-> The strategic reframe and active priorities live in [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md). This file is still a useful product/architecture snapshot, but for *what to do next*, read the iteration plan first. See the new section [§ 2026-05-06 strategic reframe](#2026-05-06-strategic-reframe) below.
+> **2026-05-11 — P1–P4 from the 2026-05-06 plan landed.**
+> The four post-keynote priorities (MCP server wrapper, Wiki Dream loop, multi-provider executors, Skills 2.0 alignment) are now in `feat/multi-provider-executors`. See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below for the punch list, and [`docs/roadmap.md`](roadmap.md) for the new candidates ("Now planning"). The original strategic reframe still applies; this file remains the long-form snapshot.
 
 This document captures the product/architecture review after the initial Atellier Studio implementation. It is intended for future Codex sessions so they understand what has already been built, what still matches the original vision, and what should happen next.
 
@@ -51,6 +51,19 @@ The documentation/memory cleanup recommended below has started:
 - The next prioritized work is captured in [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (supersedes `docs/next-work-plan.md` as of 2026-05-06).
 
 The immediate implementation priority is **MCP server wrapper + Wiki Dream loop + Anthropic executor mode** — see the iteration plan for scope. Codex Worker evidence pass moved to P5.
+
+> Update 2026-05-11: the above three priorities (plus P4 Skills 2.0 audit) all landed on `feat/multi-provider-executors`. The next candidate is **P2.b — grounding the Wiki Dream** (pre-load `/wiki/lint` output + real path listing into the curator's context). See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below.
+
+## 2026-05-10/11 P1–P4 landed
+
+All four priorities from `docs/next-iteration-plan-2026-05-06.md` shipped on `feat/multi-provider-executors` (10 commits, sitting on top of `dev/1.0.0`). Tests: 71 api + 11 web. Validated live against Ollama (llama3.1:8b on M3 Pro): `atellier-build-loop` 7/7, `llm-wiki-ingest-loop` 5/5, `wiki-dream-loop` 4/4.
+
+- **P1 — MCP server wrapper.** New package `apps/mcp-server` exposes the Atellier REST API as an MCP server over stdio. Nine tools cover the wiki (query / ingest / page read / page write / log append), orchestration (skills list / run / status), and runs (list). See `docs/mcp-server.md` for the full reference, the `~/.claude.json` wiring snippet, and the troubleshooting checklist.
+- **P2 — Wiki Dream loop.** New orchestration skill `wiki-dream-loop`. Four LLM steps (audit → propose-changes → draft-report → task-followup) that surface lint findings, stale pages, and orphan notes; the curator drafts a *proposed* report and the operator (or an MCP client) persists it explicitly via `wiki_page_write`. No silent merges. See `docs/wiki-dream.md`.
+- **P3 — Multi-provider executors.** Refactored `OpenAiAgentExecutorService` into `OpenAiCompatibleAgentExecutorService` and added Groq (free cloud tier) + Ollama (local, no key). Anthropic landed in P3.a/b with prompt caching (`cache_control: ephemeral` on the system prompt). The live smoke test driver (`apps/api/src/test/live-flow.ts`) is now provider-agnostic — reads `/health` and refuses to run against `mock`. **P3.c** also shipped: per-agent-role routing for Ollama (`OLLAMA_MODEL_<ROLE>`), so Builder can use `qwen2.5-coder:7b` while PM / QA / Wiki Curator stay on `llama3.1:8b`.
+- **P4 — Skills 2.0 alignment.** Audit landed in `docs/skills.md`: the eight existing skills under `.agents/skills/` already satisfy Skills 2.0 minimum (folder + `SKILL.md` with `name` / `description` frontmatter). No migration required; optional enhancements (`allowed-tools`, `scripts/`, `references/`, `templates/`) documented but deliberately not adopted yet.
+
+Open observation from the validation: the dream loop runs cleanly with llama3.1:8b but the curator alucinates page paths because the skill does not pre-load real wiki state into the prompt. **P2.b — grounding** addresses this next: pre-load `POST /wiki/lint` output and a fresh listing of `atelier/wiki/*` into the `audit` step's context. Skill structure stays untouched; only the orchestration call site grows.
 
 ## 2026-05-06 strategic reframe
 
