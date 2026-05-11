@@ -54,6 +54,12 @@ const DEFAULT_GOALS: Record<string, { goal: string; context: string }> = {
       "Atellier should expose itself as MCP server.'",
     context: "Source: developer-notes/keynote-2026-05-06.md (paraphrased).",
   },
+  "wiki-dream-loop": {
+    goal:
+      "Periodic curator pass over the wiki — surface stale pages, " +
+      "contradictions, and orphan notes; propose tidy-ups but apply nothing.",
+    context: "Triggered manually as part of the live smoke test.",
+  },
 };
 
 const c = {
