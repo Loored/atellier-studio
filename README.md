@@ -6,7 +6,7 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Review Memory Capture. Next direction: a local Knowledge Graph that visualizes the operational memory agents are building.
+Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Review Memory Capture + Knowledge Graph v2 (live force-directed map of operational memory). Next direction: graph curation trails (dream proposal decisions feeding back to the graph), WebSocket live updates, role memory surfaces.
 
 Implemented:
 
@@ -25,7 +25,7 @@ Implemented:
 - MCP server package (`apps/mcp-server`) exposes the local REST API as stdio tools for Claude Code / Cowork
 - Multi-provider agent executors: mock, OpenAI, Anthropic, Groq, and Ollama with Ollama role overrides
 - Codex Worker control-plane: create / plan / approve-step / execute-next / cancel / retry-step / finalize, with persisted per-step evidence artifacts
-- Knowledge Graph MVP: shared graph types, read-only `GET /knowledge/graph`, and Graph view over agents, roles, tasks, runs, wiki pages, deliverables, and lint issues
+- Knowledge Graph v2: force-directed live canvas (react-force-graph-2d) clustered by wiki/raw/runtime/meta layers, inspector with markdown render + run timeline, ⌘K search with keyboard nav, URL-synced filters/density/selection, sesión viva polling, time-travel slider with snapshot ticks, hover tooltip, layer breakdown, Office↔Graph navigation, mobile tab, in-memory snapshot ring buffer at `/knowledge/graph/snapshots`
 - Agent grounding validation: builder/QA responses are checked against verified repo files; review approval is blocked on validation errors
 - Executor/model safety: `/health` exposes `executorMode`, `executorModel`, `modelProfile`; UI badge + warnings before OpenAI-backed runs
 - Focused API and web tests (no real OpenAI/Codex calls in tests)

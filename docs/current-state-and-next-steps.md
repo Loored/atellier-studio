@@ -1,5 +1,8 @@
 # Atellier Studio — Current State and Next Steps
 
+> **2026-05-13 — Knowledge Graph v2 landed (PRs #29-#32).**
+> Force-directed live map clustered by layer, inspector with markdown render + run timeline, ⌘K search, URL-synced filters, sesión viva polling, time-travel slider with snapshot ticks, mobile tab, and Office↔Graph navigation. The Knowledge Graph is now the system's operational-memory surface; see [`docs/knowledge-graph.md`](knowledge-graph.md) for the inventory and [`docs/roadmap.md`](roadmap.md) for what's next.
+
 > **2026-05-11 — P1–P4 and P2.b/P2.c landed.**
 > The four post-keynote priorities (MCP server wrapper, Wiki Dream loop, multi-provider executors, Skills 2.0 alignment) are now in `main`, and the follow-up Wiki Dream grounding + UI slices also landed. See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below for the punch list, and [`docs/roadmap.md`](roadmap.md) for the new candidates ("Now planning"). The original strategic reframe still applies; this file remains the long-form snapshot.
 
