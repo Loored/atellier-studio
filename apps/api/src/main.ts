@@ -138,6 +138,7 @@ async function main(): Promise<void> {
     ollamaModelByRole: Object.keys(ollamaModelByRole).length > 0 ? ollamaModelByRole : undefined,
     maxHandoffDepth,
     executionTimeoutMs,
+    seedDemoData: storageMode === "memory" && process.env.SEED_DEMO_DATA !== "false",
   });
 
   try {

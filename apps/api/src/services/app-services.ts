@@ -18,6 +18,7 @@ import { type StorageMode } from "./service-utils";
 import { CodexWorkerService } from "./codex-worker.service";
 import { readdir } from "node:fs/promises";
 import { KnowledgeGraphService } from "./knowledge-graph.service";
+import { seedDemoData } from "./seed.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -60,6 +61,12 @@ export type CreateAppServicesOptions = {
   ollamaModelByRole?: Partial<Record<AgentRole, string>>;
   maxHandoffDepth?: number;
   executionTimeoutMs?: number;
+  /**
+   * When true, populates the in-memory storage with a small set of agents,
+   * tasks, and runs so the dashboard and Knowledge Graph have realistic
+   * content out of the box. Ignored when storageMode is "mongo".
+   */
+  seedDemoData?: boolean;
 };
 
 export function resolveAtellierRoot(input?: string): string {
@@ -157,7 +164,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     verifiedRepoFiles: repoFileHints,
   });
 
-  return {
+  const services: AppServices = {
     agents,
     agentRuns,
     messages,
@@ -166,6 +173,12 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs, wiki),
     wiki,
     codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
-    knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki),
+    knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki, atelierRootResolved),
   };
+
+  if (storageMode === "memory" && options.seedDemoData) {
+    await seedDemoData({ agents, tasks, runs });
+  }
+
+  return services;
 }
