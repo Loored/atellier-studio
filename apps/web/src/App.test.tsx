@@ -2,6 +2,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./features/knowledge/components/ForceGraphCanvas", () => ({
+  ForceGraphCanvas: () => null,
+}));
+
 import App from "./App";
 import { queryClient } from "./api/query/queryClient";
 import { wikiService } from "./api/services/wiki.service";
@@ -416,6 +421,7 @@ describe("App", () => {
         {
           id: "agent:agent-1",
           type: "agent",
+          layer: "runtime",
           label: "Builder Agent",
           sourceId: "agent-1",
           role: "builder",
@@ -425,6 +431,7 @@ describe("App", () => {
         {
           id: "role:builder",
           type: "role",
+          layer: "meta",
           label: "builder",
           role: "builder",
           quality: "verified",
@@ -451,6 +458,8 @@ describe("App", () => {
           "wiki-page": 0,
           deliverable: 0,
           "lint-issue": 0,
+          "raw-source": 0,
+          "runtime-log": 0,
         },
         byQuality: {
           verified: 2,
@@ -459,6 +468,12 @@ describe("App", () => {
           stale: 0,
           orphaned: 0,
           generated: 0,
+        },
+        byLayer: {
+          wiki: 0,
+          raw: 0,
+          runtime: 1,
+          meta: 1,
         },
       },
     });
@@ -488,8 +503,9 @@ describe("App", () => {
     await user.click(await screen.findByRole("button", { name: "Graph" }));
 
     expect(await screen.findByRole("heading", { name: "Knowledge Graph" })).toBeInTheDocument();
-    expect(await screen.findByText("Builder Agent")).toBeInTheDocument();
-    expect(await screen.findByText("has role")).toBeInTheDocument();
+    expect(await screen.findByText("Composición por capa")).toBeInTheDocument();
+    expect((await screen.findAllByRole("button", { name: /WIKI/i })).length).toBeGreaterThan(0);
+    expect(await screen.findByPlaceholderText("Buscar nodos…")).toBeInTheDocument();
     expect(readKnowledgeGraphMock).toHaveBeenCalled();
   });
 
