@@ -86,6 +86,17 @@ export function useKnowledgeGraphPanel() {
   const [recentlyAddedNodeIds, setRecentlyAddedNodeIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    function onSelect(event: Event) {
+      const detail = (event as CustomEvent<string>).detail;
+      if (typeof detail === "string" && detail.length > 0) {
+        setSelectedNodeId(detail);
+      }
+    }
+    window.addEventListener("knowledge:select", onSelect);
+    return () => window.removeEventListener("knowledge:select", onSelect);
+  }, [setSelectedNodeId]);
+
+  useEffect(() => {
     const currentIds = new Set((knowledgeGraph?.nodes ?? []).map((node) => node.id));
     if (previousNodeIdsRef.current.size === 0) {
       previousNodeIdsRef.current = currentIds;

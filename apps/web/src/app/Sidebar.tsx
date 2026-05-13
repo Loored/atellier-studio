@@ -26,6 +26,7 @@ type SidebarProps = {
   view: View;
   onViewChange: (v: View) => void;
   agents: Agent[];
+  onAgentSelect?: (agent: Agent) => void;
 };
 
 const MAIN_NAV: { id: View; icon: React.ElementType; label: string }[] = [
@@ -38,7 +39,7 @@ const MAIN_NAV: { id: View; icon: React.ElementType; label: string }[] = [
   { id: "office",    icon: Building2,       label: "Office" },
 ];
 
-export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
+export function Sidebar({ view, onViewChange, agents, onAgentSelect }: SidebarProps) {
   const activeCount = agents.filter((a) =>
     ["reading", "thinking", "planning", "writing", "executing", "reviewing"].includes(a.status)
   ).length;
@@ -99,11 +100,14 @@ export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
               const isBlocked = agent.status === "blocked";
 
               return (
-                <div
+                <button
                   key={agent.id}
-                  className="relative flex items-center justify-center w-[30px] h-[30px] rounded-full text-[0.7rem] font-extrabold text-white/90 border-2 border-black/30 flex-shrink-0 cursor-default"
+                  type="button"
+                  onClick={() => onAgentSelect?.(agent)}
+                  className="relative flex items-center justify-center w-[30px] h-[30px] rounded-full text-[0.7rem] font-extrabold text-white/90 border-2 border-black/30 flex-shrink-0 cursor-pointer transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                   style={{ background: ROLE_COLORS[agent.role] ?? "#45556c" }}
-                  title={`${agent.name} · ${agent.status}`}
+                  title={`${agent.name} · ${agent.status} — abrir en grafo`}
+                  aria-label={`Open ${agent.name} in knowledge graph`}
                 >
                   <span>{agent.name.charAt(0).toUpperCase()}</span>
                   <span
@@ -118,7 +122,7 @@ export function Sidebar({ view, onViewChange, agents }: SidebarProps) {
                             : "bg-ink-faint",
                     )}
                   />
-                </div>
+                </button>
               );
             })}
           </div>

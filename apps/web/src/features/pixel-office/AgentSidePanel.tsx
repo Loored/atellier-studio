@@ -181,6 +181,18 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
               >
                 <Copy size={11} />
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("knowledge:navigate", { detail: `agent:${agent.id}` }),
+                  );
+                }}
+                className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider text-ink-muted hover:bg-white/10"
+                title="Abrir en Knowledge Graph"
+              >
+                Ver en grafo
+              </button>
             </div>
             <span className="text-[0.72rem] text-ink-muted">{ROLE_DESCRIPTIONS[agent.role] ?? agent.role}</span>
           </div>
