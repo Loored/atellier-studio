@@ -81,3 +81,13 @@ export type KnowledgeGraphResponse = {
     byLayer: Record<KnowledgeGraphLayer, number>;
   };
 };
+
+export type KnowledgeGraphSnapshotMeta = {
+  id: string;
+  generatedAt: string;
+  stats: KnowledgeGraphResponse["stats"];
+};
+
+export type KnowledgeGraphSnapshotListResponse = {
+  snapshots: KnowledgeGraphSnapshotMeta[];
+};

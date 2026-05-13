@@ -38,7 +38,18 @@ const MARKDOWN_LINK = /\[[^\]]+\]\(([^)\s#]+)(?:#[^)]*)?\)/g;
 const RAW_PATH_FIELD = /^- Raw path:\s*(.+)$/m;
 const PATH_MENTION = /(?<![\w/])((?:wiki|raw|runs|tasks)\/[\w./-]+\.(?:md|pdf|txt|json|csv|jsonl|yaml|yml))\b/gi;
 
+export type KnowledgeGraphSnapshotMeta = {
+  id: string;
+  generatedAt: string;
+  stats: KnowledgeGraphResponse["stats"];
+};
+
+const SNAPSHOT_RING_SIZE = 48;
+const SNAPSHOT_MIN_INTERVAL_MS = 60 * 60 * 1000;
+
 export class KnowledgeGraphService {
+  private snapshots: KnowledgeGraphResponse[] = [];
+
   constructor(
     private readonly agents: AgentService,
     private readonly tasks: TaskService,
@@ -46,6 +57,35 @@ export class KnowledgeGraphService {
     private readonly wiki: WikiService,
     private readonly atelierRoot?: string,
   ) {}
+
+  listSnapshots(): KnowledgeGraphSnapshotMeta[] {
+    return this.snapshots.map((snapshot) => ({
+      id: snapshot.generatedAt,
+      generatedAt: snapshot.generatedAt,
+      stats: snapshot.stats,
+    }));
+  }
+
+  getSnapshot(id: string): KnowledgeGraphResponse | null {
+    return this.snapshots.find((snapshot) => snapshot.generatedAt === id) ?? null;
+  }
+
+  private recordSnapshot(response: KnowledgeGraphResponse): void {
+    const last = this.snapshots[this.snapshots.length - 1];
+    if (last) {
+      const lastTime = Date.parse(last.generatedAt);
+      if (
+        !Number.isNaN(lastTime) &&
+        Date.parse(response.generatedAt) - lastTime < SNAPSHOT_MIN_INTERVAL_MS
+      ) {
+        return;
+      }
+    }
+    this.snapshots.push(response);
+    if (this.snapshots.length > SNAPSHOT_RING_SIZE) {
+      this.snapshots.shift();
+    }
+  }
 
   private async fileMtime(relativePath: string): Promise<string | undefined> {
     if (!this.atelierRoot) return undefined;
@@ -253,7 +293,7 @@ export class KnowledgeGraphService {
 
     const nodeList = [...nodes.values()].sort((a, b) => a.id.localeCompare(b.id));
     const edgeList = [...edges.values()].sort((a, b) => a.id.localeCompare(b.id));
-    return {
+    const response: KnowledgeGraphResponse = {
       generatedAt: new Date().toISOString(),
       nodes: nodeList,
       edges: edgeList,
@@ -265,6 +305,8 @@ export class KnowledgeGraphService {
         byLayer: this.countByLayer(nodeList),
       },
     };
+    this.recordSnapshot(response);
+    return response;
   }
 
   private async addWikiInternalLinkEdges(

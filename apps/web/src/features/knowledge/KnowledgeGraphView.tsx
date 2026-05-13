@@ -13,6 +13,7 @@ import { LiveTimestamp } from "./components/LiveTimestamp";
 import { NodeTooltip } from "./components/NodeTooltip";
 import { SearchBar } from "./components/SearchBar";
 import { TimelineSlider } from "./components/TimelineSlider";
+import { useKnowledgeSnapshotsApi } from "../../api/hooks/knowledge/useKnowledgeApi";
 import { cn } from "../../lib/cn";
 
 const NODE_COLORS: Record<KnowledgeGraphNodeType, string> = {
@@ -91,6 +92,12 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
     setTimelineCursor,
     nodeTimestamps,
   } = useKnowledgeGraphPanel();
+
+  const { data: snapshots } = useKnowledgeSnapshotsApi();
+  const snapshotTimestamps = useMemo(
+    () => (snapshots?.snapshots ?? []).map((s) => s.generatedAt),
+    [snapshots],
+  );
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 800, height: 520 });
@@ -252,6 +259,7 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
             timestamps={nodeTimestamps}
             value={timelineCursor}
             onChange={setTimelineCursor}
+            snapshotTimestamps={snapshotTimestamps}
           />
           <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 p-0.5">
             {DENSITY_MODES.map((mode) => (

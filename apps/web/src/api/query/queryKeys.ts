@@ -37,6 +37,7 @@ export const queryKeys = {
   },
   knowledge: {
     graph: [QUERY_KEYS.KNOWLEDGE, "graph"] as const,
+    snapshots: [QUERY_KEYS.KNOWLEDGE, "snapshots"] as const,
   },
   system: {
     health: [QUERY_KEYS.SYSTEM, "health"] as const,

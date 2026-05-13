@@ -155,6 +155,8 @@ function NavigationBridge({ onSwitchToKnowledge }: { onSwitchToKnowledge: () => 
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
         selectKnowledgeNode(detail, onSwitchToKnowledge);
+      } else {
+        onSwitchToKnowledge();
       }
     }
     window.addEventListener("knowledge:navigate", onNavigate);

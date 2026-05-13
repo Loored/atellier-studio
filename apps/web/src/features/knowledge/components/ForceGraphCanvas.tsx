@@ -212,9 +212,11 @@ export function ForceGraphCanvas({
         return selectedNodeId && (source === selectedNodeId || target === selectedNodeId) ? 1.8 : 0.6;
       }}
       linkDirectionalParticles={(link) => {
+        if (!selectedNodeId) return 0;
+        if (data.nodes.length > 250) return 0;
         const source = typeof link.source === "object" ? (link.source as ForceNode).id : (link.source as string);
         const target = typeof link.target === "object" ? (link.target as ForceNode).id : (link.target as string);
-        return selectedNodeId && (source === selectedNodeId || target === selectedNodeId) ? 3 : 0;
+        return source === selectedNodeId || target === selectedNodeId ? 3 : 0;
       }}
       linkDirectionalParticleWidth={1.8}
       linkDirectionalParticleColor={() => "rgba(196,181,253,0.95)"}
@@ -274,7 +276,8 @@ export function ForceGraphCanvas({
           ctx.stroke();
         }
 
-        const labelVisible = isSelected || scale >= 1.7 || (selectedNodeId !== null && isNeighbour);
+        const showLabelsAtScale = data.nodes.length > 200 ? 2.4 : 1.7;
+        const labelVisible = isSelected || scale >= showLabelsAtScale || (selectedNodeId !== null && isNeighbour);
         if (labelVisible) {
           const fontSize = Math.max(9, 11 / Math.sqrt(scale));
           ctx.font = `${fontSize}px ui-sans-serif`;

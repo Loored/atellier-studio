@@ -150,9 +150,21 @@ export function OfficeView() {
       <div className="shrink-0 px-6 pt-5 pb-4 border-b border-(--border-subtle)">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="min-w-0">
-            <h1 className="text-[1.8rem] font-extrabold tracking-[-0.03em] text-ink leading-none">
-              Office
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-[1.8rem] font-extrabold tracking-[-0.03em] text-ink leading-none">
+                Office
+              </h1>
+              <button
+                type="button"
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent("knowledge:navigate", { detail: "" }))
+                }
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-ink-muted hover:bg-white/10"
+                title="Abrir Knowledge Graph"
+              >
+                Knowledge Graph →
+              </button>
+            </div>
             <p className="text-[0.78rem] text-ink-muted mt-1">
               Monitor your agents in real time.
             </p>
