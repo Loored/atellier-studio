@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
   Agent,
   AgentMessage,
+  KnowledgeGraphResponse,
   OrchestrationSkillSummary,
   OrchestrationStatusResult,
   Run,
@@ -114,6 +115,100 @@ describe("operational spine routes", () => {
     expect(task.title).toBe("Prepare project spine");
     expect(task.status).toBe("inbox");
     expect(task.priority).toBe("high");
+  });
+
+  it("builds a deterministic knowledge graph from local operational memory", async () => {
+    const deliverablesDir = path.join(atelierRoot, "wiki", "deliverables");
+    await mkdir(deliverablesDir, { recursive: true });
+    await writeFile(
+      path.join(deliverablesDir, "45d6e401-5f68-4d6c-a189-809b554cfe25-atellier-build-loop-completed.md"),
+      "# Generated deliverable\n",
+      "utf8",
+    );
+    const agentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Graph Builder",
+        role: "builder",
+      },
+    });
+    const agent = agentResponse.json<Agent>();
+
+    const taskResponse = await server.inject({
+      method: "POST",
+      url: "/tasks",
+      payload: {
+        title: "Map operational memory",
+        status: "active",
+        assignedAgentId: agent.id,
+      },
+    });
+    const task = taskResponse.json<Task>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: "/runs",
+      payload: {
+        agentId: agent.id,
+        taskId: task.id,
+        type: "manual",
+      },
+    });
+    const run = runResponse.json<Run>();
+
+    await server.inject({
+      method: "PATCH",
+      url: `/runs/${run.id}/complete`,
+      payload: {
+        summary: "Graph read model seed run.",
+        reviewStatus: "approved",
+      },
+    });
+
+    const graphResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph",
+    });
+
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(graph.stats.nodes).toBe(graph.nodes.length);
+    expect(graph.stats.edges).toBe(graph.edges.length);
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: `agent:${agent.id}`, type: "agent", label: "Graph Builder" }),
+        expect.objectContaining({ id: "role:builder", type: "role", label: "builder" }),
+        expect.objectContaining({ id: `task:${task.id}`, type: "task", label: "Map operational memory" }),
+        expect.objectContaining({ id: `run:${run.id}`, type: "run", label: "manual run" }),
+      ]),
+    );
+    expect(graph.nodes.some((node) => node.path === "wiki/deliverables/45d6e401-5f68-4d6c-a189-809b554cfe25-atellier-build-loop-completed.md")).toBe(false);
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "agent_has_role",
+          from: `agent:${agent.id}`,
+          to: "role:builder",
+        }),
+        expect.objectContaining({
+          type: "agent_assigned_task",
+          from: `agent:${agent.id}`,
+          to: `task:${task.id}`,
+        }),
+        expect.objectContaining({
+          type: "run_by_agent",
+          from: `run:${run.id}`,
+          to: `agent:${agent.id}`,
+        }),
+        expect.objectContaining({
+          type: "run_for_task",
+          from: `run:${run.id}`,
+          to: `task:${task.id}`,
+        }),
+      ]),
+    );
   });
 
   it("rejects oversized task titles and run log messages", async () => {
@@ -773,6 +868,17 @@ describe("operational spine routes", () => {
     expect(pageResponse.statusCode).toBe(200);
     expect(pageResponse.json<WikiPageResponse>().content).toContain("Wiki Brain v2");
 
+    const dreamWriteResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/dreams/2026-05-11-dream-report.md",
+        content: "# Dream Report\n\n- Proposed wiki maintenance only.\n",
+      },
+    });
+    expect(dreamWriteResponse.statusCode).toBe(201);
+    expect(dreamWriteResponse.json<WikiPageResponse>().path).toBe("wiki/dreams/2026-05-11-dream-report.md");
+
     const logResponse = await server.inject({
       method: "GET",
       url: "/wiki/log",
@@ -1417,6 +1523,26 @@ describe("operational spine routes", () => {
   });
 
   it("runs wiki-dream-loop skill to completion and never silently writes wiki pages", async () => {
+    const sourceDir = path.join(atelierRoot, "wiki", "sources");
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(
+      path.join(sourceDir, "dream-grounding-fixture.md"),
+      [
+        "# Dream Grounding Fixture",
+        "",
+        "## Source",
+        "",
+        "- Raw path: raw/ingest/missing-dream-grounding-source.md",
+        "- Source type: note",
+        "",
+        "## Summary",
+        "",
+        "Fixture source summary used to verify wiki dream grounding.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
     // Capture the wiki page count before so we can prove the dream loop did
     // not auto-apply changes (it must produce a *proposed* report only).
     const indexBefore = await server.inject({ method: "GET", url: "/wiki/index" });
@@ -1457,6 +1583,19 @@ describe("operational spine routes", () => {
 
     const indexAfter = await server.inject({ method: "GET", url: "/wiki/index" });
     expect(indexAfter.json<WikiPageResponse>().content).toBe(indexBeforeContent);
+
+    const runsResponse = await server.inject({ method: "GET", url: "/runs" });
+    const runList = runsResponse.json<Run[]>();
+    const auditRun = runList.find((run) => {
+      const input = run.input as Record<string, unknown> | undefined;
+      return input?.orchestrationRunId === started.runId && input.orchestrationStepLabel === "Audit the wiki";
+    });
+    const auditInput = auditRun?.input as { context?: string } | undefined;
+    expect(auditInput?.context).toContain("Wiki Dream Grounding");
+    expect(auditInput?.context).toContain("broken_link: wiki/sources/dream-grounding-fixture.md");
+    expect(auditInput?.context).toContain("raw/ingest/missing-dream-grounding-source.md");
+    expect(auditInput?.context).toContain("Available wiki markdown paths");
+    expect(auditInput?.context).toContain("wiki/sources/dream-grounding-fixture.md");
   });
 
   it("rejects approving a codex step that does not require approval", async () => {

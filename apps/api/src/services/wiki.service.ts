@@ -29,6 +29,7 @@ const DEFAULT_INDEX = `# Atellier Studio Wiki Index
 - workflows
 - decisions
 - synthesis
+- dreams
 `;
 
 const DEFAULT_LOG = `# Atellier Studio Wiki Log
@@ -58,7 +59,7 @@ export class WikiService {
   async ensureWiki(): Promise<void> {
     await mkdir(this.wikiRoot, { recursive: true });
     await Promise.all(
-      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "sources", "deliverables"].map((segment) =>
+      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "sources", "deliverables", "dreams"].map((segment) =>
         mkdir(path.join(this.wikiRoot, segment), { recursive: true }),
       ),
     );
@@ -388,6 +389,84 @@ export class WikiService {
     };
   }
 
+  async listWikiMarkdownPaths(): Promise<string[]> {
+    await this.ensureWiki();
+    const files = await this.listMarkdownFiles(this.wikiRoot);
+    return files.map((filePath) => this.toRelativeAtelierPath(filePath)).sort();
+  }
+
+  async listRawMarkdownPaths(): Promise<string[]> {
+    return this.listAtelierSubdirMarkdownPaths("raw");
+  }
+
+  async listRawAssetPaths(): Promise<string[]> {
+    return this.listAtelierSubdirAssetPaths("raw");
+  }
+
+  async listRuntimeMarkdownPaths(): Promise<string[]> {
+    const [runs, tasks] = await Promise.all([
+      this.listAtelierSubdirMarkdownPaths("runs"),
+      this.listAtelierSubdirMarkdownPaths("tasks"),
+    ]);
+    return [...runs, ...tasks].sort();
+  }
+
+  private async listAtelierSubdirMarkdownPaths(subdir: string): Promise<string[]> {
+    const root = path.join(this.atelierRootResolved, subdir);
+    try {
+      const files = await this.listMarkdownFiles(root);
+      return files.map((filePath) => this.toRelativeAtelierPath(filePath)).sort();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return [];
+      throw error;
+    }
+  }
+
+  private async listAtelierSubdirAssetPaths(subdir: string): Promise<string[]> {
+    const root = path.join(this.atelierRootResolved, subdir);
+    try {
+      const files = await this.listAssetFiles(root);
+      return files.map((filePath) => this.toRelativeAtelierPath(filePath)).sort();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return [];
+      throw error;
+    }
+  }
+
+  private async listAssetFiles(root: string): Promise<string[]> {
+    const entries = await readdir(root, { withFileTypes: true });
+    const files: string[] = [];
+    for (const entry of entries) {
+      const fullPath = path.join(root, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...(await this.listAssetFiles(fullPath)));
+        continue;
+      }
+      if (entry.isFile() && /\.(md|pdf|txt|json|csv|jsonl|yaml|yml)$/i.test(entry.name)) {
+        files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  async readPagesByPaths(
+    relativePaths: string[],
+  ): Promise<Array<{ path: string; content: string }>> {
+    const results: Array<{ path: string; content: string }> = [];
+    for (const relativePath of relativePaths) {
+      try {
+        const { normalized, resolved } = this.resolveAtelierPath(relativePath);
+        const content = await readFile(resolved, "utf8");
+        results.push({ path: normalized, content });
+      } catch {
+        // file disappeared or could not be read — skip silently
+      }
+    }
+    return results;
+  }
+
   private async ensureFile(filePath: string, content: string): Promise<void> {
     try {
       await readFile(filePath, "utf8");
@@ -477,6 +556,7 @@ export class WikiService {
       "sources",
       "deliverables",
       "notes",
+      "dreams",
     ]);
     if (!allowedSegments.has(segment)) {
       throw new Error("Writable wiki path must target an allowed wiki category.");

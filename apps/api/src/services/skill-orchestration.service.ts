@@ -16,6 +16,7 @@ import type {
 import { AgentRunService } from "./agent-run.service";
 import { AgentService } from "./agent.service";
 import { RunService } from "./run.service";
+import type { WikiService } from "./wiki.service";
 
 type SkillStepTemplate = OrchestrationSkillStepSummary & {
   instruction: string;
@@ -215,6 +216,7 @@ export class SkillOrchestrationService {
     private readonly agents: AgentService,
     private readonly agentRuns: AgentRunService,
     private readonly runs: RunService,
+    private readonly wiki: WikiService,
   ) {}
 
   listSkills(): OrchestrationSkillSummary[] {
@@ -346,7 +348,7 @@ export class SkillOrchestrationService {
         const nextStep = template.steps[template.steps.indexOf(step) + 1];
         const result = await this.agentRuns.run(agent.id, {
           instruction: this.buildStepInstruction(template, step, input.goal),
-          context: this.buildStepContext(orchestrationRun.id, input.context, previousOutputs),
+          context: await this.buildStepContext(template, step, orchestrationRun.id, input.context, previousOutputs),
           recordDeliverable: false,
           orchestrationStep: {
             orchestrationRunId: orchestrationRun.id,
@@ -451,14 +453,51 @@ export class SkillOrchestrationService {
     ].join("\n");
   }
 
-  private buildStepContext(orchestrationRunId: string, baseContext?: string, previousOutputs: string[] = []): string {
+  private async buildStepContext(
+    template: SkillTemplate,
+    step: SkillStepTemplate,
+    orchestrationRunId: string,
+    baseContext?: string,
+    previousOutputs: string[] = [],
+  ): Promise<string> {
+    const dreamGrounding = await this.buildWikiDreamGrounding(template, step);
     return [
       `Parent orchestration run: ${orchestrationRunId}`,
       baseContext?.trim() ? `Operator context:\n${baseContext.trim()}` : "",
+      dreamGrounding,
       previousOutputs.length > 0 ? `Previous step outputs:\n${previousOutputs.join("\n\n")}` : "",
     ]
       .filter(Boolean)
       .join("\n\n");
+  }
+
+  private async buildWikiDreamGrounding(template: SkillTemplate, step: SkillStepTemplate): Promise<string> {
+    if (template.id !== "wiki-dream-loop" || step.id !== "audit") {
+      return "";
+    }
+
+    const [lint, wikiPaths] = await Promise.all([
+      this.wiki.lint(),
+      this.wiki.listWikiMarkdownPaths(),
+    ]);
+    const issueLines = lint.issues.length > 0
+      ? lint.issues.map((issue) => [
+          `- ${issue.code}: ${issue.path}`,
+          `  message: ${issue.message}`,
+          issue.suggestion ? `  suggestion: ${issue.suggestion}` : "",
+        ].filter(Boolean).join("\n"))
+      : ["- none"];
+
+    return [
+      "Wiki Dream Grounding",
+      `Lint checked at: ${lint.checkedAt}`,
+      `Lint ok: ${lint.ok}`,
+      "Lint findings:",
+      ...issueLines,
+      `Available wiki markdown paths (${wikiPaths.length}):`,
+      ...wikiPaths.map((wikiPath) => `- ${wikiPath}`),
+      "Use only the paths above when naming wiki files. If a page is not listed, mark it as unverified instead of inventing it.",
+    ].join("\n");
   }
 
   private truncateForContext(content: string): string {
