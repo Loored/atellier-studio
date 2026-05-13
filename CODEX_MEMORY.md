@@ -94,18 +94,39 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 ## Current Priorities
 
-Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done, and P2.b/P2.c Wiki Dream grounding + UI are done. The work model is in place; next leverage is keeping generated memory tidy, then adding a Knowledge Graph surface over existing local state.
+Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 (force-directed map + inspector + search + sesión viva + time-travel + run timeline + Office↔Graph + mobile tab + snapshots) shipped 2026-05-13 across PRs #29-#32 on `dev/1.0.0`.
 
-1. **Memory artifact hygiene**: curate generated run/deliverable files so durable wiki memory stays readable and publishable.
-2. **Knowledge Graph read model + Graph View MVP**: derive nodes/edges from wiki, runs, agents, tasks, deliverables, reviews, decisions, contradictions, and dream reports; visualize operational memory and knowledge quality.
-3. **Dream report review trail and graph curation**: accepted/rejected/deferred decisions should improve graph links and follow-up tasks.
-4. **Role memory**: curated per-role learning surfaces for Builder, QA, Wiki Curator, PM, and other agents.
-5. **Per-run executor override**: evaluate whether Settings/UI should choose mock/OpenAI/Anthropic/Groq/Ollama per run or stay env-driven.
-6. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata, no real Codex CLI yet.
+1. **Dream report review trail and graph curation**: accepted/rejected/deferred decisions should improve graph links and follow-up tasks.
+2. **WebSocket live updates for graph** (replace 15s polling).
+3. **Role memory**: curated per-role learning surfaces for Builder, QA, Wiki Curator, PM, and other agents.
+4. **Graph annotations + filter presets** (operator notes/tags + saved filter sets).
+5. **Persisted snapshots** to disk so history survives API restarts.
+6. **Per-run executor override**: evaluate whether Settings/UI should choose mock/OpenAI/Anthropic/Groq/Ollama per run or stay env-driven.
+7. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata, no real Codex CLI yet.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-05-13 - Knowledge Graph v2 shipped (PRs #29-#32)
+
+The Graph view evolved from a static hub-and-spoke SVG (22 nodes/2 edges) into a force-directed live map with **94 nodes / 59 edges** from real local memory. Four PRs merged to `dev/1.0.0`:
+
+- **#29 — Foundation**: `react-force-graph-2d` canvas, inspector with markdown render, ⌘K SearchBar, URL-synced filters/density/selection, sesión viva polling (15s), hover tooltip, layer breakdown, persistent viewport. Backend: ingest wiki/raw assets/runtime logs + parse markdown links + plain-text path mentions + legacy `- Raw path:` metadata.
+- **#30 — Seed + Office nav + time-travel**: in-memory seed (6 agents/10 tasks/5 runs auto-populated when `API_STORAGE=memory`), file mtime stamps for time-travel slider, "Volver a Oficina" header button, SearchBar/LayerBreakdown unit tests, App.test fixed with canvas mock + ResizeObserver polyfill.
+- **#31 — Bridges**: roster avatars in sidebar become buttons that open agent nodes in graph; AgentSidePanel gets "Ver en grafo" shortcut; AppShell exposes `NavigationBridge`; URL-first navigation avoids the listener-not-mounted race.
+- **#32 — Snapshots + extras**: 48-slot in-memory snapshot ring buffer (throttle 1/hour) with `/knowledge/graph/snapshots[/:id]`; TimelineSlider renders snapshot ticks; inspector renders run logs as timeline; Office gets "Knowledge Graph →" header button; MobileView adds 🕸️ Grafo tab; perf tweaks for >250 nodes.
+
+Tests: **72 API + 18 web** (5 new). Typecheck clean across 4 workspaces. The view auto-seeds in memory mode so future sessions start with a populated graph.
+
+Architecture choices to remember:
+- URL state via `useUrlState/useUrlSetState/useUrlNullable` hooks (no router).
+- Cross-feature navigation via `CustomEvent("knowledge:select" | "knowledge:navigate")` listened to in `useKnowledgeGraphPanel` and `AppShell`.
+- Snapshots only in-memory; persisted snapshots are still a candidate next step.
+- `MARKED` for markdown render in the inspector (no DOMPurify — local-first content).
+- Inspector reads file content via the existing `/wiki/page?path=` endpoint for any textual atelier file.
+
+See `docs/knowledge-graph.md` for the full feature inventory and next candidates.
 
 ### 2026-05-12 - Knowledge Graph direction added
 

@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-05-12 — Knowledge Graph direction added.
-**Active plan:** [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (P1–P4 complete; current candidates under "Now planning" below).
+**Last updated:** 2026-05-13 — Knowledge Graph v2 (live force-directed map + inspector + sessions + snapshots) shipped.
+**Active plan:** [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (P1–P4 complete; Knowledge Graph v2 complete; current candidates under "Now planning" below).
 
 ## Strategic stance
 
@@ -44,17 +44,24 @@ The working tree contains many generated run/deliverable artifacts from earlier 
 
 Policy started in [`docs/memory-artifact-hygiene.md`](memory-artifact-hygiene.md). UUID-prefixed generated deliverables are now ignored like ObjectId-prefixed generated deliverables.
 
-### P1 — Knowledge Graph read model ✅ first slice landed 2026-05-12
+### P1 — Knowledge Graph read model ✅ shipped 2026-05-12
 
-Add a local read model that derives nodes and edges from the existing Atellier spine: wiki pages, sources, tasks, agents, roles, runs, deliverables, reviews, decisions, contradictions, dream reports, and synthesis pages. This should be computed from existing local state first, not backed by a new external graph database.
+Local read model derives nodes/edges from wiki, raw assets, runtime logs, agents/tasks/runs, deliverables, and lint issues. Computed from existing state — no external graph DB, no embeddings. See [`docs/knowledge-graph.md`](knowledge-graph.md).
 
-See [`docs/knowledge-graph.md`](knowledge-graph.md) for the first design note.
+### P2 — Knowledge Graph v2 ✅ shipped 2026-05-13
 
-### P2 — Graph View MVP ✅ first slice landed 2026-05-12
+Force-directed live map with layer clustering, inspector with markdown render, ⌘K search, URL-synced filters, sesión viva polling, time-travel slider with snapshot ticks, run timeline, mobile tab, Office↔Graph navigation. Four PRs (#29 #30 #31 #32) landed on `dev/1.0.0`. 90 tests (72 api + 18 web). See `docs/knowledge-graph.md` for the full feature inventory.
 
-Add a new app page for visualizing the woven knowledge network that agents are building. The initial view should show the graph as operational memory, not decoration: filters by agent, role, node type, status, review state, recency, and knowledge quality.
+### Next Knowledge Graph candidates
 
-Next graph work: browser screenshot review, better layout against real local data, richer wiki link extraction, and dream proposal decision nodes.
+After P2 v2 the obvious gaps before declaring the surface "done":
+
+- **WebSocket live updates** instead of 15s polling — closes the "sesión viva" loop properly.
+- **Graph annotations** — operator notes/tags on nodes that persist to disk; would feed back into curation.
+- **Filter presets** saved to URL or settings (e.g. "needs curation", "this week", "wiki orphans").
+- **Diff snapshot view** — pick two snapshots, render +/- nodes/edges.
+- **Sub-tabs inside Office** (mock alignment) — promote Office to host the graph as one of its panes.
+- **Performance hardening** for >300 nodes (sprite caching, WebGL toggle, virtualised neighbour calc).
 
 ### P3 — Dream report review trail and graph curation
 
