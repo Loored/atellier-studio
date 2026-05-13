@@ -112,7 +112,13 @@ export function AppShell() {
         </div>
       </header>
 
-      <Sidebar view={view} onViewChange={setView} agents={agents} />
+      <Sidebar
+        view={view}
+        onViewChange={setView}
+        agents={agents}
+        onAgentSelect={(agent) => selectKnowledgeNode(`agent:${agent.id}`, () => setView("knowledge"))}
+      />
+      <NavigationBridge onSwitchToKnowledge={() => setView("knowledge")} />
 
       <main className="overflow-hidden bg-canvas relative">
         {view === "dashboard" && <Dashboard onNavigate={setView} />}
@@ -126,4 +132,33 @@ export function AppShell() {
       </main>
     </div>
   );
+}
+
+function selectKnowledgeNode(nodeId: string, switchView: () => void): void {
+  // Write the selection to the URL first so the freshly-mounted graph hook
+  // picks it up via its initial-state read. Then dispatch a follow-up event
+  // for the case where the graph view is already mounted.
+  const params = new URLSearchParams(window.location.search);
+  params.set("selected", nodeId);
+  const search = params.toString();
+  const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+  window.history.replaceState(window.history.state, "", next);
+  switchView();
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("knowledge:select", { detail: nodeId }));
+  }, 0);
+}
+
+function NavigationBridge({ onSwitchToKnowledge }: { onSwitchToKnowledge: () => void }) {
+  useEffect(() => {
+    function onNavigate(event: Event) {
+      const detail = (event as CustomEvent<string>).detail;
+      if (typeof detail === "string" && detail.length > 0) {
+        selectKnowledgeNode(detail, onSwitchToKnowledge);
+      }
+    }
+    window.addEventListener("knowledge:navigate", onNavigate);
+    return () => window.removeEventListener("knowledge:navigate", onNavigate);
+  }, [onSwitchToKnowledge]);
+  return null;
 }
