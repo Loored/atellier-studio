@@ -17,6 +17,7 @@ import { WikiService } from "./wiki.service";
 import { type StorageMode } from "./service-utils";
 import { CodexWorkerService } from "./codex-worker.service";
 import { readdir } from "node:fs/promises";
+import { KnowledgeGraphService } from "./knowledge-graph.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -27,6 +28,7 @@ export type AppServices = {
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
+  knowledgeGraph: KnowledgeGraphService;
 };
 
 export type CreateAppServicesOptions = {
@@ -93,6 +95,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
   const repoRootResolved = path.resolve(atelierRootResolved, "..");
   const wiki = new WikiService(atelierRootResolved);
   const agents = new AgentService(storageMode);
+  const tasks = new TaskService(storageMode);
   const runs = new RunService(storageMode, wiki);
   const messages = new MessageService(storageMode);
   const repoFileHints = [
@@ -158,10 +161,11 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     agents,
     agentRuns,
     messages,
-    tasks: new TaskService(storageMode),
+    tasks,
     runs,
-    skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs),
+    skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs, wiki),
     wiki,
     codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
+    knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki),
   };
 }

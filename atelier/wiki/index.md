@@ -7,6 +7,9 @@
 | [../../docs/history/implementation-log.md](../../docs/history/implementation-log.md) | Long chronological implementation history moved out of active Codex memory. | operations | 2026-05-05 | 0 |
 | [../../docs/operations/local-setup.md](../../docs/operations/local-setup.md) | Local Docker, Colima, Mongo, runtime mode, and validation setup notes. | operations | 2026-05-05 | 0 |
 | [../../docs/next-work-plan.md](../../docs/next-work-plan.md) | Prioritized next implementation plan based on current-state review and Karpathy agentic-system insights. | operations | 2026-05-08 | 1 |
+| [../../docs/knowledge-graph.md](../../docs/knowledge-graph.md) | Product direction and MVP scope for a local Knowledge Graph over Atellier's wiki, runs, tasks, agents, reviews, deliverables, decisions, contradictions, and dream reports. | operations | 2026-05-12 | 0 |
+| [../../docs/memory-artifact-hygiene.md](../../docs/memory-artifact-hygiene.md) | Active policy for tracking curated operational memory while ignoring generated validation deliverables by default. | operations | 2026-05-12 | 0 |
+| [../runs/2026-05-12-knowledge-graph-read-model.md](../runs/2026-05-12-knowledge-graph-read-model.md) | Run log for the first read-only Knowledge Graph vertical slice and Graph view. | operations | 2026-05-12 | 0 |
 | [synthesis/2026-05-04-ui-security-review.md](./synthesis/2026-05-04-ui-security-review.md) | UI/UX, PDF, and security review notes for the Milestone 0 dashboard and local API defaults. | synthesis | 2026-05-04 | 0 |
 | [workflows/agent-skill-orchestration.md](./workflows/agent-skill-orchestration.md) | Skill-triggered orchestration pattern for Atellier build and LLM Wiki ingest loops. | workflows | 2026-05-05 | 1 |
 | [sources/2026-05-05-karpathy-agentes-llm.md](./sources/2026-05-05-karpathy-agentes-llm.md) | Source summary and Atellier implications from Karpathy agentic-system insights. | sources | 2026-05-05 | 1 |
@@ -24,3 +27,4 @@
 - decisions
 - synthesis
 - sources
+- dreams

@@ -7,6 +7,7 @@ import { AgentsView } from "../features/agents/AgentsView";
 import { RunsView } from "../features/runs/RunsView";
 import { ReviewView } from "../features/review/ReviewView";
 import { WikiView } from "../features/wiki/WikiView";
+import { KnowledgeGraphView } from "../features/knowledge/KnowledgeGraphView";
 import { OfficeView } from "../features/pixel-office/OfficeView";
 import { SettingsView } from "../features/settings/SettingsView";
 import { useAgentsApi } from "../api/hooks/agents/useAgentsApi";
@@ -119,6 +120,7 @@ export function AppShell() {
         {view === "runs"      && <RunsView />}
         {view === "review"    && <ReviewView />}
         {view === "wiki"      && <WikiView />}
+        {view === "knowledge" && <KnowledgeGraphView />}
         {view === "office"    && <OfficeView />}
         {view === "settings"  && <SettingsView />}
       </main>

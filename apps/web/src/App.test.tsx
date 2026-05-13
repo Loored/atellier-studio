@@ -8,11 +8,13 @@ import { wikiService } from "./api/services/wiki.service";
 
 const createTaskMock = vi.hoisted(() => vi.fn());
 const appendLogMock = vi.hoisted(() => vi.fn());
+const listRunsMock = vi.hoisted(() => vi.fn());
 const updateRunReviewMock = vi.hoisted(() => vi.fn());
 const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
 const captureRunMemoryMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
+const getOrchestrationStatusMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
@@ -25,6 +27,7 @@ const approveCodexStepMock = vi.hoisted(() => vi.fn());
 const executeNextCodexMock = vi.hoisted(() => vi.fn());
 const cancelCodexMock = vi.hoisted(() => vi.fn());
 const finalizeCodexMock = vi.hoisted(() => vi.fn());
+const readKnowledgeGraphMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -63,35 +66,7 @@ vi.mock("./api/services/tasks.service", () => ({
 
 vi.mock("./api/services/runs.service", () => ({
   runsService: {
-    list: vi.fn().mockResolvedValue([
-      {
-        id: "run-1",
-        type: "manual",
-        status: "running",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
-      {
-        id: "run-2",
-        type: "review",
-        status: "completed",
-        reviewStatus: "pending",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
-      {
-        id: "run-3",
-        type: "build",
-        status: "completed",
-        reviewStatus: "approved",
-        deliverablePath: "wiki/deliverables/run-3.md",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
-    ]),
+    list: listRunsMock,
     create: vi.fn(),
     appendLog: appendLogMock,
     complete: vi.fn(),
@@ -128,8 +103,32 @@ vi.mock("./api/services/orchestrations.service", () => ({
           },
         ],
       },
+      {
+        id: "wiki-dream-loop",
+        name: "Wiki Dream Loop",
+        description: "Periodic curator pass over the wiki.",
+        steps: [
+          {
+            id: "audit",
+            label: "Audit the wiki",
+            phase: "wiki",
+            agentRole: "wiki-curator",
+            agentName: "Wiki Curator",
+            objective: "Surface structural issues.",
+          },
+          {
+            id: "draft-report",
+            label: "Draft the dream report",
+            phase: "wiki",
+            agentRole: "wiki-curator",
+            agentName: "Wiki Curator",
+            objective: "Draft the report.",
+          },
+        ],
+      },
     ]),
     startSkillRun: startSkillOrchestrationMock,
+    getStatus: getOrchestrationStatusMock,
   },
 }));
 
@@ -183,6 +182,12 @@ vi.mock("./api/services/codex-worker.service", () => ({
   },
 }));
 
+vi.mock("./api/services/knowledge.service", () => ({
+  knowledgeService: {
+    readGraph: readKnowledgeGraphMock,
+  },
+}));
+
 describe("App", () => {
   beforeEach(() => {
     Object.defineProperty(window, "confirm", {
@@ -191,6 +196,35 @@ describe("App", () => {
     });
     vi.clearAllMocks();
     queryClient.clear();
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-1",
+        type: "manual",
+        status: "running",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-2",
+        type: "review",
+        status: "completed",
+        reviewStatus: "pending",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
     createTaskMock.mockResolvedValue({
       id: "task-2",
       title: "Review V3",
@@ -255,18 +289,15 @@ describe("App", () => {
       wikiPath: "wiki/synthesis/run-run-2-review-memory-captured-from-dashboard.md",
       logPath: "wiki/log.md",
     });
-    startSkillOrchestrationMock.mockResolvedValue({
+    startSkillOrchestrationMock.mockResolvedValue({ runId: "run-4" });
+    getOrchestrationStatusMock.mockResolvedValue({
+      orchestrationRunId: "run-4",
       skillId: "atellier-build-loop",
       goal: "Build orchestration",
-      orchestrationRun: {
-        id: "run-4",
-        type: "orchestration",
-        status: "completed",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
+      status: "completed",
       steps: [],
+      activeStep: null,
+      nextStep: null,
     });
     ingestWikiMock.mockResolvedValue({
       rawPath: "raw/ingest/2026-05-05-client-meeting-notes.md",
@@ -379,6 +410,58 @@ describe("App", () => {
     executeNextCodexMock.mockResolvedValue({});
     cancelCodexMock.mockResolvedValue({});
     finalizeCodexMock.mockResolvedValue({});
+    readKnowledgeGraphMock.mockResolvedValue({
+      generatedAt: "2026-05-12T00:00:00.000Z",
+      nodes: [
+        {
+          id: "agent:agent-1",
+          type: "agent",
+          label: "Builder Agent",
+          sourceId: "agent-1",
+          role: "builder",
+          status: "idle",
+          quality: "verified",
+        },
+        {
+          id: "role:builder",
+          type: "role",
+          label: "builder",
+          role: "builder",
+          quality: "verified",
+        },
+      ],
+      edges: [
+        {
+          id: "edge:agent:agent-1->role:builder:agent_has_role",
+          type: "agent_has_role",
+          from: "agent:agent-1",
+          to: "role:builder",
+          label: "has role",
+          quality: "verified",
+        },
+      ],
+      stats: {
+        nodes: 2,
+        edges: 1,
+        byNodeType: {
+          agent: 1,
+          role: 1,
+          task: 0,
+          run: 0,
+          "wiki-page": 0,
+          deliverable: 0,
+          "lint-issue": 0,
+        },
+        byQuality: {
+          verified: 2,
+          proposed: 0,
+          contradicted: 0,
+          stale: 0,
+          orphaned: 0,
+          generated: 0,
+        },
+      },
+    });
     vi.mocked(wikiService.readPage).mockResolvedValue({
       path: "runs/2026-05-05-codex-worker-codex-run-1.md",
       ready: true,
@@ -396,6 +479,18 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Wiki Log" })).toBeInTheDocument();
     // Executor mode badge in header shows the mode name
     expect(await screen.findByText("openai")).toBeInTheDocument();
+  });
+
+  it("renders the knowledge graph view from the graph API chain", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Graph" }));
+
+    expect(await screen.findByRole("heading", { name: "Knowledge Graph" })).toBeInTheDocument();
+    expect(await screen.findByText("Builder Agent")).toBeInTheDocument();
+    expect(await screen.findByText("has role")).toBeInTheDocument();
+    expect(readKnowledgeGraphMock).toHaveBeenCalled();
   });
 
   it("creates a task through the dashboard form", async () => {
@@ -599,6 +694,88 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: /run wiki lint/i }));
     expect(await screen.findByText(/Fix the Raw path reference or restore the missing raw source\./i)).toBeInTheDocument();
+  });
+
+  it("runs a wiki dream and saves the approved report", async () => {
+    const user = userEvent.setup();
+    const dreamReport = [
+      "# Dream Report",
+      "",
+      "Suggested filename: wiki/dreams/2026-05-11-dream-report.md",
+      "",
+      "## Summary",
+      "",
+      "- Grounded paths reviewed.",
+      "",
+      "## Proposed actions",
+      "",
+      "1. Keep the report as a proposed maintenance page.",
+    ].join("\n");
+
+    startSkillOrchestrationMock.mockResolvedValueOnce({ runId: "dream-run-1" });
+    getOrchestrationStatusMock.mockResolvedValueOnce({
+      orchestrationRunId: "dream-run-1",
+      skillId: "wiki-dream-loop",
+      goal: "Periodic curator pass — propose wiki maintenance but apply nothing.",
+      status: "completed",
+      steps: [
+        {
+          stepId: "draft-report",
+          label: "Draft the dream report",
+          phase: "wiki",
+          agentRole: "wiki-curator",
+          agentName: "Wiki Curator",
+          runId: "dream-draft-run",
+          status: "completed",
+          isActive: false,
+        },
+      ],
+      activeStep: null,
+      nextStep: null,
+    });
+    listRunsMock.mockResolvedValue([
+      {
+        id: "dream-draft-run",
+        type: "manual",
+        status: "completed",
+        output: {
+          response: dreamReport,
+        },
+        logs: [],
+        createdAt: "2026-05-11T00:00:00.000Z",
+        updatedAt: "2026-05-11T00:00:00.000Z",
+      },
+    ]);
+    writeWikiPageMock.mockResolvedValueOnce({
+      path: "wiki/dreams/2026-05-11-dream-report.md",
+      content: dreamReport,
+      ready: true,
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: /dream now/i }));
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("OPENAI execution is active"));
+    await waitFor(() => {
+      expect(startSkillOrchestrationMock).toHaveBeenCalledWith({
+        skillId: "wiki-dream-loop",
+        goal: "Periodic curator pass — propose wiki maintenance but apply nothing.",
+        context: "Triggered from the Wiki view. Save only the report after explicit operator approval.",
+      });
+    });
+
+    expect(await screen.findByText(/Grounded paths reviewed\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Report path: wiki\/dreams\/2026-05-11-dream-report\.md/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /save report/i }));
+    await waitFor(() => {
+      expect(writeWikiPageMock).toHaveBeenCalledWith({
+        path: "wiki/dreams/2026-05-11-dream-report.md",
+        content: dreamReport,
+      });
+    });
+    expect(await screen.findByText(/Saved: wiki\/dreams\/2026-05-11-dream-report\.md/i)).toBeInTheDocument();
   });
 
   it("runs codex worker panel actions", async () => {

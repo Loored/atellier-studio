@@ -4,6 +4,7 @@ import {
   Building2,
   ClipboardCheck,
   LayoutDashboard,
+  Network,
   Settings2,
   Users,
 } from "lucide-react";
@@ -19,7 +20,7 @@ const ROLE_COLORS: Record<string, string> = {
   designer:       "#6d28d9",
 };
 
-export type View = "dashboard" | "agents" | "runs" | "review" | "wiki" | "office" | "settings";
+export type View = "dashboard" | "agents" | "runs" | "review" | "wiki" | "knowledge" | "office" | "settings";
 
 type SidebarProps = {
   view: View;
@@ -33,6 +34,7 @@ const MAIN_NAV: { id: View; icon: React.ElementType; label: string }[] = [
   { id: "runs",      icon: Activity,        label: "Runs" },
   { id: "review",    icon: ClipboardCheck,  label: "Review" },
   { id: "wiki",      icon: BookOpen,        label: "Wiki" },
+  { id: "knowledge", icon: Network,         label: "Graph" },
   { id: "office",    icon: Building2,       label: "Office" },
 ];
 
