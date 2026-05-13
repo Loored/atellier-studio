@@ -2086,3 +2086,15 @@ body {
 }
 .prose-inspector hr { border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 0.6em 0; }
 .prose-inspector strong { color: var(--ink, #f1f5f9); }
+
+.mobile-graph-wrapper {
+  width: 100%;
+  height: calc(100vh - 180px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.mobile-graph-wrapper > div {
+  flex: 1;
+  min-height: 0;
+}

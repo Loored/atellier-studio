@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { marked } from "marked";
 import type { KnowledgeGraphEdge, KnowledgeGraphNode, KnowledgeGraphNodeType } from "@atellier/shared";
 import { useWikiPageApi } from "../../../api/hooks/wiki/useWikiApi";
+import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
 import { cn } from "../../../lib/cn";
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -36,6 +37,12 @@ export function KnowledgeInspector({ node, edges, nodeLabelById, onSelectNode }:
       ? node?.path ?? null
       : null;
   const { data: page, isFetching: isFetchingPage } = useWikiPageApi(fetchablePath);
+
+  const { data: runs } = useRunsApi();
+  const runDetail = useMemo(() => {
+    if (node?.type !== "run" || !node.sourceId) return null;
+    return runs?.find((r) => r.id === node.sourceId) ?? null;
+  }, [runs, node]);
 
   if (!node) {
     return (
@@ -132,6 +139,36 @@ export function KnowledgeInspector({ node, edges, nodeLabelById, onSelectNode }:
                 {!isFetchingPage && !page?.content && (
                   <p className="mt-1 text-ink-faint">Sin contenido disponible.</p>
                 )}
+              </div>
+            )}
+            {runDetail && (
+              <div>
+                <p className="text-ink-faint">Timeline del run</p>
+                <div className="mt-1 space-y-1.5 rounded bg-black/30 p-2">
+                  <p className="text-[0.7rem] text-ink-muted">
+                    {runDetail.type} · {runDetail.status}
+                    {runDetail.reviewStatus ? ` · ${runDetail.reviewStatus}` : ""}
+                  </p>
+                  <ol className="space-y-1.5 border-l border-white/10 pl-2">
+                    {runDetail.logs.length === 0 && (
+                      <li className="text-[0.7rem] text-ink-faint">Sin entradas en el log todavía.</li>
+                    )}
+                    {runDetail.logs.slice(0, 20).map((entry, idx) => (
+                      <li key={`${entry.timestamp}-${idx}`} className="text-[0.7rem] text-ink-muted">
+                        <span className="font-bold text-ink-faint">
+                          {new Date(entry.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className="ml-2 rounded bg-white/5 px-1 py-px text-[0.6rem] uppercase tracking-wider text-ink-faint">
+                          {entry.level}
+                        </span>
+                        <p className="mt-0.5 whitespace-pre-wrap">{entry.message}</p>
+                      </li>
+                    ))}
+                    {runDetail.logs.length > 20 && (
+                      <li className="text-[0.62rem] text-ink-faint">+{runDetail.logs.length - 20} más</li>
+                    )}
+                  </ol>
+                </div>
               </div>
             )}
           </div>
