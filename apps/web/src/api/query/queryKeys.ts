@@ -4,6 +4,7 @@ export const QUERY_KEYS = {
   RUNS: "runs",
   WIKI: "wiki",
   ORCHESTRATIONS: "orchestrations",
+  KNOWLEDGE: "knowledge",
   SYSTEM: "system",
   CLIENTS: "clients",
   PROJECTS: "projects",
@@ -33,6 +34,9 @@ export const queryKeys = {
   orchestrations: {
     skills: [QUERY_KEYS.ORCHESTRATIONS, "skills"] as const,
     status: (runId: string) => [QUERY_KEYS.ORCHESTRATIONS, "status", runId] as const,
+  },
+  knowledge: {
+    graph: [QUERY_KEYS.KNOWLEDGE, "graph"] as const,
   },
   system: {
     health: [QUERY_KEYS.SYSTEM, "health"] as const,
