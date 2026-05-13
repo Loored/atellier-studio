@@ -48,7 +48,10 @@ See `docs/operations/local-setup.md` for install commands and solved setup pitfa
 - `.gitignore` now excludes local-only browser automation folders: `.playwright-mcp/` and `.playwright-cli/`.
 - Root-level UI review screenshots are ignored (`agents-check.png`, `ui-check-*`, `dashboard-*`, `office-*`, `review-*`).
 - Auto-generated deliverables in `atelier/wiki/deliverables/` are ignored only when filename starts with a 24-hex ObjectId prefix (`<24hex>-*.md`).
+- Auto-generated deliverables in `atelier/wiki/deliverables/` are also ignored when filename starts with a UUID prefix (`<uuid>-*.md`).
+- Auto-generated Codex Worker finalize logs in `atelier/runs/YYYY-MM-DD-codex-worker-<uuid>.md` are ignored by default; promote useful outcomes into narrative run logs.
 - Curated wiki memory remains tracked: `atelier/wiki/deliverables/index.md`, `atelier/wiki/log.md`, and non-ObjectId deliverables.
+- Memory artifact policy lives in `docs/memory-artifact-hygiene.md`.
 
 ## Current Architecture Constraints
 
@@ -91,17 +94,49 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 ## Current Priorities
 
-Active plan: [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md). The 2026-05-06 strategic reframe (post *Code with Claude 2026* keynote) reorders previous priorities. API foundation for Wiki Brain MVP, Review Memory Capture, Codex Worker control-plane v1.1, and agent grounding v1.2 are done — the work model is in place; next leverage is in exposing it to the platform and compounding wiki memory.
+Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done, and P2.b/P2.c Wiki Dream grounding + UI are done. The work model is in place; next leverage is keeping generated memory tidy, then adding a Knowledge Graph surface over existing local state.
 
-1. **MCP server wrapper** over the REST API: expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get`. Local-only auth. Targeted at Cowork + Claude Code as a callable tool.
-2. **Wiki Dream loop**: scheduled `wiki-curator` run that prunes stale, resolves contradictions (via `/wiki/lint`), links orphans, reorganizes the index. v1 produces *proposed* changes the operator approves — no silent rewrites.
-3. **Anthropic executor mode** (`AGENT_EXECUTOR_MODE=anthropic`): Opus 4.7 default, native prompt caching, `/health` exposes mode/model. Default executor stays `mock`.
-4. **Skills 2.0 alignment**: audit `.agents/skills/` against the new format; migrate `atellier-build-loop` and `llm-wiki-ingest-loop` if compatible.
-5. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata, no real Codex CLI yet.
+1. **Memory artifact hygiene**: curate generated run/deliverable files so durable wiki memory stays readable and publishable.
+2. **Knowledge Graph read model + Graph View MVP**: derive nodes/edges from wiki, runs, agents, tasks, deliverables, reviews, decisions, contradictions, and dream reports; visualize operational memory and knowledge quality.
+3. **Dream report review trail and graph curation**: accepted/rejected/deferred decisions should improve graph links and follow-up tasks.
+4. **Role memory**: curated per-role learning surfaces for Builder, QA, Wiki Curator, PM, and other agents.
+5. **Per-run executor override**: evaluate whether Settings/UI should choose mock/OpenAI/Anthropic/Groq/Ollama per run or stay env-driven.
+6. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata, no real Codex CLI yet.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-05-12 - Knowledge Graph direction added
+
+- Product direction: add a Graph view that visualizes the knowledge network agents are weaving across wiki pages, sources, runs, tasks, deliverables, reviews, dream reports, decisions, contradictions, roles, and agent activity.
+- This should start as a local read model over existing state, not a vector DB, graph DB, Slack/Calendar/Drive integration, or neural-network simulation.
+- Next sequence: memory hygiene -> graph read model -> Graph View MVP -> Dream/graph curation trail -> role memory.
+- Design note: `docs/knowledge-graph.md`.
+
+### 2026-05-12 - Memory artifact hygiene started
+
+- Added `docs/memory-artifact-hygiene.md` to define which local memory artifacts should be tracked or ignored.
+- `.gitignore` now ignores UUID-prefixed generated deliverables under `atelier/wiki/deliverables/`, matching the existing ObjectId-prefixed deliverable rule.
+- `.gitignore` also ignores generated Codex Worker finalize logs with UUID run IDs; meaningful outcomes should be promoted into narrative run logs and wiki entries.
+- Curated docs, wiki log/index, raw inputs, sources, synthesis pages, tasks, and meaningful run logs remain trackable.
+
+### 2026-05-12 - Knowledge Graph read model landed
+
+- Added shared graph types, `KnowledgeGraphService`, `GET /knowledge/graph`, frontend API chain, and Graph view.
+- First graph nodes: agents, roles, tasks, runs, wiki pages, deliverables, lint issues.
+- First graph edges: agent role, task assignment, run/agent/task, run deliverable, deliverable wiki page, wiki lint issue.
+- Visual QA found and fixed generated deliverable artifact flooding. The graph now excludes UUID/ObjectId-generated deliverable wiki pages by default while keeping curated memory visible.
+- Relationship cards now show readable labels, and the Graph view includes a node-type legend.
+- Validation passed: `pnpm --filter @atellier/api typecheck`, `pnpm --filter @atellier/web typecheck`, `pnpm test:api`, `pnpm test:web`.
+
+### 2026-05-11 - Wiki Dream grounding landed
+
+- `wiki-dream-loop` now grounds its `audit` step with backend context: `wiki.lint()` output plus the current real markdown path list under `atelier/wiki`.
+- The curator is instructed to use only listed paths and mark unlisted pages as unverified instead of inventing files.
+- API coverage asserts that the audit run context includes lint findings and real wiki paths.
+- P2.c also landed: Wiki panel can start a dream, preview the report, and save it explicitly under `wiki/dreams`.
+- Next recommended slice: memory artifact hygiene before publishing.
 
 ### 2026-05-10 - Branch state, test coverage, and reframe alignment
 

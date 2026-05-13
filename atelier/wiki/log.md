@@ -1,5 +1,35 @@
 # Atellier Studio Wiki Log
 
+## [2026-05-12T00:00:00.000Z] decision | Knowledge Graph direction added
+- Summary: Added the next product direction: a local Knowledge Graph read model and Graph View that visualize the operational memory agents are building across sources, wiki pages, agents, roles, tasks, runs, reviews, deliverables, decisions, contradictions, dream reports, and skills. Initial scope avoids external integrations, vector DB, graph DB, and silent autonomous curation.
+- runLog: atelier/runs/2026-05-12-knowledge-graph-direction.md
+- design: docs/knowledge-graph.md
+
+## [2026-05-12T00:10:00.000Z] decision | Memory artifact hygiene policy started
+- Summary: Added a policy for tracking curated wiki memory while ignoring generated deliverables and generated Codex Worker finalize logs by default. UUID-prefixed generated deliverables are now ignored like ObjectId-prefixed generated deliverables.
+- policy: docs/memory-artifact-hygiene.md
+- runLog: atelier/runs/2026-05-12-memory-artifact-hygiene.md
+
+## [2026-05-12T01:00:00.000Z] decision | Knowledge Graph read model landed
+- Summary: Added a read-only Knowledge Graph derived from existing local Atellier state, plus a Graph view in the web app. The slice covers shared graph types, backend service, GET /knowledge/graph, frontend API chain, filters, graph stats, node preview, and relationship list.
+- runLog: atelier/runs/2026-05-12-knowledge-graph-read-model.md
+
+## [2026-05-12T01:20:00.000Z] decision | Knowledge Graph visual QA pass
+- Summary: Reviewed the Graph view with Playwright against local data. Fixed graph flooding from generated deliverable artifacts, kept curated deliverable index visible, added a node-type legend, and made relationship cards readable by showing node labels instead of raw graph IDs.
+- runLog: atelier/runs/2026-05-12-knowledge-graph-read-model.md
+
+## [2026-05-11T09:00:00.000Z] manual | Wiki Dream UI surface landed
+- Summary: Implemented P2.c in the Wiki panel: Dream now trigger, live status, report preview, and explicit save-to-wiki approval for wiki/dreams reports. Added safe write support for wiki/dreams and web/API coverage.
+- runLog: atelier/runs/2026-05-11-wiki-dream-ui.md
+
+## [2026-05-11T08:43:45.000Z] manual | Wiki Dream grounding landed
+- Summary: Implemented P2.b so wiki-dream-loop audit runs receive backend-grounded wiki lint output and the current real markdown path list. Updated API tests and roadmap/docs.
+- runLog: atelier/runs/2026-05-11-wiki-dream-grounding.md
+
+## [2026-05-11T08:28:58.000Z] manual | Project state analysis
+- Summary: Reviewed current code, docs, git state, workspace setup, and validation results. Main is aligned with origin/main and includes P1-P4 from the 2026-05-06 plan. Validation passes after restoring workspace dependencies. Recommended next priority is P2.b Wiki Dream grounding.
+- runLog: atelier/runs/2026-05-11-project-state-analysis.md
+
 ## [2026-05-04T00:00:00.000Z] initialization | Milestone 0 wiki log created
 
 - Summary: Initial durable wiki log for Atellier Studio operational memory.
@@ -10069,3 +10099,1387 @@
 - status: completed
 - reviewStatus: pending
 - deliverablePath: wiki/deliverables/becf6f25-2b45-4dde-a4da-9a775e835817-wiki-dream-loop-completed.md
+
+## [2026-05-11T09:28:41.328Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 61b28712-1e4d-433f-88d8-4c32d82af2ba
+- Agent ID: 375af9a2-c360-44d2-9c08-c3d8fe8ef1e3
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:30:36.077Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 9b9c5a52-0ba4-4420-a7f4-96ca0adbc26d
+- Agent ID: 15f8645d-9e2a-4ceb-adc4-33446cab77d4
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:30:50.775Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 42db8b23-3613-47b2-a26d-1ade68f0f94e
+- Agent ID: 67746192-c812-4420-8702-85a34cabeb00
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:31:07.214Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 7bdf0a86-e21b-4ad6-a634-2139cf4b8cd4
+- Agent ID: 5e139ea7-9f39-48ae-8422-98b2199e4970
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:31:24.510Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: c5aeb84a-a9f8-46f9-97ab-6fe369e03f63
+- Agent ID: 9b9ece1d-40a9-4dd5-a281-ffdfc5ab3016
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:31:44.627Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 7e17cd81-17f9-450f-8d42-66c06b237c41
+- Agent ID: 67746192-c812-4420-8702-85a34cabeb00
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:31:57.173Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 3d4a372d-4283-4d5d-9830-0872e7ad8143
+- Agent ID: 9b9ece1d-40a9-4dd5-a281-ffdfc5ab3016
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:32:19.734Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: f64263a0-4c89-42e3-b67c-6d69f71f63a6
+- Agent ID: bdb60acf-47c2-4588-bb74-07cac8b2a6cd
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-11T09:32:36.407Z] run_completed | Atellier Build Loop completed
+- Run ID: 45d6e401-5f68-4d6c-a189-809b554cfe25
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/45d6e401-5f68-4d6c-a189-809b554cfe25-atellier-build-loop-completed.md
+
+## [2026-05-12T20:14:27.779Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T20:14:52.815Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T20:15:11.577Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T20:15:56.199Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T20:16:26.437Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T21:53:09.444Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:01:00.436Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:01:34.096Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:02:01.126Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:04:59.631Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:06:33.296Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:09:30.415Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:09:30.417Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:10:59.900Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:11:08.744Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:15:19.551Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:15:28.902Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:20:05.874Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:23:53.855Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:27:45.709Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:29:36.228Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:29:51.311Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:30:06.405Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:30:21.492Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:30:36.571Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:30:51.628Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:31:06.703Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:31:21.772Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:31:36.837Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:31:51.908Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:32:07.006Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:32:22.060Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:32:37.133Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:32:52.196Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:33:07.275Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:33:22.330Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:33:37.396Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:33:52.461Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:34:07.528Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:34:22.639Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:34:37.751Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:34:52.829Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:35:07.944Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:35:22.998Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:35:38.102Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:35:53.182Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:36:08.296Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:36:23.355Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:36:38.443Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:36:53.511Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:37:08.598Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:37:23.683Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:37:38.766Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:37:53.853Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:41:16.192Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:41:24.531Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:41:39.597Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:41:54.660Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:42:09.761Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:42:24.828Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:42:39.879Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:42:54.924Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:43:09.978Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:43:25.057Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:43:40.107Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:43:55.195Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:44:10.273Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:44:25.336Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:44:40.423Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:44:55.479Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:45:10.539Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:45:25.599Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:45:40.658Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:45:55.710Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:46:10.799Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:46:29.325Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:48:37.999Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:48:53.061Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:49:08.144Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:49:23.221Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:49:38.311Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:49:53.381Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:50:08.468Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:50:23.536Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:50:38.602Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:50:53.669Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:51:08.754Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:51:23.823Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:51:38.895Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:51:53.988Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:52:09.090Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:52:24.157Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:52:39.213Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:52:54.285Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:53:09.367Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:53:24.436Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:53:39.508Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:53:54.583Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:54:09.680Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:54:24.745Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:54:39.824Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:54:54.883Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:55:09.976Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:55:25.044Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:55:40.112Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:55:55.205Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:56:10.309Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:56:25.354Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:56:40.410Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:56:55.474Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:57:10.560Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:57:25.648Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:57:40.726Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:57:55.778Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:58:10.873Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:58:25.932Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:58:40.993Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:58:56.049Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:59:11.114Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:59:26.184Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:59:41.259Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T22:59:56.310Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:00:11.397Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:00:26.456Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:00:41.554Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:00:56.638Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:01:11.734Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:01:26.817Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:01:41.893Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:01:56.969Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:02:12.043Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:02:27.158Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:02:42.239Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:02:57.294Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:03:12.367Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:03:27.460Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:03:42.522Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:03:57.610Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:04:12.715Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:04:27.788Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:04:42.865Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:04:57.942Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:05:13.016Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:05:28.091Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:05:43.172Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:05:58.248Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:06:13.335Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:06:28.406Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:06:43.480Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:06:58.550Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:07:13.613Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:07:28.691Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:07:43.753Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:07:58.824Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:08:13.904Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:08:28.971Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:08:44.065Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:08:59.124Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:09:14.209Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:09:29.288Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:09:44.373Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:09:59.451Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:10:14.520Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:10:29.582Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:10:44.654Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:10:59.734Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:11:14.818Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:11:29.897Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:11:44.992Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:12:00.088Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:12:15.177Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:12:30.261Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:12:45.349Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:13:00.425Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:13:15.493Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:13:30.557Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:13:45.637Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:14:00.781Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:14:15.860Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:14:30.929Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:14:46.006Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:15:01.069Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:15:16.163Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:15:31.240Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:15:46.303Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:16:01.378Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:16:16.451Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:16:31.529Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:16:46.594Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:17:01.658Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:17:16.750Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:17:31.823Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:17:46.894Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:18:01.980Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:18:17.058Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:18:32.142Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:18:47.221Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:19:02.289Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:19:17.368Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:19:32.446Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:19:47.514Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:20:02.621Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:20:17.684Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:20:32.768Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:20:47.845Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:21:02.936Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:21:18.020Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:21:33.099Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:21:48.169Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:22:03.227Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:22:18.321Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:22:33.392Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:22:48.466Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:23:03.532Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:23:18.607Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:23:33.680Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:23:48.743Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:24:03.847Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:24:18.935Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:24:34.009Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:24:49.057Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:25:04.138Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:25:19.235Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:25:34.315Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:25:49.383Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:26:04.461Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:26:19.548Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:26:34.679Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:26:49.756Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:27:04.832Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:27:19.908Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:27:34.985Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:27:50.050Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:28:05.120Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:28:20.202Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:28:35.286Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:28:50.353Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:29:05.420Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:29:20.493Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:29:35.574Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:29:50.655Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:30:05.738Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:30:20.813Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:30:35.873Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:30:50.944Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:31:06.024Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:31:21.111Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:31:36.188Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:31:51.268Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:32:06.343Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:32:21.414Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:32:36.479Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:32:51.564Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:33:06.639Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:33:21.714Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:33:36.786Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:33:51.859Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:34:06.938Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:34:22.059Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:34:37.169Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:34:52.242Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:35:07.324Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:35:22.401Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:35:37.465Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:35:52.535Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:36:07.602Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:36:22.680Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:36:37.733Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:36:52.809Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:37:07.888Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:37:22.969Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:37:38.008Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:37:53.078Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:38:08.154Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:38:23.224Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:38:38.297Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:38:53.364Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:39:08.437Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:39:23.512Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:39:38.577Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:39:53.638Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:40:08.724Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:40:23.793Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:40:38.871Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:40:53.951Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:41:09.043Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:41:24.115Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:41:39.201Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:41:54.275Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:42:09.355Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:42:24.432Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:42:39.488Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:42:54.551Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:43:09.611Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:43:24.663Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:43:39.752Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:43:54.843Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:44:09.913Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:44:24.991Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:44:40.055Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:44:55.141Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:45:10.227Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:45:25.297Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:45:40.381Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-12T23:45:55.457Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:01:56.823Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:02:11.890Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:02:26.967Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:02:42.035Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:02:57.103Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:03:12.174Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:03:27.252Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:03:42.331Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:03:57.439Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:04:12.518Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:04:27.727Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:04:42.810Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:04:57.880Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:05:12.939Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:05:28.091Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:05:43.180Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:05:58.307Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:06:13.375Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:06:28.436Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:06:43.515Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T01:06:58.579Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2

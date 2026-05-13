@@ -1,7 +1,7 @@
 # Atellier Studio — Current State and Next Steps
 
-> **2026-05-11 — P1–P4 from the 2026-05-06 plan landed.**
-> The four post-keynote priorities (MCP server wrapper, Wiki Dream loop, multi-provider executors, Skills 2.0 alignment) are now in `feat/multi-provider-executors`. See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below for the punch list, and [`docs/roadmap.md`](roadmap.md) for the new candidates ("Now planning"). The original strategic reframe still applies; this file remains the long-form snapshot.
+> **2026-05-11 — P1–P4 and P2.b/P2.c landed.**
+> The four post-keynote priorities (MCP server wrapper, Wiki Dream loop, multi-provider executors, Skills 2.0 alignment) are now in `main`, and the follow-up Wiki Dream grounding + UI slices also landed. See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below for the punch list, and [`docs/roadmap.md`](roadmap.md) for the new candidates ("Now planning"). The original strategic reframe still applies; this file remains the long-form snapshot.
 
 This document captures the product/architecture review after the initial Atellier Studio implementation. It is intended for future Codex sessions so they understand what has already been built, what still matches the original vision, and what should happen next.
 
@@ -52,7 +52,7 @@ The documentation/memory cleanup recommended below has started:
 
 The immediate implementation priority is **MCP server wrapper + Wiki Dream loop + Anthropic executor mode** — see the iteration plan for scope. Codex Worker evidence pass moved to P5.
 
-> Update 2026-05-11: the above three priorities (plus P4 Skills 2.0 audit) all landed on `feat/multi-provider-executors`. The next candidate is **P2.b — grounding the Wiki Dream** (pre-load `/wiki/lint` output + real path listing into the curator's context). See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below.
+> Update 2026-05-11: the above three priorities (plus P4 Skills 2.0 audit) all landed. **P2.b — grounding the Wiki Dream** now pre-loads `/wiki/lint` output + real path listing into the curator's audit context, and **P2.c — Wiki Dream UI surface** is available in the Wiki panel. See [§ 2026-05-10/11 P1–P4 landed](#2026-05-1011-p1p4-landed) below.
 
 ## 2026-05-10/11 P1–P4 landed
 
@@ -63,7 +63,7 @@ All four priorities from `docs/next-iteration-plan-2026-05-06.md` shipped on `fe
 - **P3 — Multi-provider executors.** Refactored `OpenAiAgentExecutorService` into `OpenAiCompatibleAgentExecutorService` and added Groq (free cloud tier) + Ollama (local, no key). Anthropic landed in P3.a/b with prompt caching (`cache_control: ephemeral` on the system prompt). The live smoke test driver (`apps/api/src/test/live-flow.ts`) is now provider-agnostic — reads `/health` and refuses to run against `mock`. **P3.c** also shipped: per-agent-role routing for Ollama (`OLLAMA_MODEL_<ROLE>`), so Builder can use `qwen2.5-coder:7b` while PM / QA / Wiki Curator stay on `llama3.1:8b`.
 - **P4 — Skills 2.0 alignment.** Audit landed in `docs/skills.md`: the eight existing skills under `.agents/skills/` already satisfy Skills 2.0 minimum (folder + `SKILL.md` with `name` / `description` frontmatter). No migration required; optional enhancements (`allowed-tools`, `scripts/`, `references/`, `templates/`) documented but deliberately not adopted yet.
 
-Open observation from the validation: the dream loop runs cleanly with llama3.1:8b but the curator alucinates page paths because the skill does not pre-load real wiki state into the prompt. **P2.b — grounding** addresses this next: pre-load `POST /wiki/lint` output and a fresh listing of `atelier/wiki/*` into the `audit` step's context. Skill structure stays untouched; only the orchestration call site grows.
+Open observation from the validation: the dream loop ran cleanly with llama3.1:8b but the curator hallucinated page paths because the skill did not pre-load real wiki state into the prompt. **P2.b — grounding** now addresses this by injecting `wiki.lint()` output and a fresh listing of `atelier/wiki/*` into the `audit` step's context. Skill structure stayed untouched; only the orchestration call site grew.
 
 ## 2026-05-06 strategic reframe
 

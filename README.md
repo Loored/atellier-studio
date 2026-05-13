@@ -6,21 +6,26 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + Codex Worker control-plane + Review Memory Capture.
+Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Review Memory Capture. Next direction: a local Knowledge Graph that visualizes the operational memory agents are building.
 
 Implemented:
 
 - Local MongoDB and in-memory storage mode for tests
 - Fastify API with thin routes and service-owned business logic
 - React dashboard on Tailwind CSS v4 (only `MobileView.tsx` still on legacy CSS)
-- Skill-triggered agent orchestration (`atellier-build-loop`, `llm-wiki-ingest-loop`)
+- Skill-triggered agent orchestration (`atellier-build-loop`, `llm-wiki-ingest-loop`, `wiki-dream-loop`)
 - Agent run logs, handoffs, circular-handoff and depth guards
 - Deliverable generation, preview, promotion, unlink, and review states
 - Markdown wiki index, log, deliverables index, and synthesis pages
 - Wiki Brain MVP: deterministic `POST /wiki/ingest`, `POST /wiki/query`, `POST /wiki/lint`, safe `POST /wiki/page`
 - Wiki query surfaces related pages and possible contradictions
+- Wiki Dream audit grounding: curator receives real lint findings and current wiki paths before proposing maintenance
+- Wiki Dream UI: trigger dream runs, preview reports, and save approved reports under `wiki/dreams`
 - Review memory capture: `POST /runs/:id/capture-memory` writes durable `wiki/synthesis/` pages
+- MCP server package (`apps/mcp-server`) exposes the local REST API as stdio tools for Claude Code / Cowork
+- Multi-provider agent executors: mock, OpenAI, Anthropic, Groq, and Ollama with Ollama role overrides
 - Codex Worker control-plane: create / plan / approve-step / execute-next / cancel / retry-step / finalize, with persisted per-step evidence artifacts
+- Knowledge Graph MVP: shared graph types, read-only `GET /knowledge/graph`, and Graph view over agents, roles, tasks, runs, wiki pages, deliverables, and lint issues
 - Agent grounding validation: builder/QA responses are checked against verified repo files; review approval is blocked on validation errors
 - Executor/model safety: `/health` exposes `executorMode`, `executorModel`, `modelProfile`; UI badge + warnings before OpenAI-backed runs
 - Focused API and web tests (no real OpenAI/Codex calls in tests)
@@ -95,7 +100,7 @@ pnpm --filter @atellier/web dev
 
 The API defaults to `http://127.0.0.1:4000`.
 The web app defaults to Vite's local dev URL.
-Agent execution runs in real OpenAI mode by default for local runtime. You must provide `OPENAI_API_KEY`, or explicitly opt into mock mode with `AGENT_EXECUTOR_MODE=mock`.
+Agent execution defaults to `mock` unless you explicitly set `AGENT_EXECUTOR_MODE` or provide an `OPENAI_API_KEY` without an explicit mode.
 
 The API CORS default is intentionally local-first: browser origins on `localhost`, `127.0.0.1`, and `::1` are allowed for local development, while arbitrary remote origins are not reflected.
 The API listen host also defaults to `127.0.0.1`; set `API_HOST=0.0.0.0` only when you intentionally want LAN exposure.
@@ -124,6 +129,8 @@ pnpm build
 - `atelier/tasks`: markdown task views
 - `atelier/runs`: execution history
 
+Generated deliverables whose filenames start with ObjectIds or UUIDs are treated as local artifacts by default. Durable knowledge should be promoted into curated wiki pages and logs; see [docs/memory-artifact-hygiene.md](docs/memory-artifact-hygiene.md).
+
 ## Agent Orchestration
 
 The dashboard includes an Orchestration panel backed by:
@@ -131,7 +138,7 @@ The dashboard includes an Orchestration panel backed by:
 - `GET /orchestrations/skills`
 - `POST /orchestrations/skills/:skillId/run`
 
-Current skills are `atellier-build-loop` and `llm-wiki-ingest-loop`. They use the existing local agent/run/wiki spine and do not yet execute external Codex workers or MCP tools.
+Current skills are `atellier-build-loop`, `llm-wiki-ingest-loop`, and `wiki-dream-loop`. They use the existing local agent/run/wiki spine and do not yet execute external Codex workers or MCP tools.
 
 ## Codex Workflow
 
@@ -152,14 +159,15 @@ pnpm codex:wiki-lint
 
 ## Next Work
 
-Active plan: [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
+Active plan: [`docs/roadmap.md`](docs/roadmap.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-1. **MCP server wrapper** over the REST API: expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get` as MCP tools. Local-only auth. Targeted at Cowork + Claude Code.
-2. **Wiki Dream loop**: scheduled `wiki-curator` that prunes stale, resolves contradictions via `/wiki/lint`, links orphans, and reorganizes the index. v1 produces *proposed* changes the operator approves.
-3. **Anthropic executor mode** (`AGENT_EXECUTOR_MODE=anthropic`): Opus 4.7 default, native prompt caching, `/health` exposes new mode/model.
-4. **Skills 2.0 alignment**: audit `.agents/skills/` against the new format and migrate `atellier-build-loop` and `llm-wiki-ingest-loop` if compatible.
-5. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata. No real Codex CLI integration yet.
+1. **Memory artifact hygiene**: curate generated run/deliverable files so durable wiki memory stays readable and publishable.
+2. **Graph visual QA and curation polish**: inspect the new graph view against real local data, improve layout/readability, and add richer wiki link extraction.
+3. **Dream report review trail + graph curation**: record accepted/rejected/deferred dream proposals and feed those decisions back into graph links and follow-up tasks.
+4. **Role memory**: curate what Builder, QA, Wiki Curator, PM, and other roles learn over time.
+5. **Per-run executor override**: evaluate whether Settings/UI should choose mock/OpenAI/Anthropic/Groq/Ollama per run or stay env-driven.
+6. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata. No real Codex CLI integration yet.
 
-Auth, cloud deploy, multiplayer, vector search, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
+Auth, cloud deploy, multiplayer, vector search, graph DB, external meeting/chat/drive integrations, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
 
-Read `CODEX_MEMORY.md`, `docs/next-iteration-plan-2026-05-06.md`, `docs/roadmap.md`, and `docs/current-state-and-next-steps.md` before starting an implementation pass.
+Read `CODEX_MEMORY.md`, `docs/next-iteration-plan-2026-05-06.md`, `docs/roadmap.md`, `docs/memory-artifact-hygiene.md`, `docs/knowledge-graph.md`, and `docs/current-state-and-next-steps.md` before starting an implementation pass.

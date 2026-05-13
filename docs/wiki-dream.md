@@ -2,7 +2,7 @@
 
 A periodic curator pass over the Atellier wiki. Surfaces lint issues, stale pages, contradictions, and orphan notes; produces a **dream report** of *proposed* changes that the operator approves before any other wiki page is touched.
 
-Status: **P2 — first cut live**. Implemented as the orchestration skill `wiki-dream-loop` so it reuses the existing run/orchestration/agent machinery and is triggerable from the REST API, the MCP server, or any scheduler that can hit either.
+Status: **P2.c — grounded UI loop live**. Implemented as the orchestration skill `wiki-dream-loop` so it reuses the existing run/orchestration/agent machinery and is triggerable from the REST API, the MCP server, the Wiki panel, or any scheduler that can hit either. The audit step now receives a real grounding block from the backend: latest wiki lint output plus the current `atelier/wiki/**/*.md` path listing.
 
 ## What it does (and what it does NOT)
 
@@ -14,6 +14,27 @@ Status: **P2 — first cut live**. Implemented as the orchestration skill `wiki-
 | Optionally proposes a tracked task if the changes are non-trivial | Open tasks automatically — the PM agent only proposes |
 
 The dream loop is intentionally **read-only at the LLM layer**. The operator (or an MCP client acting on their behalf) decides whether to save the report via `wiki_page_write` and whether to act on each proposal.
+
+## Grounding
+
+Before the `audit` step runs, the API injects a `Wiki Dream Grounding` section into the agent context. It includes:
+
+- `wiki.lint()` result, including issue code, path, message, and suggestion
+- the fresh list of real markdown pages under `atelier/wiki`
+- an explicit instruction to use only listed paths and mark unlisted pages as unverified
+
+This keeps the curator from inventing wiki paths during dream reports while preserving the no-silent-writes rule.
+
+## Wiki UI
+
+The Wiki panel includes:
+
+- `Dream now` to start `wiki-dream-loop`
+- live parent/draft run status
+- inline preview of the `draft-report` output
+- `Save report` to persist the approved report through `POST /wiki/page`
+
+Reports are saved under `wiki/dreams/*.md`, which is now part of the safe write allowlist.
 
 ## Steps
 
@@ -84,7 +105,6 @@ Whatever cadence you pick, **do not auto-apply** the proposals. The dream loop i
 
 ## Out of scope (intentional, deferred)
 
-- **Wiki view UI button.** A "Dream now" button in the Wiki view would be nice; not needed for v1 because manual trigger via curl/MCP is enough for the operator workflow.
 - **Auto-persist the report.** Could be a `postRunCallback` registered on the skill; deliberate kept manual to enforce the approval pattern.
-- **Resolved-contradictions tracking.** When the operator applies a proposed change, we don't yet record that the proposal was acted on. Track in P2.b.
+- **Resolved-contradictions tracking.** When the operator applies a proposed change, we don't yet record that the proposal was acted on. Track in a future report-review slice.
 - **Dream-of-dreams.** Reflective passes over previous reports to detect repeated proposals (signal the audit instruction is too aggressive). Future.
