@@ -1,4 +1,4 @@
-import { BookOpenText, Loader2 } from "lucide-react";
+import { BookOpenText, Loader2, Save, Sparkles } from "lucide-react";
 import { useWikiPanel } from "../hooks/useWikiPanel";
 
 export function WikiPanel() {
@@ -31,6 +31,19 @@ export function WikiPanel() {
     lintIssues,
     lintSummary,
     lintCheckedAt,
+    dreamRunId,
+    dreamStatus,
+    dreamDraftRunId,
+    dreamReportContent,
+    dreamSuggestedPath,
+    dreamActionError,
+    lastSavedDreamPath,
+    isDreamRunning,
+    isFetchingRuns,
+    isStartingDream,
+    isSavingDreamReport,
+    canRunDream,
+    canSaveDreamReport,
     canRunIngest,
     canRunQuery,
     canWritePage,
@@ -45,6 +58,8 @@ export function WikiPanel() {
     submitQuery,
     promoteQueryMatchToDraft,
     runLint,
+    runDream,
+    saveDreamReport,
     submitWritePage,
   } = useWikiPanel();
 
@@ -80,6 +95,67 @@ export function WikiPanel() {
       </pre>
 
       <div className="mt-3.5 grid gap-2.5">
+        <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-1.5">Dream</p>
+              <p className="m-0 text-[0.78rem] text-ink-muted">
+                {dreamStatus?.status
+                  ? `Run ${dreamStatus.status}${dreamDraftRunId ? ` · report ${dreamDraftRunId}` : ""}`
+                  : "No active dream"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void runDream()}
+              disabled={!canRunDream}
+              className="inline-flex items-center gap-1.5 border-purple/35 text-purple bg-purple/10 hover:bg-purple/20"
+            >
+              {isStartingDream || isDreamRunning ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+              <span>{isStartingDream || isDreamRunning ? "Dreaming..." : "Dream now"}</span>
+            </button>
+          </div>
+
+          {dreamRunId ? (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[0.74rem] text-ink-muted">
+              <p className="m-0">Parent: {dreamRunId}</p>
+              <p className="m-0">Runs: {isFetchingRuns ? "refreshing" : "current"}</p>
+            </div>
+          ) : null}
+
+          {dreamReportContent ? (
+            <div className="mt-2">
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <p className="m-0 text-[0.74rem] text-ink-muted">Report path: {dreamSuggestedPath}</p>
+                <button
+                  type="button"
+                  onClick={() => void saveDreamReport()}
+                  disabled={!canSaveDreamReport}
+                  className="inline-flex items-center gap-1.5 min-h-7 px-2.5 border-teal/35 text-teal bg-teal/10 hover:bg-teal/20 text-[0.74rem]"
+                >
+                  <Save size={13} />
+                  <span>{isSavingDreamReport ? "Saving..." : "Save report"}</span>
+                </button>
+              </div>
+              <pre
+                className="max-h-40 overflow-auto border border-[var(--border-card)] rounded-md p-2 text-[0.72rem] text-ink-muted bg-black/25 whitespace-pre-wrap"
+                aria-label="Wiki dream report preview"
+              >
+                {dreamReportContent}
+              </pre>
+            </div>
+          ) : dreamStatus?.status === "completed" ? (
+            <p className="mt-2 text-[0.74rem] text-ink-faint">Report is still loading.</p>
+          ) : null}
+
+          {lastSavedDreamPath ? (
+            <p className="mt-2 text-[0.74rem] text-ink-muted">Saved: {lastSavedDreamPath}</p>
+          ) : null}
+          {dreamActionError ? (
+            <p className="mt-2 text-[0.74rem] text-orange" role="alert">{dreamActionError}</p>
+          ) : null}
+        </section>
+
         <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
           <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-2">Ingest</p>
           <label className="block text-[0.74rem] text-ink-muted mb-1" htmlFor="wiki-ingest-title">Title</label>

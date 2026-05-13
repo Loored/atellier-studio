@@ -1,4 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import type { Run } from "@atellier/shared";
+import {
+  useOrchestrationStatusApi,
+  useStartSkillOrchestrationApi,
+} from "../../../api/hooks/orchestrations/useOrchestrationsApi";
+import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
+import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
   useAppendWikiLogApi,
   useWikiIndexApi,
@@ -9,8 +17,13 @@ import {
   useWikiQueryApi,
   useWikiWritePageApi,
 } from "../../../api/hooks/wiki/useWikiApi";
+import { queryKeys } from "../../../api/query/queryKeys";
+
+const DREAM_GOAL = "Periodic curator pass — propose wiki maintenance but apply nothing.";
+const DREAM_CONTEXT = "Triggered from the Wiki view. Save only the report after explicit operator approval.";
 
 export function useWikiPanel() {
+  const queryClient = useQueryClient();
   const [ingestTitle, setIngestTitle] = useState("");
   const [ingestContent, setIngestContent] = useState("");
   const [ingestSourceType, setIngestSourceType] = useState<"note" | "research" | "client" | "decision" | "other">("note");
@@ -21,7 +34,21 @@ export function useWikiPanel() {
   const [queryDraftOriginPath, setQueryDraftOriginPath] = useState<string | null>(null);
   const [writePath, setWritePath] = useState("wiki/notes/my-note.md");
   const [writeContent, setWriteContent] = useState("");
+  const [dreamRunId, setDreamRunId] = useState<string | null>(null);
+  const [dreamActionError, setDreamActionError] = useState<string | null>(null);
+  const [lastSavedDreamPath, setLastSavedDreamPath] = useState<string | null>(null);
 
+  const { data: healthStatus } = useHealthApi();
+  const isMeteredDreamExecution =
+    healthStatus?.executorMode === "openai" ||
+    healthStatus?.executorMode === "anthropic" ||
+    healthStatus?.executorMode === "groq";
+  const dreamExecutorMode = healthStatus?.executorMode ?? "mock";
+  const dreamExecutorModel = healthStatus?.executorModel ?? "unknown";
+  const dreamModelProfile = healthStatus?.modelProfile ?? "standard";
+  const { data: runList = [], isFetching: isFetchingRuns } = useRunsApi();
+  const startDreamOrchestration = useStartSkillOrchestrationApi();
+  const { data: dreamStatus } = useOrchestrationStatusApi(dreamRunId);
   const {
     data: wikiIndex,
     isFetching: isFetchingWikiIndex,
@@ -48,11 +75,8 @@ export function useWikiPanel() {
     isPending: isLinting,
     data: lintResult,
   } = useWikiLintApi();
-  const {
-    mutateAsync: writeWikiPage,
-    isPending: isWritingWikiPage,
-    data: writeResult,
-  } = useWikiWritePageApi();
+  const writePageMutation = useWikiWritePageApi();
+  const dreamWritePageMutation = useWikiWritePageApi();
   const { mutateAsync: appendWikiLog } = useAppendWikiLogApi();
 
   const latestLog = wikiLog?.content
@@ -71,15 +95,85 @@ export function useWikiPanel() {
     writePath.trim().endsWith(".md") &&
     writePath.trim().length > 0 &&
     writeContent.trim().length > 0 &&
-    !isWritingWikiPage;
+    !writePageMutation.isPending;
   const lintIssues = lintResult?.issues ?? [];
   const lintCheckedAt = lintResult?.checkedAt ?? null;
+  const dreamDraftRunId = dreamStatus?.steps.find((step) => step.stepId === "draft-report")?.runId ?? null;
+  const dreamDraftRun = useMemo(
+    () => runList.find((run) => run.id === dreamDraftRunId) ?? null,
+    [dreamDraftRunId, runList],
+  );
+  const dreamReportContent = useMemo(() => extractRunResponse(dreamDraftRun), [dreamDraftRun]);
+  const dreamSuggestedPath = useMemo(() => {
+    return extractDreamPath(dreamReportContent) ?? `wiki/dreams/${new Date().toISOString().slice(0, 10)}-dream-report.md`;
+  }, [dreamReportContent]);
+  const isDreamRunning = Boolean(
+    dreamRunId &&
+    dreamStatus?.status !== "completed" &&
+    dreamStatus?.status !== "failed",
+  );
+  const canRunDream = !startDreamOrchestration.isPending && !isDreamRunning;
+  const canSaveDreamReport = Boolean(dreamReportContent && dreamSuggestedPath) && !dreamWritePageMutation.isPending;
   const lintSummary = useMemo(() => {
     if (!lintResult) {
       return "";
     }
     return lintResult.ok ? "No issues found." : `${lintIssues.length} issue(s) found.`;
   }, [lintIssues.length, lintResult]);
+
+  useEffect(() => {
+    if (dreamStatus?.status !== "completed" && dreamStatus?.status !== "failed") {
+      return;
+    }
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+    ]);
+  }, [dreamStatus?.status, queryClient]);
+
+  async function runDream(): Promise<void> {
+    setDreamActionError(null);
+    setLastSavedDreamPath(null);
+    if (!canRunDream) {
+      return;
+    }
+    if (isMeteredDreamExecution) {
+      const confirmed = window.confirm(
+        `${dreamExecutorMode.toUpperCase()} execution is active (${dreamExecutorModel}, ${dreamModelProfile}). Starting a wiki dream may consume API quota. Continue?`,
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    try {
+      const result = await startDreamOrchestration.mutateAsync({
+        skillId: "wiki-dream-loop",
+        goal: DREAM_GOAL,
+        context: DREAM_CONTEXT,
+      });
+      setDreamRunId(result.runId);
+    } catch (error) {
+      setDreamActionError(error instanceof Error ? error.message : "Failed to start wiki dream.");
+    }
+  }
+
+  async function saveDreamReport(): Promise<void> {
+    if (!canSaveDreamReport) {
+      return;
+    }
+    setDreamActionError(null);
+    try {
+      const result = await dreamWritePageMutation.mutateAsync({
+        path: dreamSuggestedPath,
+        content: dreamReportContent.trim(),
+      });
+      setLastSavedDreamPath(result.path);
+      setSelectedSummaryPath(result.path);
+    } catch (error) {
+      setDreamActionError(error instanceof Error ? error.message : "Failed to save dream report.");
+    }
+  }
 
   async function submitIngest(): Promise<void> {
     if (!canRunIngest) {
@@ -226,7 +320,7 @@ export function useWikiPanel() {
 
   async function submitWritePage(): Promise<void> {
     if (!canWritePage) return;
-    const result = await writeWikiPage({
+    const result = await writePageMutation.mutateAsync({
       path: writePath.trim(),
       content: writeContent.trim(),
     });
@@ -280,6 +374,19 @@ export function useWikiPanel() {
     lintIssues,
     lintCheckedAt,
     lintSummary,
+    dreamRunId,
+    dreamStatus,
+    dreamDraftRunId,
+    dreamReportContent,
+    dreamSuggestedPath,
+    dreamActionError,
+    lastSavedDreamPath,
+    isDreamRunning,
+    isFetchingRuns,
+    isStartingDream: startDreamOrchestration.isPending,
+    isSavingDreamReport: dreamWritePageMutation.isPending,
+    canRunDream,
+    canSaveDreamReport,
     canRunIngest,
     canRunQuery,
     canWritePage,
@@ -287,13 +394,28 @@ export function useWikiPanel() {
     writeContent,
     setWritePath,
     setWriteContent,
-    isWritingWikiPage,
-    writeResult,
+    isWritingWikiPage: writePageMutation.isPending,
+    writeResult: writePageMutation.data,
     submitIngest,
     selectIngestSummary,
     submitQuery,
     promoteQueryMatchToDraft,
     runLint,
+    runDream,
+    saveDreamReport,
     submitWritePage,
   };
+}
+
+function extractRunResponse(run: Run | null): string {
+  if (!run?.output || typeof run.output !== "object") {
+    return "";
+  }
+  const response = (run.output as { response?: unknown }).response;
+  return typeof response === "string" ? response : "";
+}
+
+function extractDreamPath(content: string): string | null {
+  const match = content.match(/wiki\/dreams\/[a-z0-9._/-]+\.md/i);
+  return match?.[0] ?? null;
 }
