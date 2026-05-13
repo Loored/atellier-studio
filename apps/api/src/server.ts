@@ -36,6 +36,7 @@ export type BuildServerOptions = {
   | "ollamaModelByRole"
   | "maxHandoffDepth"
   | "executionTimeoutMs"
+  | "seedDemoData"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
