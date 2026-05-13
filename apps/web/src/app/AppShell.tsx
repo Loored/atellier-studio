@@ -120,7 +120,7 @@ export function AppShell() {
         {view === "runs"      && <RunsView />}
         {view === "review"    && <ReviewView />}
         {view === "wiki"      && <WikiView />}
-        {view === "knowledge" && <KnowledgeGraphView />}
+        {view === "knowledge" && <KnowledgeGraphView onNavigate={setView} />}
         {view === "office"    && <OfficeView />}
         {view === "settings"  && <SettingsView />}
       </main>

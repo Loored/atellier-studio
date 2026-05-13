@@ -12,6 +12,7 @@ import { LayerBreakdown } from "./components/LayerBreakdown";
 import { LiveTimestamp } from "./components/LiveTimestamp";
 import { NodeTooltip } from "./components/NodeTooltip";
 import { SearchBar } from "./components/SearchBar";
+import { TimelineSlider } from "./components/TimelineSlider";
 import { cn } from "../../lib/cn";
 
 const NODE_COLORS: Record<KnowledgeGraphNodeType, string> = {
@@ -52,7 +53,13 @@ const LAYER_DOT: Record<KnowledgeLayer, string> = {
   meta: "#8b5cf6",
 };
 
-export function KnowledgeGraphView() {
+type View = "dashboard" | "agents" | "runs" | "review" | "wiki" | "knowledge" | "office" | "settings";
+
+type KnowledgeGraphViewProps = {
+  onNavigate?: (view: View) => void;
+};
+
+export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {}) {
   const {
     knowledgeGraph,
     filteredNodes,
@@ -80,6 +87,9 @@ export function KnowledgeGraphView() {
     setSearchQuery,
     searchMatches,
     matchedNodeIds,
+    timelineCursor,
+    setTimelineCursor,
+    nodeTimestamps,
   } = useKnowledgeGraphPanel();
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -150,7 +160,18 @@ export function KnowledgeGraphView() {
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
           <p className="eyebrow">Memory</p>
-          <h1 className="text-[2rem] font-extrabold leading-none text-ink">Knowledge Graph</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[2rem] font-extrabold leading-none text-ink">Knowledge Graph</h1>
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate("office")}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-ink-muted hover:bg-white/10"
+              >
+                ← Volver a Oficina
+              </button>
+            )}
+          </div>
           <p className="mt-2 max-w-2xl text-sm text-ink-muted">
             Red viva del sistema, sus relaciones y los puntos donde hace falta curación.
           </p>
@@ -226,20 +247,27 @@ export function KnowledgeGraphView() {
           );
         })}
 
-        <div className="ml-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/30 p-0.5">
-          {DENSITY_MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setDensityMode(mode)}
-              className={cn(
-                "rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wide",
-                densityMode === mode ? "bg-white/15 text-ink" : "text-ink-faint hover:text-ink-muted",
-              )}
-            >
-              {mode}
-            </button>
-          ))}
+        <div className="ml-auto flex items-center gap-2">
+          <TimelineSlider
+            timestamps={nodeTimestamps}
+            value={timelineCursor}
+            onChange={setTimelineCursor}
+          />
+          <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 p-0.5">
+            {DENSITY_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setDensityMode(mode)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wide",
+                  densityMode === mode ? "bg-white/15 text-ink" : "text-ink-faint hover:text-ink-muted",
+                )}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -72,6 +72,7 @@ export function useKnowledgeGraphPanel() {
   });
   const [selectedNodeId, setSelectedNodeId] = useUrlNullable<string>("selected");
   const [searchQuery, setSearchQuery] = useState("");
+  const [timelineCursor, setTimelineCursor] = useState<number | null>(null);
 
   const {
     data: knowledgeGraph,
@@ -107,9 +108,18 @@ export function useKnowledgeGraphPanel() {
       const matchesType = nodeTypeFilter === ALL_NODE_TYPES || node.type === nodeTypeFilter;
       const matchesQuality = qualityFilter === ALL_QUALITIES || node.quality === qualityFilter;
       const matchesLayer = activeLayers.has(layerForNode(node));
-      return matchesType && matchesQuality && matchesLayer;
+      const matchesTimeline =
+        timelineCursor === null ||
+        !node.updatedAt ||
+        Date.parse(node.updatedAt) <= timelineCursor;
+      return matchesType && matchesQuality && matchesLayer && matchesTimeline;
     });
-  }, [knowledgeGraph?.nodes, nodeTypeFilter, qualityFilter, activeLayers]);
+  }, [knowledgeGraph?.nodes, nodeTypeFilter, qualityFilter, activeLayers, timelineCursor]);
+
+  const nodeTimestamps = useMemo(
+    () => (knowledgeGraph?.nodes ?? []).map((n) => n.updatedAt).filter((t): t is string => Boolean(t)),
+    [knowledgeGraph?.nodes],
+  );
 
   const visibleNodeIds = useMemo(() => new Set(filteredNodes.map((node) => node.id)), [filteredNodes]);
 
@@ -189,5 +199,8 @@ export function useKnowledgeGraphPanel() {
     setSearchQuery,
     searchMatches,
     matchedNodeIds,
+    timelineCursor,
+    setTimelineCursor,
+    nodeTimestamps,
   };
 }

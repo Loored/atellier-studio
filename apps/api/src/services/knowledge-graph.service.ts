@@ -1,3 +1,5 @@
+import { stat } from "node:fs/promises";
+import * as path from "node:path";
 import type {
   Agent,
   KnowledgeGraphEdge,
@@ -42,7 +44,19 @@ export class KnowledgeGraphService {
     private readonly tasks: TaskService,
     private readonly runs: RunService,
     private readonly wiki: WikiService,
+    private readonly atelierRoot?: string,
   ) {}
+
+  private async fileMtime(relativePath: string): Promise<string | undefined> {
+    if (!this.atelierRoot) return undefined;
+    try {
+      const absolute = path.resolve(this.atelierRoot, relativePath);
+      const stats = await stat(absolute);
+      return stats.mtime.toISOString();
+    } catch {
+      return undefined;
+    }
+  }
 
   async buildGraph(): Promise<KnowledgeGraphResponse> {
     const [agents, tasks, runs, wikiPaths, rawPaths, runtimePaths, lint] = await Promise.all([
@@ -155,6 +169,7 @@ export class KnowledgeGraphService {
 
     const curatedWikiPaths = wikiPaths.filter((wikiPath) => !this.isGeneratedMemoryArtifactPath(wikiPath));
     for (const wikiPath of curatedWikiPaths) {
+      const updatedAt = await this.fileMtime(wikiPath);
       this.addNode(nodes, {
         id: this.wikiPageNodeId(wikiPath),
         type: "wiki-page",
@@ -162,6 +177,7 @@ export class KnowledgeGraphService {
         label: this.labelFromPath(wikiPath),
         path: wikiPath,
         quality: "verified",
+        updatedAt,
       });
       const deliverableNodeId = this.deliverableNodeId(wikiPath);
       if (nodes.has(deliverableNodeId)) {
@@ -177,6 +193,7 @@ export class KnowledgeGraphService {
     }
 
     for (const rawPath of rawPaths) {
+      const updatedAt = await this.fileMtime(rawPath);
       this.addNode(nodes, {
         id: this.rawSourceNodeId(rawPath),
         type: "raw-source",
@@ -184,10 +201,12 @@ export class KnowledgeGraphService {
         label: this.labelFromPath(rawPath),
         path: rawPath,
         quality: "verified",
+        updatedAt,
       });
     }
 
     for (const runtimePath of runtimePaths) {
+      const updatedAt = await this.fileMtime(runtimePath);
       this.addNode(nodes, {
         id: this.runtimeLogNodeId(runtimePath),
         type: "runtime-log",
@@ -195,6 +214,7 @@ export class KnowledgeGraphService {
         label: this.labelFromPath(runtimePath),
         path: runtimePath,
         quality: "verified",
+        updatedAt,
       });
     }
 
