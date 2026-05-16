@@ -39,6 +39,7 @@ type ForceNode = {
   label: string;
   type: KnowledgeGraphNodeType;
   layer: KnowledgeGraphLayer;
+  role?: string;
   quality: string;
   x?: number;
   y?: number;
@@ -47,6 +48,7 @@ type ForceNode = {
 };
 
 type ForceLink = {
+  id: string;
   source: string;
   target: string;
   quality: string;
@@ -63,6 +65,8 @@ type Props = {
   height: number;
   recentlyAddedNodeIds?: Set<string>;
   matchedNodeIds?: Set<string>;
+  roleMemoryOverlayEnabled?: boolean;
+  roleMemoryByRole?: Map<string, { blocked: number; failed: number; pendingReview: number; focusCount: number }>;
 };
 
 export function ForceGraphCanvas({
@@ -76,6 +80,8 @@ export function ForceGraphCanvas({
   height,
   recentlyAddedNodeIds,
   matchedNodeIds,
+  roleMemoryOverlayEnabled = false,
+  roleMemoryByRole,
 }: Props) {
   const ref = useRef<ForceGraphMethods<ForceNode, ForceLink> | undefined>(undefined);
   const lastFocusedRef = useRef<string | null>(null);
@@ -91,9 +97,11 @@ export function ForceGraphCanvas({
         label: node.label,
         type: node.type,
         layer: node.layer,
+        role: node.role,
         quality: node.quality,
       })),
       links: edges.map<ForceLink>((edge) => ({
+        id: edge.id,
         source: edge.from,
         target: edge.to,
         quality: edge.quality,
@@ -101,6 +109,7 @@ export function ForceGraphCanvas({
     }),
     [nodes, edges],
   );
+  const performanceMode = data.nodes.length > 300;
 
   useEffect(() => {
     const fg = ref.current;
@@ -148,12 +157,13 @@ export function ForceGraphCanvas({
       } catch {
         /* positions not ready */
       }
-    }, 1200);
+    }, performanceMode ? 900 : 1200);
     return () => window.clearTimeout(id);
-  }, [density, data]);
+  }, [density, data, performanceMode]);
 
   useEffect(() => {
     if (!recentlyAddedNodeIds || recentlyAddedNodeIds.size === 0) return;
+    if (performanceMode) return;
     const fg = ref.current;
     if (!fg) return;
     const interval = window.setInterval(() => {
@@ -161,7 +171,7 @@ export function ForceGraphCanvas({
       maybeRefresh.refresh?.();
     }, 60);
     return () => window.clearInterval(interval);
-  }, [recentlyAddedNodeIds]);
+  }, [recentlyAddedNodeIds, performanceMode]);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -178,15 +188,38 @@ export function ForceGraphCanvas({
     lastFocusedRef.current = selectedNodeId;
   }, [selectedNodeId, data.nodes]);
 
+  const adjacencyMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const edge of edges) {
+      const fromSet = map.get(edge.from) ?? new Set<string>();
+      fromSet.add(edge.to);
+      map.set(edge.from, fromSet);
+      const toSet = map.get(edge.to) ?? new Set<string>();
+      toSet.add(edge.from);
+      map.set(edge.to, toSet);
+    }
+    return map;
+  }, [edges]);
+
   const neighbourIds = useMemo(() => {
     if (!selectedNodeId) return null;
     const set = new Set<string>([selectedNodeId]);
-    for (const edge of edges) {
-      if (edge.from === selectedNodeId) set.add(edge.to);
-      if (edge.to === selectedNodeId) set.add(edge.from);
+    for (const id of adjacencyMap.get(selectedNodeId) ?? []) {
+      set.add(id);
     }
     return set;
-  }, [edges, selectedNodeId]);
+  }, [adjacencyMap, selectedNodeId]);
+
+  const highlightedLinkIds = useMemo(() => {
+    if (!selectedNodeId) return null;
+    const set = new Set<string>();
+    for (const link of data.links) {
+      if (link.source === selectedNodeId || link.target === selectedNodeId) {
+        set.add(link.id);
+      }
+    }
+    return set;
+  }, [data.links, selectedNodeId]);
 
   return (
     <ForceGraph2D
@@ -195,22 +228,20 @@ export function ForceGraphCanvas({
       width={width}
       height={height}
       backgroundColor="rgba(8,11,24,0.95)"
-      cooldownTicks={200}
-      d3VelocityDecay={0.32}
+      cooldownTicks={performanceMode ? 120 : 200}
+      d3VelocityDecay={performanceMode ? 0.42 : 0.32}
       linkCurvature={0.18}
       linkColor={(link) => {
-        const source = typeof link.source === "object" ? (link.source as ForceNode).id : (link.source as string);
-        const target = typeof link.target === "object" ? (link.target as ForceNode).id : (link.target as string);
-        if (selectedNodeId && (source === selectedNodeId || target === selectedNodeId)) {
+        const id = (link as ForceLink).id;
+        if (selectedNodeId && highlightedLinkIds?.has(id)) {
           return "rgba(167,139,250,0.95)";
         }
         if (selectedNodeId) return "rgba(148,163,184,0.05)";
         return link.quality === "verified" ? "rgba(148,163,184,0.32)" : "rgba(250,189,79,0.4)";
       }}
       linkWidth={(link) => {
-        const source = typeof link.source === "object" ? (link.source as ForceNode).id : (link.source as string);
-        const target = typeof link.target === "object" ? (link.target as ForceNode).id : (link.target as string);
-        return selectedNodeId && (source === selectedNodeId || target === selectedNodeId) ? 1.8 : 0.6;
+        const id = (link as ForceLink).id;
+        return selectedNodeId && highlightedLinkIds?.has(id) ? 1.8 : 0.6;
       }}
       linkDirectionalParticles={(link) => {
         if (!selectedNodeId) return 0;
@@ -237,7 +268,7 @@ export function ForceGraphCanvas({
         const baseRadius = isSelected ? 7.5 : isMatched && hasSearch ? 5.5 : 4.5;
         const color = NODE_COLORS[n.type];
 
-        if (isProminent) {
+        if (isProminent && !performanceMode) {
           const gradient = ctx.createRadialGradient(nx as number, ny as number, 0, nx as number, ny as number, baseRadius * 3);
           gradient.addColorStop(0, `${color}55`);
           gradient.addColorStop(1, `${color}00`);
@@ -268,7 +299,27 @@ export function ForceGraphCanvas({
           ctx.stroke();
         }
 
-        if (recentlyAddedNodeIds?.has(n.id)) {
+        if (roleMemoryOverlayEnabled && (n.type === "role" || n.type === "agent")) {
+          const roleStats = n.type === "role"
+            ? roleMemoryByRole?.get(n.label)
+            : roleMemoryByRole?.get(n.role ?? "");
+          if (roleStats) {
+            const risk = roleStats.blocked + roleStats.failed;
+            const review = roleStats.pendingReview;
+            const badgeColor = risk > 0 ? "rgba(239,68,68,0.95)" : review > 0 ? "rgba(234,179,8,0.95)" : "rgba(16,185,129,0.95)";
+            ctx.beginPath();
+            ctx.arc((nx as number) + baseRadius + 1.5, (ny as number) - baseRadius - 1.5, 2.6, 0, Math.PI * 2, false);
+            ctx.fillStyle = badgeColor;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc((nx as number) + baseRadius + 1.5, (ny as number) - baseRadius - 1.5, 3.6, 0, Math.PI * 2, false);
+            ctx.strokeStyle = "rgba(8,11,24,0.95)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+
+        if (!performanceMode && recentlyAddedNodeIds?.has(n.id)) {
           const pulse = (Math.sin(Date.now() / 220) + 1) / 2;
           ctx.beginPath();
           ctx.arc(nx as number, ny as number, baseRadius + 5 + pulse * 5, 0, Math.PI * 2, false);
@@ -277,19 +328,21 @@ export function ForceGraphCanvas({
           ctx.stroke();
         }
 
-        const showLabelsAtScale = data.nodes.length > 200 ? 2.4 : 1.7;
+        const showLabelsAtScale = data.nodes.length > 200 ? (performanceMode ? 2.9 : 2.4) : 1.7;
         const labelVisible = isSelected || scale >= showLabelsAtScale || (selectedNodeId !== null && isNeighbour);
         if (labelVisible) {
           const fontSize = Math.max(9, 11 / Math.sqrt(scale));
           ctx.font = `${fontSize}px ui-sans-serif`;
           const text = n.label.length > 28 ? `${n.label.slice(0, 27)}…` : n.label;
-          const textWidth = ctx.measureText(text).width;
-          const padX = 4;
-          const padY = 2;
           const boxX = (nx as number) + baseRadius + 4;
-          const boxY = (ny as number) - fontSize / 2 - padY;
-          ctx.fillStyle = "rgba(8,11,24,0.75)";
-          ctx.fillRect(boxX - padX, boxY, textWidth + padX * 2, fontSize + padY * 2);
+          if (!performanceMode) {
+            const textWidth = ctx.measureText(text).width;
+            const padX = 4;
+            const padY = 2;
+            const boxY = (ny as number) - fontSize / 2 - padY;
+            ctx.fillStyle = "rgba(8,11,24,0.75)";
+            ctx.fillRect(boxX - padX, boxY, textWidth + padX * 2, fontSize + padY * 2);
+          }
           ctx.fillStyle = isNeighbour ? "#f1f5f9" : "rgba(241,245,249,0.45)";
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";

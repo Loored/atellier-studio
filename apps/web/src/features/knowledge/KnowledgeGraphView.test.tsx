@@ -22,6 +22,7 @@ vi.mock("./components/KnowledgeInspector", () => ({
 
 vi.mock("../../api/hooks/knowledge/useKnowledgeApi", () => ({
   useKnowledgeSnapshotsApi: vi.fn(() => ({ data: { snapshots: [] } })),
+  useKnowledgeSnapshotDiffApi: vi.fn(() => ({ data: null })),
 }));
 
 function makeNode(id: string, label: string, decision: "accepted" | "rejected" | "deferred"): KnowledgeGraphNode {
@@ -87,6 +88,7 @@ describe("KnowledgeGraphView", () => {
       dreamDecisionFilter: "all",
       setDreamDecisionFilter,
       dreamDecisionCounts: { accepted: 2, rejected: 1, deferred: 1 },
+      roleMemoryByRole: new Map(),
       filterPresets: [],
       selectedNodeAnnotation: null,
       selectedNode: null,

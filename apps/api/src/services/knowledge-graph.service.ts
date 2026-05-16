@@ -12,6 +12,9 @@ import type {
   KnowledgeGraphNodeType,
   KnowledgeGraphQualityState,
   KnowledgeGraphResponse,
+  KnowledgeGraphSnapshotDiffResponse,
+  RoleMemoryEntry,
+  RoleMemoryResponse,
   Run,
   Task,
 } from "@atellier/shared";
@@ -144,6 +147,40 @@ export class KnowledgeGraphService {
 
   getSnapshot(id: string): KnowledgeGraphResponse | null {
     return this.snapshots.find((snapshot) => snapshot.generatedAt === id) ?? null;
+  }
+
+  buildSnapshotDiff(baseId: string, headId: string): KnowledgeGraphSnapshotDiffResponse | null {
+    const base = this.getSnapshot(baseId);
+    const head = this.getSnapshot(headId);
+    if (!base || !head) return null;
+
+    const baseNodeIds = new Set(base.nodes.map((node) => node.id));
+    const headNodeIds = new Set(head.nodes.map((node) => node.id));
+    const addedNodeIds = [...headNodeIds].filter((id) => !baseNodeIds.has(id)).sort();
+    const removedNodeIds = [...baseNodeIds].filter((id) => !headNodeIds.has(id)).sort();
+
+    const baseEdgeIds = new Set(base.edges.map((edge) => edge.id));
+    const headEdgeIds = new Set(head.edges.map((edge) => edge.id));
+    const addedEdgeIds = [...headEdgeIds].filter((id) => !baseEdgeIds.has(id)).sort();
+    const removedEdgeIds = [...baseEdgeIds].filter((id) => !headEdgeIds.has(id)).sort();
+
+    return {
+      generatedAt: new Date().toISOString(),
+      baseId,
+      headId,
+      nodes: {
+        added: addedNodeIds.length,
+        removed: removedNodeIds.length,
+        addedNodeIds: addedNodeIds.slice(0, 25),
+        removedNodeIds: removedNodeIds.slice(0, 25),
+      },
+      edges: {
+        added: addedEdgeIds.length,
+        removed: removedEdgeIds.length,
+        addedEdgeIds: addedEdgeIds.slice(0, 25),
+        removedEdgeIds: removedEdgeIds.slice(0, 25),
+      },
+    };
   }
 
   private async recordSnapshot(response: KnowledgeGraphResponse): Promise<void> {
@@ -386,6 +423,62 @@ export class KnowledgeGraphService {
     };
     await this.recordSnapshot(response);
     return response;
+  }
+
+  async buildRoleMemory(): Promise<RoleMemoryResponse> {
+    const [agents, tasks, runs] = await Promise.all([this.agents.list(), this.tasks.list(), this.runs.list()]);
+    const generatedAt = new Date().toISOString();
+    const roles: RoleMemoryEntry[] = AGENT_ROLES.map((role) => {
+      const roleAgents = agents.filter((agent) => agent.role === role);
+      const roleAgentIds = new Set(roleAgents.map((agent) => agent.id));
+      const roleTasks = tasks.filter((task) => task.assignedAgentId && roleAgentIds.has(task.assignedAgentId));
+      const roleRuns = runs
+        .filter((run) => run.agentId && roleAgentIds.has(run.agentId))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const pendingReview = roleRuns.filter((run) => run.reviewStatus === "pending").length;
+      const blocked = roleRuns.filter((run) => run.status === "blocked").length;
+      const failed = roleRuns.filter((run) => run.status === "failed").length;
+      const completed = roleRuns.filter((run) => run.status === "completed").length;
+      const blockers = this.extractBlockerSignals(roleRuns);
+
+      const focus: string[] = [];
+      if (blocked + failed > 0) {
+        focus.push(`Address ${blocked + failed} blocked/failed run(s) before starting new work.`);
+      }
+      if (pendingReview > 0) {
+        focus.push(`Close ${pendingReview} pending review item(s) to keep delivery flow moving.`);
+      }
+      if (focus.length === 0) {
+        focus.push("No active friction detected. Keep cadence with small, verifiable run slices.");
+      }
+
+      return {
+        role,
+        agentIds: roleAgents.map((agent) => agent.id),
+        agentNames: roleAgents.map((agent) => agent.name),
+        stats: {
+          agents: roleAgents.length,
+          tasks: roleTasks.length,
+          runs: roleRuns.length,
+          completed,
+          blocked,
+          failed,
+          pendingReview,
+        },
+        recentRuns: roleRuns.slice(0, 5).map((run) => ({
+          runId: run.id,
+          type: run.type,
+          status: run.status,
+          reviewStatus: run.reviewStatus,
+          taskId: run.taskId,
+          updatedAt: run.updatedAt,
+        })),
+        blockers,
+        focus,
+      };
+    });
+
+    return { generatedAt, roles };
   }
 
   private async applyAnnotations(nodes: Map<string, KnowledgeGraphNode>): Promise<void> {
@@ -749,6 +842,25 @@ export class KnowledgeGraphService {
       /^wiki\/deliverables\/[0-9a-f]{24}-.*\.md$/.test(wikiPath) ||
       /^wiki\/deliverables\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-.*\.md$/.test(wikiPath)
     );
+  }
+
+  private extractBlockerSignals(runs: Run[]): string[] {
+    const scores = new Map<string, number>();
+    for (const run of runs) {
+      const runHasIssue = run.status === "blocked" || run.status === "failed";
+      for (const log of run.logs) {
+        const message = log.message.trim();
+        if (!message) continue;
+        const containsSignal = /block|error|fail|missing|timeout|permission|invalid|not found/i.test(message);
+        if (!containsSignal && !runHasIssue) continue;
+        const normalized = message.replace(/\s+/g, " ").slice(0, 160);
+        scores.set(normalized, (scores.get(normalized) ?? 0) + (runHasIssue ? 2 : 1));
+      }
+    }
+    return [...scores.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([message]) => message);
   }
 
   private roleNodeId(role: string): string {

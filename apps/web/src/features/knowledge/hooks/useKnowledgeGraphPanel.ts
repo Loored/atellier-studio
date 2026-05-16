@@ -16,6 +16,7 @@ import {
   useKnowledgeFilterPresetsApi,
   useKnowledgeGraphApi,
   useKnowledgeLiveUpdates,
+  useKnowledgeRoleMemoryApi,
   useSaveKnowledgeAnnotationApi,
 } from "../../../api/hooks/knowledge/useKnowledgeApi";
 import { useUrlNullable, useUrlSetState, useUrlState } from "./useUrlState";
@@ -98,6 +99,7 @@ export function useKnowledgeGraphPanel() {
   const { isKnowledgeLiveConnected } = useKnowledgeLiveUpdates();
   const { data: annotationsData } = useKnowledgeAnnotationsApi();
   const { data: filterPresetsData } = useKnowledgeFilterPresetsApi();
+  const { data: roleMemoryData } = useKnowledgeRoleMemoryApi();
   const saveAnnotationMutation = useSaveKnowledgeAnnotationApi();
   const createPresetMutation = useCreateKnowledgeFilterPresetApi();
 
@@ -214,6 +216,19 @@ export function useKnowledgeGraphPanel() {
     return counts;
   }, [knowledgeGraph?.nodes]);
 
+  const roleMemoryByRole = useMemo(() => {
+    const map = new Map<string, { blocked: number; failed: number; pendingReview: number; focusCount: number }>();
+    for (const roleEntry of roleMemoryData?.roles ?? []) {
+      map.set(roleEntry.role, {
+        blocked: roleEntry.stats.blocked,
+        failed: roleEntry.stats.failed,
+        pendingReview: roleEntry.stats.pendingReview,
+        focusCount: roleEntry.focus.length,
+      });
+    }
+    return map;
+  }, [roleMemoryData?.roles]);
+
   function toggleLayer(layer: KnowledgeLayer): void {
     const next = new Set(activeLayers);
     if (next.has(layer)) {
@@ -274,6 +289,7 @@ export function useKnowledgeGraphPanel() {
     dreamDecisionFilter,
     setDreamDecisionFilter,
     dreamDecisionCounts,
+    roleMemoryByRole,
     filterPresets: filterPresetsData?.presets ?? [],
     selectedNodeAnnotation,
     selectedNode,

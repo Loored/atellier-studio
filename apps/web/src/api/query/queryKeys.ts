@@ -38,6 +38,8 @@ export const queryKeys = {
   knowledge: {
     graph: [QUERY_KEYS.KNOWLEDGE, "graph"] as const,
     snapshots: [QUERY_KEYS.KNOWLEDGE, "snapshots"] as const,
+    diff: (baseId: string, headId: string) => [QUERY_KEYS.KNOWLEDGE, "diff", baseId, headId] as const,
+    roleMemory: [QUERY_KEYS.KNOWLEDGE, "role-memory"] as const,
     annotations: [QUERY_KEYS.KNOWLEDGE, "annotations"] as const,
     filterPresets: [QUERY_KEYS.KNOWLEDGE, "filter-presets"] as const,
   },

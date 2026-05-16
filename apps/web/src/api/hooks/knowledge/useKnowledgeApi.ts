@@ -5,10 +5,12 @@ import type {
   KnowledgeFilterPresetCreateInput,
   KnowledgeFilterPresetListResponse,
   KnowledgeGraphResponse,
+  KnowledgeGraphSnapshotDiffResponse,
   KnowledgeNodeAnnotation,
   KnowledgeNodeAnnotationListResponse,
   KnowledgeNodeAnnotationUpsertInput,
   KnowledgeGraphSnapshotListResponse,
+  RoleMemoryResponse,
 } from "@atellier/shared";
 import { queryKeys } from "../../query/queryKeys";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
@@ -28,6 +30,23 @@ export function useKnowledgeSnapshotsApi() {
   return useQueryInstance<KnowledgeGraphSnapshotListResponse>({
     queryKey: queryKeys.knowledge.snapshots,
     queryFn: knowledgeService.listSnapshots,
+    refetchInterval: false,
+  });
+}
+
+export function useKnowledgeSnapshotDiffApi(baseId: string | null, headId: string | null) {
+  return useQueryInstance<KnowledgeGraphSnapshotDiffResponse>({
+    queryKey: queryKeys.knowledge.diff(baseId ?? "", headId ?? ""),
+    queryFn: () => knowledgeService.readSnapshotDiff(baseId ?? "", headId ?? ""),
+    enabled: Boolean(baseId && headId),
+    refetchInterval: false,
+  });
+}
+
+export function useKnowledgeRoleMemoryApi() {
+  return useQueryInstance<RoleMemoryResponse>({
+    queryKey: queryKeys.knowledge.roleMemory,
+    queryFn: knowledgeService.readRoleMemory,
     refetchInterval: false,
   });
 }
@@ -113,6 +132,7 @@ export function useKnowledgeLiveUpdates() {
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.graph }),
         queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.snapshots }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.roleMemory }),
       ]);
     };
 
@@ -135,6 +155,7 @@ export function useKnowledgeLiveUpdates() {
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.graph }),
         queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.snapshots }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.roleMemory }),
       ]);
     }, 15_000);
     return () => window.clearInterval(intervalId);

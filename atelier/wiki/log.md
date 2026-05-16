@@ -1,5 +1,40 @@
 # Atellier Studio Wiki Log
 
+## [2026-05-16T04:25:00.000Z] manual | Role memory overlay added to graph canvas
+- Summary: Added toggleable role-memory overlay badges on role and agent nodes so risk/focus signals are visible directly in Knowledge Graph navigation.
+- runLog: atelier/runs/2026-05-15-role-memory-overlay-graph.md
+- area: apps/web/src/features/knowledge/components/ForceGraphCanvas.tsx
+
+## [2026-05-16T04:20:00.000Z] manual | Office sub-tabs now host Knowledge Graph
+- Summary: Added Office-local tabs so operators can switch between Pixel Office and embedded Knowledge Graph without leaving the Office surface.
+- runLog: atelier/runs/2026-05-15-office-subtabs-knowledge-graph.md
+- area: apps/web/src/features/pixel-office/OfficeView.tsx
+
+## [2026-05-16T04:15:00.000Z] manual | Knowledge Graph performance hardening shipped
+- Summary: Added automatic large-graph performance mode in ForceGraph canvas to reduce per-frame work, optimize edge/neighbor lookups, and preserve interaction quality for >300 nodes.
+- runLog: atelier/runs/2026-05-15-knowledge-graph-performance-hardening.md
+- area: apps/web/src/features/knowledge/components/ForceGraphCanvas.tsx
+
+## [2026-05-16T04:08:00.000Z] manual | Graph curation signals integrated into wiki lint
+- Summary: Extended `wiki/lint` to emit deterministic `curation_signal` issues from graph annotations and deferred/rejected Dream decisions, with de-duplication to keep lint output readable.
+- runLog: atelier/runs/2026-05-15-graph-curation-signals-in-lint.md
+- route: POST /wiki/lint
+
+## [2026-05-16T04:00:00.000Z] manual | Graph Snapshot Diff view shipped
+- Summary: Added snapshot-to-snapshot diff support across shared types, API route/service, frontend API chain, and Knowledge Graph UI with +/− node/edge deltas.
+- runLog: atelier/runs/2026-05-15-graph-snapshot-diff-view.md
+- route: GET /knowledge/graph/diff
+
+## [2026-05-16T03:52:00.000Z] manual | Role Memory v1 shipped
+- Summary: Added first per-role memory surface with API read model, shared contracts, frontend API chain, and Knowledge Inspector rendering for role nodes.
+- runLog: atelier/runs/2026-05-15-role-memory-v1.md
+- route: GET /knowledge/role-memory
+
+## [2026-05-16T03:46:00.000Z] manual | Memory hygiene review closed with clean wiki lint
+- Summary: Closed the pending memory artifact hygiene review by fixing missing `Raw path` metadata in two source pages and re-running wiki lint to zero issues.
+- runLog: atelier/runs/2026-05-15-memory-hygiene-review-closeout.md
+- lint: ok=true, issues=0
+
 ## [2026-05-13T00:00:00.000Z] decision | Dream decision trail and persisted graph snapshots landed
 - Summary: Added explicit Dream proposal decisions (`accepted/rejected/deferred`) with durable records under `wiki/decisions`, connected those decisions to Knowledge Graph nodes/edges, and persisted graph snapshots to disk so timeline history survives API restarts.
 - runLog: atelier/runs/2026-05-13-dream-decisions-and-persisted-snapshots.md
@@ -11692,3 +11727,155 @@
 ## [2026-05-13T04:19:48.331Z] wiki_lint | Wiki lint run
 - Summary: Found 2 issue(s).
 - issues: 2
+
+## [2026-05-16T03:44:46.677Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-16T03:45:26.788Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T03:54:47.991Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T03:55:03.001Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T03:55:17.980Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T03:55:32.969Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:00:07.019Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:00:22.120Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:00:37.017Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:00:52.312Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:01:07.225Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:01:22.226Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:01:37.229Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:01:56.670Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:02:56.627Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:03:56.572Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:04:56.625Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:05:56.621Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:06:24.109Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:06:37.000Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:06:51.990Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:07:07.064Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:28:00.000Z] run_log | Role memory focus filters in graph
+- Summary: Added role-memory quick focus modes (`all`, `high-risk`, `pending-review`) and focused subgraph projection in Knowledge Graph view.
+- run: `atelier/runs/2026-05-15-role-memory-focus-filters.md`
+
+## [2026-05-16T04:37:32.977Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:37:47.808Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:38:02.833Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:38:17.831Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:38:32.817Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:38:47.847Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:39:02.842Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:39:17.824Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:39:32.831Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:39:47.816Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:40:02.828Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:40:17.822Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:40:32.840Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:40:47.830Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-05-16T04:41:02.817Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0

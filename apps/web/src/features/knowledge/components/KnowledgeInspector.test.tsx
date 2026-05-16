@@ -12,6 +12,10 @@ vi.mock("../../../api/hooks/runs/useRunsApi", () => ({
   useRunsApi: vi.fn(() => ({ data: [] })),
 }));
 
+vi.mock("../../../api/hooks/knowledge/useKnowledgeApi", () => ({
+  useKnowledgeRoleMemoryApi: vi.fn(() => ({ data: { generatedAt: "2026-05-16T00:00:00.000Z", roles: [] } })),
+}));
+
 describe("KnowledgeInspector", () => {
   it("navigates to report wiki node from dream decision details", async () => {
     const user = userEvent.setup();

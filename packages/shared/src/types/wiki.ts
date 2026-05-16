@@ -90,7 +90,7 @@ export type WikiQueryResponse = {
 };
 
 export type WikiLintIssue = {
-  code: "missing_page" | "broken_link" | "stale_index_entry";
+  code: "missing_page" | "broken_link" | "stale_index_entry" | "curation_signal";
   path: string;
   message: string;
   suggestion?: string;

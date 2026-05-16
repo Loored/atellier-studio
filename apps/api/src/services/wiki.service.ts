@@ -41,6 +41,8 @@ const DEFAULT_LOG = `# Atellier Studio Wiki Log
 - Summary: Initial durable wiki log for Atellier Studio operational memory.
 `;
 
+const GRAPH_ANNOTATIONS_FILE = path.join("_runtime", "graph-annotations.json");
+
 export class WikiService {
   private readonly wikiRoot: string;
   private readonly atelierRootResolved: string;
@@ -376,6 +378,13 @@ export class WikiService {
   async lint(): Promise<WikiLintResponse> {
     await this.ensureWiki();
     const issues: WikiLintIssue[] = [];
+    const issueKeys = new Set<string>();
+    const addIssue = (issue: WikiLintIssue) => {
+      const key = `${issue.code}|${issue.path}|${issue.message}`;
+      if (issueKeys.has(key)) return;
+      issueKeys.add(key);
+      issues.push(issue);
+    };
     const indexContent = await readFile(this.indexPath, "utf8");
     const linkedPaths = Array.from(indexContent.matchAll(/\]\(\.\/([^)]+)\)/g)).map((m) => m[1]);
     const duplicateLinkedPaths = this.findDuplicates(linkedPaths);
@@ -385,7 +394,7 @@ export class WikiService {
       try {
         await stat(resolved);
       } catch {
-        issues.push({
+        addIssue({
           code: "missing_page",
           path: `wiki/${linkedPath.replace(/\\/g, "/")}`,
           message: "Linked page from wiki index does not exist.",
@@ -395,7 +404,7 @@ export class WikiService {
     }
 
     for (const duplicatePath of duplicateLinkedPaths) {
-      issues.push({
+      addIssue({
         code: "stale_index_entry",
         path: `wiki/${duplicatePath.replace(/\\/g, "/")}`,
         message: "Wiki index contains duplicate entries for the same path.",
@@ -410,7 +419,7 @@ export class WikiService {
       const rawPath = this.extractMetadata(sourceContent, "Raw path");
 
       if (!rawPath) {
-        issues.push({
+        addIssue({
           code: "stale_index_entry",
           path: sourceRelativePath,
           message: "Source summary is missing Raw path metadata.",
@@ -423,13 +432,33 @@ export class WikiService {
         const { resolved } = this.resolveAtelierPath(rawPath);
         await stat(resolved);
       } catch {
-        issues.push({
+        addIssue({
           code: "broken_link",
           path: sourceRelativePath,
           message: `Raw source reference is missing: ${rawPath}`,
           suggestion: "Fix the Raw path reference or restore the missing raw source.",
         });
       }
+    }
+
+    const annotationSignals = await this.readAnnotationSignals();
+    for (const signal of annotationSignals) {
+      addIssue({
+        code: "curation_signal",
+        path: signal.path,
+        message: signal.message,
+        suggestion: signal.suggestion,
+      });
+    }
+
+    const decisionSignals = await this.readDreamDecisionSignals();
+    for (const signal of decisionSignals) {
+      addIssue({
+        code: "curation_signal",
+        path: signal.path,
+        message: signal.message,
+        suggestion: signal.suggestion,
+      });
     }
 
     const checkedAt = new Date().toISOString();
@@ -898,5 +927,74 @@ export class WikiService {
       },
     });
     return [proposalLine];
+  }
+
+  private async readAnnotationSignals(): Promise<Array<{ path: string; message: string; suggestion: string }>> {
+    const annotationsPath = path.join(this.atelierRootResolved, GRAPH_ANNOTATIONS_FILE);
+    type AnnotationRecord = { nodeId?: unknown; note?: unknown; tags?: unknown };
+    let parsed: Record<string, AnnotationRecord> | null = null;
+    try {
+      parsed = JSON.parse(await readFile(annotationsPath, "utf8")) as Record<string, AnnotationRecord>;
+    } catch {
+      return [];
+    }
+    if (!parsed || typeof parsed !== "object") return [];
+
+    const signals: Array<{ path: string; message: string; suggestion: string }> = [];
+    for (const value of Object.values(parsed)) {
+      const nodeId = typeof value?.nodeId === "string" ? value.nodeId : null;
+      if (!nodeId || !nodeId.startsWith("wiki-page:")) continue;
+      const path = nodeId.slice("wiki-page:".length);
+      const note = typeof value?.note === "string" ? value.note.trim() : "";
+      const tagsRaw = Array.isArray(value?.tags) ? value.tags : [];
+      const tags = tagsRaw
+        .filter((tag): tag is string => typeof tag === "string")
+        .map((tag) => tag.trim().toLowerCase())
+        .filter((tag) => tag.length > 0);
+      const hasSignalTag = tags.some((tag) =>
+        tag.includes("stale") || tag.includes("orphan") || tag.includes("contradict") || tag.includes("needs-review"),
+      );
+      if (!hasSignalTag) continue;
+      const label = tags.join(", ");
+      signals.push({
+        path,
+        message: `Annotation marks this page for curation (${label}).${note ? ` Note: ${note.slice(0, 120)}` : ""}`,
+        suggestion: "Review this page in Knowledge Graph curation and resolve or confirm the signal.",
+      });
+    }
+
+    return signals;
+  }
+
+  private async readDreamDecisionSignals(): Promise<Array<{ path: string; message: string; suggestion: string }>> {
+    const decisionsRoot = path.join(this.wikiRoot, "decisions");
+    let files: string[] = [];
+    try {
+      files = await this.listMarkdownFiles(decisionsRoot);
+    } catch {
+      return [];
+    }
+
+    const signals: Array<{ path: string; message: string; suggestion: string }> = [];
+    for (const filePath of files) {
+      const content = await readFile(filePath, "utf8");
+      const decision = this.extractMetadata(content, "Decision")?.toLowerCase();
+      if (decision !== "deferred" && decision !== "rejected") continue;
+      const reportPath = this.extractMetadata(content, "Report path");
+      if (!reportPath) continue;
+      const proposal = this.extractSection(content, "Proposal");
+      signals.push({
+        path: reportPath,
+        message: `Dream decision is ${decision} for a proposal on this report.${proposal ? ` Proposal: ${proposal.slice(0, 120)}` : ""}`,
+        suggestion: "Revisit the deferred/rejected proposal and either resolve it or record the next decision.",
+      });
+    }
+    return signals;
+  }
+
+  private extractSection(content: string, sectionName: string): string | null {
+    const regex = new RegExp(`## ${sectionName}\\n\\n([\\s\\S]*?)(?:\\n## |$)`);
+    const section = content.match(regex)?.[1]?.trim();
+    return section && section.length > 0 ? section : null;
   }
 }

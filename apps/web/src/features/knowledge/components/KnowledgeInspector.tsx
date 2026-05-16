@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { marked } from "marked";
-import type { KnowledgeGraphEdge, KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeNodeAnnotation } from "@atellier/shared";
+import type {
+  KnowledgeGraphEdge,
+  KnowledgeGraphNode,
+  KnowledgeGraphNodeType,
+  KnowledgeNodeAnnotation,
+  RoleMemoryEntry,
+} from "@atellier/shared";
 import { useWikiPageApi } from "../../../api/hooks/wiki/useWikiApi";
 import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
+import { useKnowledgeRoleMemoryApi } from "../../../api/hooks/knowledge/useKnowledgeApi";
 import { cn } from "../../../lib/cn";
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -51,12 +58,17 @@ export function KnowledgeInspector({
       ? node?.path ?? null
       : null;
   const { data: page, isFetching: isFetchingPage } = useWikiPageApi(fetchablePath);
+  const { data: roleMemoryData } = useKnowledgeRoleMemoryApi();
 
   const { data: runs } = useRunsApi();
   const runDetail = useMemo(() => {
     if (node?.type !== "run" || !node.sourceId) return null;
     return runs?.find((r) => r.id === node.sourceId) ?? null;
   }, [runs, node]);
+  const selectedRoleMemory = useMemo((): RoleMemoryEntry | null => {
+    if (node?.type !== "role" || !node.role) return null;
+    return roleMemoryData?.roles.find((entry) => entry.role === node.role) ?? null;
+  }, [node, roleMemoryData?.roles]);
 
   const dreamDecision = node?.type === "dream-decision" ? String(node.metadata?.decision ?? "") : null;
   const dreamProposal = node?.type === "dream-decision" ? String(node.metadata?.proposal ?? "") : null;
@@ -251,6 +263,53 @@ export function KnowledgeInspector({
                     )}
                   </ol>
                 </div>
+              </div>
+            )}
+            {selectedRoleMemory && (
+              <div className="rounded border border-white/10 bg-black/25 p-2">
+                <p className="text-ink-faint">Role memory</p>
+                <p className="mt-1 text-ink-muted">
+                  Agents: {selectedRoleMemory.stats.agents} · Tasks: {selectedRoleMemory.stats.tasks} · Runs:{" "}
+                  {selectedRoleMemory.stats.runs}
+                </p>
+                <p className="mt-1 text-ink-muted">
+                  Completed: {selectedRoleMemory.stats.completed} · Blocked: {selectedRoleMemory.stats.blocked} ·
+                  Failed: {selectedRoleMemory.stats.failed} · Pending review: {selectedRoleMemory.stats.pendingReview}
+                </p>
+                {selectedRoleMemory.focus.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-ink-faint">Focus</p>
+                    <ul className="mt-1 space-y-1 text-ink-muted">
+                      {selectedRoleMemory.focus.map((item) => (
+                        <li key={item}>- {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedRoleMemory.blockers.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-ink-faint">Top blockers</p>
+                    <ul className="mt-1 space-y-1 text-ink-muted">
+                      {selectedRoleMemory.blockers.map((item) => (
+                        <li key={item}>- {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedRoleMemory.recentRuns.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-ink-faint">Recent runs</p>
+                    <ul className="mt-1 space-y-1 text-ink-muted">
+                      {selectedRoleMemory.recentRuns.map((run) => (
+                        <li key={run.runId}>
+                          {run.type} · {run.status}
+                          {run.reviewStatus ? ` · ${run.reviewStatus}` : ""} ·{" "}
+                          {new Date(run.updatedAt).toLocaleString()}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
