@@ -9,7 +9,7 @@ Tasks currently in progress.
   - Decide which generated artifacts should remain local-only or ignored.
   - Keep curated wiki memory readable before the next feature slice.
 
-- [ ] Memory artifact hygiene review
+- [x] Memory artifact hygiene review
   - Review existing untracked run logs and raw/source files.
   - Track meaningful human-readable run logs and curated sources.
   - Leave auto-generated deliverables local unless promoted into curated memory.
@@ -38,5 +38,35 @@ Tasks currently in progress.
   - Record accepted/rejected/deferred decisions for dream proposals.
   - Feed those decisions back into graph curation and follow-up tasks.
 
-- [ ] Role memory
+- [x] Role memory
   - Build curated per-role learning surfaces for recurring patterns, blockers, decisions, and handoff/cohesion issues.
+
+- [x] Graph snapshot diff view
+  - Compare two persisted graph snapshots.
+  - Expose +/− node and edge deltas.
+  - Surface the diff in Knowledge Graph UI for operational auditing.
+
+- [x] Graph curation signals in lint
+  - Feed annotation-based curation tags into `wiki/lint`.
+  - Feed deferred/rejected dream decisions into `wiki/lint`.
+  - Keep lint output explicit and deterministic for operator review.
+
+- [x] Knowledge graph performance hardening (>300 nodes)
+  - Reduce per-frame render work in canvas mode.
+  - Avoid high-cost visual effects on large graph states.
+  - Keep selection/navigation behavior intact while improving responsiveness.
+
+- [x] Office sub-tabs for graph context
+  - Add local tab switch between Office canvas and Knowledge Graph.
+  - Keep graph curation workflow accessible without global view switch.
+  - Preserve existing Office controls when returning to Office tab.
+
+- [x] Role memory overlay in graph canvas
+  - Expose role-memory signal map in knowledge panel state.
+  - Add overlay toggle in graph controls.
+  - Render role/agent risk badges from blocked/failed/pending-review counts.
+
+- [x] Role memory focus filters in graph
+  - Add quick focus modes for high-risk and pending-review role clusters.
+  - Project focused subgraphs from role/agent memory signals.
+  - Keep graph selection behavior coherent when focus mode changes.

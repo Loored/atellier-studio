@@ -3,6 +3,7 @@
 ## Source
 
 - Raw PDF: [2026-05-05-insights-karpathy-agentes-llm.pdf](../../raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf)
+- Raw path: raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf
 - Original local file: `/Users/e.juarez/Downloads/Insights_Karpathy_Agentes_LLM.pdf`
 - Extracted with temporary `pypdf` install because Poppler was not available locally.
 - Date captured: 2026-05-05
