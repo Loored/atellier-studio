@@ -7,7 +7,8 @@ Long history and setup details live in docs so this file stays small.
 
 - `AGENTS.md`
 - `docs/current-state-and-next-steps.md`
-- `docs/next-work-plan.md`
+- `docs/roadmap.md`
+- `docs/next-iteration-plan-2026-05-06.md`
 - `docs/history/implementation-log.md`
 - `docs/operations/local-setup.md`
 
@@ -96,17 +97,23 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 (force-directed map + inspector + search + sesión viva + time-travel + run timeline + Office↔Graph + mobile tab + snapshots) shipped 2026-05-13 across PRs #29-#32 on `dev/1.0.0`.
 
-1. **Dream report review trail and graph curation**: accepted/rejected/deferred decisions should improve graph links and follow-up tasks.
-2. **WebSocket live updates for graph** (replace 15s polling).
-3. **Role memory**: curated per-role learning surfaces for Builder, QA, Wiki Curator, PM, and other agents.
-4. **Graph annotations + filter presets** (operator notes/tags + saved filter sets).
-5. **Persisted snapshots** to disk so history survives API restarts.
-6. **Per-run executor override**: evaluate whether Settings/UI should choose mock/OpenAI/Anthropic/Groq/Ollama per run or stay env-driven.
-7. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata, no real Codex CLI yet.
+1. **Role memory**: curated per-role learning surfaces for Builder, QA, Wiki Curator, PM, and other agents.
+2. **Graph snapshot diff view**: compare two snapshots and expose +/− node/edge deltas in UI.
+3. **Knowledge graph performance pass (>300 nodes)**: sprite caching/WebGL toggle/neighbor calc profiling.
+4. **Role memory overlays in graph/inspector**: curated role learning surfaces linked to graph entities.
+5. **Codex Worker real executor adapter (future)**: keep current fake executor until controlled real execution integration.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-05-13 - Dream decision trail + persisted snapshots shipped
+
+- Wiki Dream proposals now support explicit `accepted/rejected/deferred` decisions through `POST /wiki/dream-decisions`.
+- Decisions persist as markdown pages under `wiki/decisions/`, append `decision` entries to `wiki/log`, and appear in the graph as `dream-decision` nodes with `dream_decision_for_report` edges.
+- Knowledge Graph snapshots now persist to `atelier/_runtime/graph-snapshots/*.json` (still ring-buffered at 48 and throttled 1/hour).
+- `KnowledgeGraphService.initialize()` loads persisted snapshots on server startup; API test coverage verifies snapshots survive restart.
+- Web UI now includes Dream decision actions in `WikiPanel`, decision filters/counts in Graph view, and report-path navigation from the inspector.
 
 ### 2026-05-13 - Knowledge Graph v2 shipped (PRs #29-#32)
 
@@ -127,6 +134,36 @@ Architecture choices to remember:
 - Inspector reads file content via the existing `/wiki/page?path=` endpoint for any textual atelier file.
 
 See `docs/knowledge-graph.md` for the full feature inventory and next candidates.
+
+### 2026-05-13 - Knowledge Graph live + curation loop shipped
+
+- Task 3 shipped: WebSocket live updates for Knowledge Graph with polling fallback in the frontend session hook.
+- Task 4 shipped: persisted graph annotations and saved filter presets with full frontend API chain + inspector curation UI.
+- Runtime persistence files added:
+  - `atelier/_runtime/graph-annotations.json`
+  - `atelier/_runtime/graph-filter-presets.json`
+- Validation passed post-integration:
+  - `pnpm --filter @atellier/web typecheck`
+  - `pnpm test:web`
+  - `pnpm --filter @atellier/api typecheck`
+  - `pnpm test:api`
+
+### 2026-05-13 - Per-run executor override shipped
+
+- Manual agent runs (`POST /agents/:id/run` and `/run/stream`) now accept optional `executorModeOverride`.
+- API validates override mode enum and availability in current API session.
+- Health payload now includes `availableExecutorModes`.
+- Agent-side composer in Office UI now exposes a per-run executor selector (default env mode + available overrides).
+- Handoff keeps the selected executor mode for continuity.
+
+### 2026-05-13 - Orchestration override + Codex evidence v1.1 shipped
+
+- Orchestration runs now support optional `executorModeOverride` end-to-end (route validation, service propagation, frontend selector).
+- Codex Worker evidence v1.1 now captures richer per-step/aggregate evidence:
+  - step `durationMs`
+  - artifact `byteSize`
+  - finalize counters for failed/blocked/artifact count/total duration.
+- Codex panel finalize now submits derived evidence lists and renders richer evidence summaries.
 
 ### 2026-05-12 - Knowledge Graph direction added
 

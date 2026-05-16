@@ -29,12 +29,12 @@ Tasks currently in progress.
   - Improve graph layout/readability after seeing real data.
   - Add richer wiki link extraction and dream proposal decision nodes.
 
-- [ ] Graph curation enrichment
+- [x] Graph curation enrichment
   - Add richer wiki page link extraction.
   - Add dream proposal decision nodes and edges.
   - Add role/agent/review/recency filters after real-data usage.
 
-- [ ] Dream report review trail
+- [x] Dream report review trail
   - Record accepted/rejected/deferred decisions for dream proposals.
   - Feed those decisions back into graph curation and follow-up tasks.
 
