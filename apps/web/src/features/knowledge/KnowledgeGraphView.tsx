@@ -13,7 +13,10 @@ import { LiveTimestamp } from "./components/LiveTimestamp";
 import { NodeTooltip } from "./components/NodeTooltip";
 import { SearchBar } from "./components/SearchBar";
 import { TimelineSlider } from "./components/TimelineSlider";
-import { useKnowledgeSnapshotsApi } from "../../api/hooks/knowledge/useKnowledgeApi";
+import {
+  useKnowledgeSnapshotDiffApi,
+  useKnowledgeSnapshotsApi,
+} from "../../api/hooks/knowledge/useKnowledgeApi";
 import { cn } from "../../lib/cn";
 
 const NODE_COLORS: Record<KnowledgeGraphNodeType, string> = {
@@ -62,6 +65,8 @@ type KnowledgeGraphViewProps = {
   onNavigate?: (view: View) => void;
 };
 
+type RoleMemoryFocusMode = "all" | "high-risk" | "pending-review";
+
 export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {}) {
   const {
     knowledgeGraph,
@@ -82,6 +87,7 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
     dreamDecisionFilter,
     setDreamDecisionFilter,
     dreamDecisionCounts,
+    roleMemoryByRole,
     filterPresets,
     selectedNodeAnnotation,
     selectedNode,
@@ -107,6 +113,12 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
   } = useKnowledgeGraphPanel();
 
   const { data: snapshots } = useKnowledgeSnapshotsApi();
+  const [baseSnapshotId, setBaseSnapshotId] = useState<string>("");
+  const [headSnapshotId, setHeadSnapshotId] = useState<string>("");
+  const { data: snapshotDiff } = useKnowledgeSnapshotDiffApi(
+    baseSnapshotId || null,
+    headSnapshotId || null,
+  );
   const snapshotTimestamps = useMemo(
     () => (snapshots?.snapshots ?? []).map((s) => s.generatedAt),
     [snapshots],
@@ -117,11 +129,62 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [presetName, setPresetName] = useState("");
+  const [roleMemoryOverlayEnabled, setRoleMemoryOverlayEnabled] = useState(true);
+  const [roleMemoryFocusMode, setRoleMemoryFocusMode] = useState<RoleMemoryFocusMode>("all");
 
   const hoveredNode = useMemo(
     () => (hoveredNodeId ? filteredNodes.find((n) => n.id === hoveredNodeId) ?? null : null),
     [filteredNodes, hoveredNodeId],
   );
+
+  const riskyRoleNames = useMemo(
+    () =>
+      Array.from(roleMemoryByRole.entries())
+        .filter(([, memory]) => memory.blocked + memory.failed > 0)
+        .map(([role]) => role),
+    [roleMemoryByRole],
+  );
+
+  const pendingReviewRoleNames = useMemo(
+    () =>
+      Array.from(roleMemoryByRole.entries())
+        .filter(([, memory]) => memory.pendingReview > 0)
+        .map(([role]) => role),
+    [roleMemoryByRole],
+  );
+
+  const focusedNodeIds = useMemo(() => {
+    if (roleMemoryFocusMode === "all") return null;
+    const allowedRoles =
+      roleMemoryFocusMode === "high-risk" ? new Set(riskyRoleNames) : new Set(pendingReviewRoleNames);
+    if (allowedRoles.size === 0) return new Set<string>();
+    const ids = new Set<string>();
+    for (const node of filteredNodes) {
+      if (node.type === "role" && allowedRoles.has(node.label)) {
+        ids.add(node.id);
+      }
+      if (node.type === "agent" && node.role && allowedRoles.has(node.role)) {
+        ids.add(node.id);
+      }
+    }
+    for (const edge of filteredEdges) {
+      if (ids.has(edge.from) || ids.has(edge.to)) {
+        ids.add(edge.from);
+        ids.add(edge.to);
+      }
+    }
+    return ids;
+  }, [filteredEdges, filteredNodes, pendingReviewRoleNames, riskyRoleNames, roleMemoryFocusMode]);
+
+  const displayedNodes = useMemo(() => {
+    if (!focusedNodeIds) return filteredNodes;
+    return filteredNodes.filter((node) => focusedNodeIds.has(node.id));
+  }, [filteredNodes, focusedNodeIds]);
+
+  const displayedEdges = useMemo(() => {
+    if (!focusedNodeIds) return filteredEdges;
+    return filteredEdges.filter((edge) => focusedNodeIds.has(edge.from) && focusedNodeIds.has(edge.to));
+  }, [filteredEdges, focusedNodeIds]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -133,6 +196,12 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedNodeId, setSelectedNodeId]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    if (displayedNodes.some((node) => node.id === selectedNodeId)) return;
+    setSelectedNodeId(null);
+  }, [displayedNodes, selectedNodeId, setSelectedNodeId]);
 
   useEffect(() => {
     const node = canvasRef.current;
@@ -167,8 +236,8 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
   }, []);
 
   const nodeLabelById = useMemo(
-    () => new Map(filteredNodes.map((node) => [node.id, node.label])),
-    [filteredNodes],
+    () => new Map(displayedNodes.map((node) => [node.id, node.label])),
+    [displayedNodes],
   );
 
   const needsCuration =
@@ -293,6 +362,98 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
         </div>
       </div>
 
+      <div className="mb-4 rounded border border-[var(--border-card)] bg-[var(--bg-card)] p-3">
+        <p className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-faint">Snapshot Diff</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Snapshot diff base"
+            value={baseSnapshotId}
+            onChange={(event) => setBaseSnapshotId(event.target.value)}
+            className="h-8 border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-xs text-ink"
+          >
+            <option value="">Base snapshot…</option>
+            {(snapshots?.snapshots ?? []).map((snapshot) => (
+              <option key={`base-${snapshot.id}`} value={snapshot.id}>
+                {new Date(snapshot.generatedAt).toLocaleString()}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Snapshot diff head"
+            value={headSnapshotId}
+            onChange={(event) => setHeadSnapshotId(event.target.value)}
+            className="h-8 border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-xs text-ink"
+          >
+            <option value="">Head snapshot…</option>
+            {(snapshots?.snapshots ?? []).map((snapshot) => (
+              <option key={`head-${snapshot.id}`} value={snapshot.id}>
+                {new Date(snapshot.generatedAt).toLocaleString()}
+              </option>
+            ))}
+          </select>
+          {snapshotDiff ? (
+            <span className="text-xs text-ink-muted">
+              Nodes +{snapshotDiff.nodes.added} / -{snapshotDiff.nodes.removed} · Edges +{snapshotDiff.edges.added} / -
+              {snapshotDiff.edges.removed}
+            </span>
+          ) : (
+            <span className="text-xs text-ink-faint">Select base and head to compare snapshots.</span>
+          )}
+        </div>
+        {snapshotDiff ? (
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[0.7rem] text-ink-muted">
+            <div className="rounded border border-white/10 bg-black/20 p-2">
+              <p className="font-bold text-ink">Added nodes</p>
+              {snapshotDiff.nodes.addedNodeIds.length === 0 ? (
+                <p className="mt-1 text-ink-faint">none</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5">
+                  {snapshotDiff.nodes.addedNodeIds.slice(0, 8).map((id) => (
+                    <li key={`added-node-${id}`}>{id}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded border border-white/10 bg-black/20 p-2">
+              <p className="font-bold text-ink">Removed nodes</p>
+              {snapshotDiff.nodes.removedNodeIds.length === 0 ? (
+                <p className="mt-1 text-ink-faint">none</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5">
+                  {snapshotDiff.nodes.removedNodeIds.slice(0, 8).map((id) => (
+                    <li key={`removed-node-${id}`}>{id}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded border border-white/10 bg-black/20 p-2">
+              <p className="font-bold text-ink">Added edges</p>
+              {snapshotDiff.edges.addedEdgeIds.length === 0 ? (
+                <p className="mt-1 text-ink-faint">none</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5">
+                  {snapshotDiff.edges.addedEdgeIds.slice(0, 4).map((id) => (
+                    <li key={`added-edge-${id}`}>{id}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded border border-white/10 bg-black/20 p-2">
+              <p className="font-bold text-ink">Removed edges</p>
+              {snapshotDiff.edges.removedEdgeIds.length === 0 ? (
+                <p className="mt-1 text-ink-faint">none</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5">
+                  {snapshotDiff.edges.removedEdgeIds.slice(0, 4).map((id) => (
+                    <li key={`removed-edge-${id}`}>{id}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
           aria-label="Filter graph node type"
@@ -358,6 +519,40 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => setRoleMemoryOverlayEnabled((value) => !value)}
+          className={cn(
+            "h-8 border px-2 text-xs",
+            roleMemoryOverlayEnabled
+              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+              : "border-[var(--border-card)] bg-[var(--bg-card)] text-ink-faint hover:text-ink-muted",
+          )}
+          title="Role memory overlay on role/agent nodes"
+        >
+          Role overlay {roleMemoryOverlayEnabled ? "on" : "off"}
+        </button>
+        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 p-0.5">
+          {(
+            [
+              { id: "all", label: "Focus all" },
+              { id: "high-risk", label: `High risk (${riskyRoleNames.length})` },
+              { id: "pending-review", label: `Pending review (${pendingReviewRoleNames.length})` },
+            ] as const
+          ).map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => setRoleMemoryFocusMode(mode.id)}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide",
+                roleMemoryFocusMode === mode.id ? "bg-white/15 text-ink" : "text-ink-faint hover:text-ink-muted",
+              )}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
         <input
           aria-label="Filter preset name"
           value={presetName}
@@ -394,7 +589,7 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
           className="relative h-[640px] overflow-hidden border border-[var(--border-card)] bg-[rgba(8,11,24,0.95)]"
         >
           <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2 text-[0.65rem] uppercase tracking-wider text-ink-faint">
-            <span>drag · zoom · click · {filteredNodes.length} nodes / {filteredEdges.length} edges</span>
+            <span>drag · zoom · click · {displayedNodes.length} nodes / {displayedEdges.length} edges</span>
             {recentlyAddedNodeIds.size > 0 && (
               <span className="rounded-full bg-rose-500/20 px-2 py-0.5 font-bold text-rose-200">
                 +{recentlyAddedNodeIds.size} nuevo{recentlyAddedNodeIds.size > 1 ? "s" : ""}
@@ -407,8 +602,8 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
             )}
           </div>
           <ForceGraphCanvas
-            nodes={filteredNodes}
-            edges={filteredEdges}
+            nodes={displayedNodes}
+            edges={displayedEdges}
             density={densityMode}
             selectedNodeId={selectedNodeId}
             onSelectNode={setSelectedNodeId}
@@ -417,11 +612,13 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
             height={size.height}
             recentlyAddedNodeIds={recentlyAddedNodeIds}
             matchedNodeIds={matchedNodeIds}
+            roleMemoryOverlayEnabled={roleMemoryOverlayEnabled}
+            roleMemoryByRole={roleMemoryByRole}
           />
           {hoveredNode && tooltipPos && (
             <NodeTooltip node={hoveredNode} x={tooltipPos.x} y={tooltipPos.y} />
           )}
-          {filteredNodes.length === 0 && (
+          {displayedNodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-ink-faint">
               No graph nodes match the current filters.
             </div>

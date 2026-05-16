@@ -35,10 +35,20 @@ const cancelCodexMock = vi.hoisted(() => vi.fn());
 const finalizeCodexMock = vi.hoisted(() => vi.fn());
 const readKnowledgeGraphMock = vi.hoisted(() => vi.fn());
 const listKnowledgeSnapshotsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ snapshots: [] }));
+const readKnowledgeSnapshotDiffMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    generatedAt: "2026-05-16T00:00:00.000Z",
+    baseId: "",
+    headId: "",
+    nodes: { added: 0, removed: 0, addedNodeIds: [], removedNodeIds: [] },
+    edges: { added: 0, removed: 0, addedEdgeIds: [], removedEdgeIds: [] },
+  }),
+);
 const listKnowledgeAnnotationsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ annotations: [] }));
 const listKnowledgeFilterPresetsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ presets: [] }));
 const saveKnowledgeAnnotationMock = vi.hoisted(() => vi.fn());
 const createKnowledgeFilterPresetMock = vi.hoisted(() => vi.fn());
+const readKnowledgeRoleMemoryMock = vi.hoisted(() => vi.fn().mockResolvedValue({ generatedAt: "2026-05-16T00:00:00.000Z", roles: [] }));
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -198,6 +208,8 @@ vi.mock("./api/services/knowledge.service", () => ({
   knowledgeService: {
     readGraph: readKnowledgeGraphMock,
     listSnapshots: listKnowledgeSnapshotsMock,
+    readSnapshotDiff: readKnowledgeSnapshotDiffMock,
+    readRoleMemory: readKnowledgeRoleMemoryMock,
     listAnnotations: listKnowledgeAnnotationsMock,
     listFilterPresets: listKnowledgeFilterPresetsMock,
     saveAnnotation: saveKnowledgeAnnotationMock,

@@ -6,7 +6,9 @@ import type {
   KnowledgeNodeAnnotationListResponse,
   KnowledgeNodeAnnotationUpsertInput,
   KnowledgeGraphResponse,
+  KnowledgeGraphSnapshotDiffResponse,
   KnowledgeGraphSnapshotListResponse,
+  RoleMemoryResponse,
 } from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
@@ -30,8 +32,20 @@ export const knowledgeService = {
     return response.data;
   },
 
+  async readSnapshotDiff(baseId: string, headId: string): Promise<KnowledgeGraphSnapshotDiffResponse> {
+    const response = await httpClient.get<KnowledgeGraphSnapshotDiffResponse>(
+      `/knowledge/graph/diff?base=${encodeURIComponent(baseId)}&head=${encodeURIComponent(headId)}`,
+    );
+    return response.data;
+  },
+
   async listAnnotations(): Promise<KnowledgeNodeAnnotationListResponse> {
     const response = await httpClient.get<KnowledgeNodeAnnotationListResponse>("/knowledge/annotations");
+    return response.data;
+  },
+
+  async readRoleMemory(): Promise<RoleMemoryResponse> {
+    const response = await httpClient.get<RoleMemoryResponse>("/knowledge/role-memory");
     return response.data;
   },
 

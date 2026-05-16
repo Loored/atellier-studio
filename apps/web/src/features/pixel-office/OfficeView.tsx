@@ -12,8 +12,10 @@ import { AgentSidePanel } from "./AgentSidePanel";
 import { LiveProcessesPanel } from "./LiveProcessesPanel";
 import { cn } from "../../lib/cn";
 import type { PixelCharacter, PixelCharacterState } from "./engine/types";
+import { KnowledgeGraphView } from "../knowledge/KnowledgeGraphView";
 
 type StatusFilter = "all" | "running" | "waiting" | "inactive";
+type OfficeTab = "office" | "knowledge";
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "all",      label: "All" },
@@ -103,6 +105,7 @@ export function OfficeView() {
   const [orchestrationEnabled, setOrchestrationEnabled] = useState(false);
   const [statusFilter, setStatusFilter]   = useState<StatusFilter>("all");
   const [showLegend, setShowLegend]       = useState(true);
+  const [activeTab, setActiveTab]         = useState<OfficeTab>("office");
 
   useOrchestrationLive(agents, orchestrationEnabled);
 
@@ -154,16 +157,31 @@ export function OfficeView() {
               <h1 className="text-[1.8rem] font-extrabold tracking-[-0.03em] text-ink leading-none">
                 Office
               </h1>
-              <button
-                type="button"
-                onClick={() =>
-                  window.dispatchEvent(new CustomEvent("knowledge:navigate", { detail: "" }))
-                }
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-ink-muted hover:bg-white/10"
-                title="Abrir Knowledge Graph"
-              >
-                Knowledge Graph →
-              </button>
+              <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/25 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("office")}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wider",
+                    activeTab === "office" ? "bg-white/15 text-ink" : "text-ink-faint hover:text-ink-muted",
+                  )}
+                >
+                  Office
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAgent(null);
+                    setActiveTab("knowledge");
+                  }}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wider",
+                    activeTab === "knowledge" ? "bg-white/15 text-ink" : "text-ink-faint hover:text-ink-muted",
+                  )}
+                >
+                  Grafo
+                </button>
+              </div>
             </div>
             <p className="text-[0.78rem] text-ink-muted mt-1">
               Monitor your agents in real time.
@@ -196,6 +214,7 @@ export function OfficeView() {
         </div>
 
         {/* Filter chips + controls */}
+        {activeTab === "office" ? (
         <div className="flex items-center gap-2">
           {STATUS_FILTERS.map(({ id, label }) => (
             <button
@@ -241,8 +260,19 @@ export function OfficeView() {
             </button>
           </div>
         </div>
+        ) : (
+          <div className="text-[0.78rem] text-ink-faint">
+            Knowledge Graph embedded in Office. Use node selection and curation tools without leaving this surface.
+          </div>
+        )}
       </div>
 
+      {activeTab === "knowledge" ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <KnowledgeGraphView onNavigate={() => setActiveTab("office")} />
+        </div>
+      ) : (
+      <>
       {/* ── Body: canvas + side panel ──────────────────────── */}
       <div className="flex flex-1 min-h-0">
 
@@ -373,6 +403,8 @@ export function OfficeView() {
           </button>
         </div>
       </nav>
+      </>
+      )}
     </div>
   );
 }
