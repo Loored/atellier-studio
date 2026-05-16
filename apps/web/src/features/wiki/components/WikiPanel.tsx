@@ -36,12 +36,15 @@ export function WikiPanel() {
     dreamDraftRunId,
     dreamReportContent,
     dreamSuggestedPath,
+    dreamProposals,
     dreamActionError,
+    dreamDecisionFeedback,
     lastSavedDreamPath,
     isDreamRunning,
     isFetchingRuns,
     isStartingDream,
     isSavingDreamReport,
+    isSavingDreamDecision,
     canRunDream,
     canSaveDreamReport,
     canRunIngest,
@@ -60,6 +63,7 @@ export function WikiPanel() {
     runLint,
     runDream,
     saveDreamReport,
+    decideDreamProposal,
     submitWritePage,
   } = useWikiPanel();
 
@@ -143,6 +147,20 @@ export function WikiPanel() {
               >
                 {dreamReportContent}
               </pre>
+              {dreamProposals.length > 0 ? (
+                <div className="mt-2 space-y-1.5" aria-label="Dream proposals">
+                  {dreamProposals.map((proposal) => (
+                    <div key={proposal} className="border border-[var(--border-card)] rounded-md p-2 text-[0.72rem] text-ink-muted">
+                      <p className="m-0">{proposal}</p>
+                      <div className="mt-1.5 flex gap-1.5">
+                        <button type="button" disabled={isSavingDreamDecision} onClick={() => void decideDreamProposal(proposal, "accepted")} className="min-h-7 px-2 border-teal/35 text-teal bg-teal/10 hover:bg-teal/20 text-[0.7rem]">Accept</button>
+                        <button type="button" disabled={isSavingDreamDecision} onClick={() => void decideDreamProposal(proposal, "rejected")} className="min-h-7 px-2 border-orange/35 text-orange bg-orange/10 hover:bg-orange/20 text-[0.7rem]">Reject</button>
+                        <button type="button" disabled={isSavingDreamDecision} onClick={() => void decideDreamProposal(proposal, "deferred")} className="min-h-7 px-2 border-[var(--border-card)] text-ink-muted bg-white/[0.04] hover:bg-white/[0.08] text-[0.7rem]">Defer</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : dreamStatus?.status === "completed" ? (
             <p className="mt-2 text-[0.74rem] text-ink-faint">Report is still loading.</p>
@@ -153,6 +171,9 @@ export function WikiPanel() {
           ) : null}
           {dreamActionError ? (
             <p className="mt-2 text-[0.74rem] text-orange" role="alert">{dreamActionError}</p>
+          ) : null}
+          {dreamDecisionFeedback ? (
+            <p className="mt-2 text-[0.74rem] text-ink-muted">{dreamDecisionFeedback}</p>
           ) : null}
         </section>
 

@@ -1,4 +1,5 @@
 import type { AgentRole } from "./agent";
+import type { ExecutorMode } from "./health";
 import type { Run, RunStatus } from "./run";
 
 export const ORCHESTRATION_SKILL_IDS = [
@@ -33,6 +34,7 @@ export type StartSkillOrchestrationInput = {
   goal: string;
   context?: string;
   taskId?: string;
+  executorModeOverride?: ExecutorMode;
 };
 
 export type SkillOrchestrationStepResult = {

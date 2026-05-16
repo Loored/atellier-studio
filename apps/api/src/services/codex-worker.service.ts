@@ -96,8 +96,8 @@ export class CodexWorkerService {
     if (idx === -1) return { error: "No executable step available. Approve a step first." };
     const step = worker.steps[idx];
     if (step.needsApproval && step.status !== "approved") return { error: "Step requires approval before execution." };
-    const startedAt = new Date().toISOString();
-    const finishedAt = new Date().toISOString();
+    const startedAtDate = new Date();
+    const startedAt = startedAtDate.toISOString();
     const datePrefix = startedAt.slice(0, 10);
     const artifactBaseName = `${datePrefix}-codex-worker-${id}-step-${idx + 1}-${step.id}`;
     const stdoutPath = `runs/artifacts/${artifactBaseName}.stdout.log`;
@@ -105,21 +105,26 @@ export class CodexWorkerService {
     const stdoutAbsolute = path.join(this.atelierRoot, stdoutPath);
     const stderrAbsolute = path.join(this.atelierRoot, stderrPath);
     await mkdir(path.dirname(stdoutAbsolute), { recursive: true });
-    await writeFile(stdoutAbsolute, `Fake executor completed step: ${step.summary}\nCommand: ${step.command}\n`, "utf8");
+    const stdoutContent = `Fake executor completed step: ${step.summary}\nCommand: ${step.command}\n`;
+    await writeFile(stdoutAbsolute, stdoutContent, "utf8");
     await writeFile(stderrAbsolute, "", "utf8");
+    const finishedAtDate = new Date();
+    const finishedAt = finishedAtDate.toISOString();
+    const durationMs = Math.max(0, finishedAtDate.getTime() - startedAtDate.getTime());
     const evidence = {
       summary: "Fake executor completed step.",
       capturedAt: finishedAt,
       command: step.command,
       workingDirectory: step.workingDirectory,
+      durationMs,
       notes: [
         "Executed by the fake executor.",
         `stdout written to ${stdoutPath}`,
         `stderr written to ${stderrPath}`,
       ],
       artifacts: [
-        { label: "stdout", path: stdoutPath },
-        { label: "stderr", path: stderrPath },
+        { label: "stdout", path: stdoutPath, byteSize: Buffer.byteLength(stdoutContent, "utf8") },
+        { label: "stderr", path: stderrPath, byteSize: 0 },
       ],
     };
     const updated = worker.steps.map((s, i) =>
@@ -199,6 +204,13 @@ export class CodexWorkerService {
     const datePrefix = now.toISOString().slice(0, 10);
     const runPath = `runs/${datePrefix}-codex-worker-${id}.md`;
     const completed = worker.steps.filter((s) => s.status === "completed").length;
+    const failed = worker.steps.filter((s) => s.status === "failed").length;
+    const blocked = worker.steps.filter((s) => s.status === "blocked").length;
+    const totalDurationMs = worker.steps.reduce((sum, step) => {
+      const value = step.evidence?.durationMs;
+      return sum + (typeof value === "number" && Number.isFinite(value) ? value : 0);
+    }, 0);
+    const artifactCount = worker.steps.reduce((sum, step) => sum + (step.evidence?.artifacts.length ?? 0), 0);
     const content = [
       "# Run Log - Codex Worker Finalize",
       "",
@@ -240,6 +252,10 @@ export class CodexWorkerService {
       "## Evidence",
       "",
       `- Completed steps: ${completed}/${worker.steps.length}`,
+      `- Failed steps: ${failed}`,
+      `- Blocked steps: ${blocked}`,
+      `- Total step duration: ${totalDurationMs} ms`,
+      `- Captured artifacts: ${artifactCount}`,
       `- Changed files: ${(input.changedFiles ?? []).length}`,
       ...(input.changedFiles ?? []).map((file) => `  - ${file}`),
       `- Test evidence: ${(input.testEvidence ?? []).length}`,
@@ -266,6 +282,10 @@ export class CodexWorkerService {
         testEvidence: (input.testEvidence ?? []).join(", "),
         evidenceCompletedSteps: completed,
         evidenceTotalSteps: worker.steps.length,
+        evidenceFailedSteps: failed,
+        evidenceBlockedSteps: blocked,
+        evidenceTotalDurationMs: totalDurationMs,
+        evidenceArtifactCount: artifactCount,
       },
     });
     return this.runs.updateStatus(id, "completed", {
@@ -277,6 +297,10 @@ export class CodexWorkerService {
         evidence: {
           completedSteps: completed,
           totalSteps: worker.steps.length,
+          failedSteps: failed,
+          blockedSteps: blocked,
+          totalDurationMs,
+          artifactCount,
           changedFiles: input.changedFiles ?? [],
           testEvidence: input.testEvidence ?? [],
         } satisfies CodexWorkerFinalizeEvidence,

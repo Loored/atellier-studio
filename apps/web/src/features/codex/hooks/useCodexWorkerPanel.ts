@@ -136,7 +136,27 @@ export function useCodexWorkerPanel() {
     if (!runId || !canFinalize) return;
     setActionError(null);
     try {
-      await api.finalizeCodexWorkerMutation.mutateAsync({ id: runId, summary: "Finalized from dashboard codex worker panel." });
+      const testEvidence = steps
+        .filter((step) => step.status === "completed")
+        .map((step) => {
+          const durationSuffix = step.evidence?.durationMs !== undefined ? ` (${step.evidence.durationMs} ms)` : "";
+          return `${step.summary}${durationSuffix}`;
+        });
+      const changedFiles = Array.from(
+        new Set(
+          steps.flatMap((step) =>
+            (step.evidence?.artifacts ?? [])
+              .map((artifact) => artifact.path)
+              .filter((artifactPath) => artifactPath.endsWith(".ts") || artifactPath.endsWith(".tsx") || artifactPath.endsWith(".md")),
+          ),
+        ),
+      );
+      await api.finalizeCodexWorkerMutation.mutateAsync({
+        id: runId,
+        summary: "Finalized from dashboard codex worker panel.",
+        changedFiles,
+        testEvidence,
+      });
       await api.codexWorkerQuery.refetch();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Failed to finalize run.");

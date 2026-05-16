@@ -1,4 +1,6 @@
-export type ExecutorMode = "mock" | "openai" | "anthropic" | "groq" | "ollama";
+export const EXECUTOR_MODES = ["mock", "openai", "anthropic", "groq", "ollama"] as const;
+
+export type ExecutorMode = (typeof EXECUTOR_MODES)[number];
 
 export type ModelProfile = "cheap" | "standard" | "deep";
 
@@ -9,6 +11,7 @@ export type HealthStatus = {
   executorMode: ExecutorMode;
   executorModel: string;
   modelProfile: ModelProfile;
+  availableExecutorModes?: ExecutorMode[];
   /**
    * Per-agent-role model overrides. Present only when the active executor
    * supports per-role routing (currently Ollama only) and at least one

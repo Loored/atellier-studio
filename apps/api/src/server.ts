@@ -47,6 +47,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const services = options.services ?? await createAppServices(options);
 
   await services.wiki.ensureWiki();
+  await services.knowledgeGraph.initialize();
+  services.knowledgeLive.attach(fastify.server);
   fastify.addHook("onRequest", async (_request, reply) => {
     reply.header("Referrer-Policy", "no-referrer");
     reply.header("X-Content-Type-Options", "nosniff");

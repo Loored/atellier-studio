@@ -38,6 +38,7 @@ export async function healthRoutes(
       executorMode: options.agentExecutorMode,
       executorModel: options.executorModel,
       modelProfile: options.modelProfile,
+      availableExecutorModes: services.executor.availableModes,
       ...(options.executorRoleOverrides
         ? { executorRoleOverrides: options.executorRoleOverrides }
         : {}),

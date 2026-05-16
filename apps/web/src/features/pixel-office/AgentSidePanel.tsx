@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Copy, Send, Terminal, X, Zap } from "lucide-react";
-import type { Agent } from "@atellier/shared";
+import type { Agent, ExecutorMode } from "@atellier/shared";
 import { cn } from "../../lib/cn";
 import { ValidationSummary } from "../../components/ValidationSummary";
 import { useAgentDetailPanel } from "./hooks/useAgentDetailPanel";
@@ -106,6 +106,8 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
     instruction,
     handoffAgentId,
     handoffInstruction,
+    executorModeOverride,
+    availableExecutorModes,
     terminalCommand,
     terminalLines,
     handoffCandidateList,
@@ -122,6 +124,7 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
     setHandoffAgentId,
     setHandoffInstruction,
     setInstruction,
+    setExecutorModeOverride,
     setInstructionsDraft,
     setTerminalCommand,
     handleSaveInstructions,
@@ -465,7 +468,18 @@ export function AgentSidePanel({ agent, agentIndex, onClose }: Props) {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSendInstruction();
               }}
             />
-            <div className="grid grid-cols-[1fr_auto] gap-2 mt-2">
+            <div className="grid grid-cols-1 gap-2 mt-2 sm:grid-cols-[1fr_1fr_auto]">
+              <select
+                className="h-8 text-[0.78rem]"
+                value={executorModeOverride}
+                onChange={(e) => setExecutorModeOverride((e.target.value as ExecutorMode | "") ?? "")}
+                aria-label="Executor override"
+              >
+                <option value="">Executor por entorno (default)</option>
+                {availableExecutorModes.map((mode) => (
+                  <option key={mode} value={mode}>{mode}</option>
+                ))}
+              </select>
               <select
                 className="h-8 text-[0.78rem]"
                 value={handoffAgentId}

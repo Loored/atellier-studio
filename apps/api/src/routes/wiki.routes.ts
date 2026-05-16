@@ -3,6 +3,8 @@ import {
   type AppendWikiLogInput,
   type WikiIngestInput,
   type WikiLogEventType,
+  WIKI_DREAM_DECISION_VALUES,
+  type WikiDreamDecisionRecordInput,
   type WikiWritePageInput,
   type WikiQueryInput,
 } from "@atellier/shared";
@@ -167,5 +169,37 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
 
   fastify.post("/wiki/lint", async (_request, reply) => {
     return reply.code(200).send(await services.wiki.lint());
+  });
+
+  fastify.post("/wiki/dream-decisions", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+    const reportPath = stringField(body, "reportPath");
+    const proposal = stringField(body, "proposal");
+    const decision = optionalStringField(body, "decision");
+    if (!reportPath) {
+      return badRequest(reply, "Dream report path is required.");
+    }
+    if (!proposal) {
+      return badRequest(reply, "Dream proposal is required.");
+    }
+    if (!decision || !WIKI_DREAM_DECISION_VALUES.includes(decision as (typeof WIKI_DREAM_DECISION_VALUES)[number])) {
+      return badRequest(reply, "Dream decision must be one of: accepted, rejected, deferred.");
+    }
+    const input: WikiDreamDecisionRecordInput = {
+      reportPath,
+      proposal,
+      decision: decision as WikiDreamDecisionRecordInput["decision"],
+      rationale: optionalStringField(body, "rationale"),
+      taskId: optionalStringField(body, "taskId"),
+    };
+
+    try {
+      return reply.code(201).send(await services.wiki.recordDreamDecision(input));
+    } catch (error) {
+      return badRequest(reply, error instanceof Error ? error.message : "Dream decision record failed.");
+    }
   });
 }

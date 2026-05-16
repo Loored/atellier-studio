@@ -1,0 +1,1646 @@
+{
+  "generatedAt": "2026-05-13T04:12:30.456Z",
+  "nodes": [
+    {
+      "id": "agent:13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Toto Builder",
+      "sourceId": "13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "role": "builder",
+      "status": "idle",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "agent:1935d415-7aae-4931-8c68-1d7ab62adb8a",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Carla Intake",
+      "sourceId": "1935d415-7aae-4931-8c68-1d7ab62adb8a",
+      "role": "intake",
+      "status": "idle",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "agent:414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Pepe PM",
+      "sourceId": "414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "role": "pm",
+      "status": "needs-human",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.237Z",
+      "updatedAt": "2026-05-13T04:09:46.670Z"
+    },
+    {
+      "id": "agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Wiki Curator",
+      "sourceId": "7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "role": "wiki-curator",
+      "status": "needs-human",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:12:13.330Z"
+    },
+    {
+      "id": "agent:898921b3-1ebe-4221-a886-050fd1be4e98",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Pepe Builder",
+      "sourceId": "898921b3-1ebe-4221-a886-050fd1be4e98",
+      "role": "builder",
+      "status": "needs-human",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:46.670Z",
+      "updatedAt": "2026-05-13T04:11:31.003Z"
+    },
+    {
+      "id": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Jaco QA",
+      "sourceId": "9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "role": "qa",
+      "status": "needs-human",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:11:49.036Z"
+    },
+    {
+      "id": "agent:a26a849e-e7ae-4b8f-8735-95293449635f",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Veronika Designer",
+      "sourceId": "a26a849e-e7ae-4b8f-8735-95293449635f",
+      "role": "designer",
+      "status": "idle",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "agent:b3ffe9d0-fb55-4428-9a62-f138fe0ec93c",
+      "type": "agent",
+      "layer": "runtime",
+      "label": "Toto Runtime",
+      "sourceId": "b3ffe9d0-fb55-4428-9a62-f138fe0ec93c",
+      "role": "builder",
+      "status": "needs-human",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:10:22.965Z",
+      "updatedAt": "2026-05-13T04:10:52.235Z"
+    },
+    {
+      "id": "deliverable:wiki/deliverables/0a559696-4c24-44fe-8d78-d76ae0d7e1a1-atellier-build-loop-completed.md",
+      "type": "deliverable",
+      "layer": "wiki",
+      "label": "0a559696-4c24-44fe-8d78-d76ae0d7e1a1-atellier-build-loop-completed",
+      "path": "wiki/deliverables/0a559696-4c24-44fe-8d78-d76ae0d7e1a1-atellier-build-loop-completed.md",
+      "quality": "generated",
+      "reviewStatus": "pending",
+      "createdAt": "2026-05-13T04:12:13.334Z",
+      "updatedAt": "2026-05-13T04:12:13.334Z"
+    },
+    {
+      "id": "lint:stale_index_entry:wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "type": "lint-issue",
+      "layer": "meta",
+      "label": "stale_index_entry",
+      "path": "wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "quality": "stale",
+      "status": "stale_index_entry",
+      "updatedAt": "2026-05-13T04:12:30.364Z",
+      "metadata": {
+        "message": "Source summary is missing Raw path metadata.",
+        "suggestion": "Restore the Raw path metadata so lint can trace the original source."
+      }
+    },
+    {
+      "id": "lint:stale_index_entry:wiki/sources/query-wiki-log-md.md",
+      "type": "lint-issue",
+      "layer": "meta",
+      "label": "stale_index_entry",
+      "path": "wiki/sources/query-wiki-log-md.md",
+      "quality": "stale",
+      "status": "stale_index_entry",
+      "updatedAt": "2026-05-13T04:12:30.364Z",
+      "metadata": {
+        "message": "Source summary is missing Raw path metadata.",
+        "suggestion": "Restore the Raw path metadata so lint can trace the original source."
+      }
+    },
+    {
+      "id": "raw-source:raw/ingest/2026-05-05-wiki-curator-05-may.md",
+      "type": "raw-source",
+      "layer": "raw",
+      "label": "2026-05-05-wiki-curator-05-may",
+      "path": "raw/ingest/2026-05-05-wiki-curator-05-may.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.545Z"
+    },
+    {
+      "id": "raw-source:raw/ingest/2026-05-08-sprint-goal-live-dashboard.md",
+      "type": "raw-source",
+      "layer": "raw",
+      "label": "2026-05-08-sprint-goal-live-dashboard",
+      "path": "raw/ingest/2026-05-08-sprint-goal-live-dashboard.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.825Z"
+    },
+    {
+      "id": "raw-source:raw/ingest/2026-05-08-tech-constraints.md",
+      "type": "raw-source",
+      "layer": "raw",
+      "label": "2026-05-08-tech-constraints",
+      "path": "raw/ingest/2026-05-08-tech-constraints.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.825Z"
+    },
+    {
+      "id": "raw-source:raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf",
+      "type": "raw-source",
+      "layer": "raw",
+      "label": "2026-05-05-insights-karpathy-agentes-llm.pdf",
+      "path": "raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.550Z"
+    },
+    {
+      "id": "raw-source:raw/references/2026-05-05-llm-wiki-agent-orchestration.md",
+      "type": "raw-source",
+      "layer": "raw",
+      "label": "2026-05-05-llm-wiki-agent-orchestration",
+      "path": "raw/references/2026-05-05-llm-wiki-agent-orchestration.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.554Z"
+    },
+    {
+      "id": "role:builder",
+      "type": "role",
+      "layer": "meta",
+      "label": "builder",
+      "role": "builder",
+      "quality": "verified"
+    },
+    {
+      "id": "role:designer",
+      "type": "role",
+      "layer": "meta",
+      "label": "designer",
+      "role": "designer",
+      "quality": "verified"
+    },
+    {
+      "id": "role:intake",
+      "type": "role",
+      "layer": "meta",
+      "label": "intake",
+      "role": "intake",
+      "quality": "verified"
+    },
+    {
+      "id": "role:pm",
+      "type": "role",
+      "layer": "meta",
+      "label": "pm",
+      "role": "pm",
+      "quality": "verified"
+    },
+    {
+      "id": "role:qa",
+      "type": "role",
+      "layer": "meta",
+      "label": "qa",
+      "role": "qa",
+      "quality": "verified"
+    },
+    {
+      "id": "role:wiki-curator",
+      "type": "role",
+      "layer": "meta",
+      "label": "wiki-curator",
+      "role": "wiki-curator",
+      "quality": "verified"
+    },
+    {
+      "id": "run:0a559696-4c24-44fe-8d78-d76ae0d7e1a1",
+      "type": "run",
+      "layer": "runtime",
+      "label": "orchestration run",
+      "sourceId": "0a559696-4c24-44fe-8d78-d76ae0d7e1a1",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:16.650Z",
+      "updatedAt": "2026-05-13T04:12:13.334Z",
+      "metadata": {
+        "type": "orchestration",
+        "logCount": 15
+      }
+    },
+    {
+      "id": "run:30990e59-2b39-4c6b-b399-c7f7154c6e51",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "30990e59-2b39-4c6b-b399-c7f7154c6e51",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:11:31.004Z",
+      "updatedAt": "2026-05-13T04:11:49.030Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 2
+      }
+    },
+    {
+      "id": "run:4962c9b8-39fd-4a83-82fc-a00e6c5cf2e0",
+      "type": "run",
+      "layer": "runtime",
+      "label": "review run",
+      "sourceId": "4962c9b8-39fd-4a83-82fc-a00e6c5cf2e0",
+      "status": "queued",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "type": "review",
+        "logCount": 1
+      }
+    },
+    {
+      "id": "run:4fe76d57-0cdd-4ee2-a53e-4b47ad5bee71",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "4fe76d57-0cdd-4ee2-a53e-4b47ad5bee71",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:11:49.037Z",
+      "updatedAt": "2026-05-13T04:12:13.324Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 3
+      }
+    },
+    {
+      "id": "run:86ae20a9-d9ae-441d-a1ba-edbe9c2c273c",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "86ae20a9-d9ae-441d-a1ba-edbe9c2c273c",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:10:52.235Z",
+      "updatedAt": "2026-05-13T04:11:10.094Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 3
+      }
+    },
+    {
+      "id": "run:8b02b86f-c46c-4d01-af7f-467a2707ecfb",
+      "type": "run",
+      "layer": "runtime",
+      "label": "build run",
+      "sourceId": "8b02b86f-c46c-4d01-af7f-467a2707ecfb",
+      "status": "queued",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "type": "build",
+        "logCount": 1
+      }
+    },
+    {
+      "id": "run:9658a3e2-4518-4ca0-8c8a-7602e917bf0f",
+      "type": "run",
+      "layer": "runtime",
+      "label": "build run",
+      "sourceId": "9658a3e2-4518-4ca0-8c8a-7602e917bf0f",
+      "status": "queued",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "type": "build",
+        "logCount": 1
+      }
+    },
+    {
+      "id": "run:a3483276-52fd-4340-a4a7-c75cb597cdc1",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "a3483276-52fd-4340-a4a7-c75cb597cdc1",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:11:10.100Z",
+      "updatedAt": "2026-05-13T04:11:30.997Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 2
+      }
+    },
+    {
+      "id": "run:ab392230-cb6a-4bf6-be82-8402ec7ce0d3",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "ab392230-cb6a-4bf6-be82-8402ec7ce0d3",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:10:22.965Z",
+      "updatedAt": "2026-05-13T04:10:52.222Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 2
+      }
+    },
+    {
+      "id": "run:b332bce2-9607-42f5-a968-00ca3d17cd9b",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "b332bce2-9607-42f5-a968-00ca3d17cd9b",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:16.666Z",
+      "updatedAt": "2026-05-13T04:09:46.666Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 2
+      }
+    },
+    {
+      "id": "run:d6227d97-c0a6-4b7f-899e-3dc7396e5532",
+      "type": "run",
+      "layer": "runtime",
+      "label": "manual run",
+      "sourceId": "d6227d97-c0a6-4b7f-899e-3dc7396e5532",
+      "status": "completed",
+      "reviewStatus": "pending",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:46.670Z",
+      "updatedAt": "2026-05-13T04:10:22.957Z",
+      "metadata": {
+        "type": "manual",
+        "logCount": 2
+      }
+    },
+    {
+      "id": "run:d7ea6fe9-0f6e-4fa1-af82-448db2f67819",
+      "type": "run",
+      "layer": "runtime",
+      "label": "orchestration run",
+      "sourceId": "d7ea6fe9-0f6e-4fa1-af82-448db2f67819",
+      "status": "queued",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "type": "orchestration",
+        "logCount": 1
+      }
+    },
+    {
+      "id": "run:e7437914-a2a7-45fd-badf-5d7f10448a83",
+      "type": "run",
+      "layer": "runtime",
+      "label": "ingest run",
+      "sourceId": "e7437914-a2a7-45fd-badf-5d7f10448a83",
+      "status": "queued",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "type": "ingest",
+        "logCount": 1
+      }
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-executor-openai-mode.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-executor-openai-mode",
+      "path": "runs/2026-05-04-agent-executor-openai-mode.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.558Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-handoff-mvp.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-handoff-mvp",
+      "path": "runs/2026-05-04-agent-handoff-mvp.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.561Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-handoff-policy-guardrails.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-handoff-policy-guardrails",
+      "path": "runs/2026-05-04-agent-handoff-policy-guardrails.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.566Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-panel-unblock-and-terminal.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-panel-unblock-and-terminal",
+      "path": "runs/2026-05-04-agent-panel-unblock-and-terminal.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.569Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-run-execution.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-run-execution",
+      "path": "runs/2026-05-04-agent-run-execution.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.573Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-run-streaming.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-run-streaming",
+      "path": "runs/2026-05-04-agent-run-streaming.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.577Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-stream-cors-fix.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-stream-cors-fix",
+      "path": "runs/2026-05-04-agent-stream-cors-fix.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.581Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-agent-terminal-handoff-command.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-agent-terminal-handoff-command",
+      "path": "runs/2026-05-04-agent-terminal-handoff-command.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.585Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-auto-deliverables-and-approval-log.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-auto-deliverables-and-approval-log",
+      "path": "runs/2026-05-04-auto-deliverables-and-approval-log.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.590Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-deliverable-preview-and-auto-review.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-deliverable-preview-and-auto-review",
+      "path": "runs/2026-05-04-deliverable-preview-and-auto-review.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.597Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-openai-output-parser-and-handoff-motion-fix.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-openai-output-parser-and-handoff-motion-fix",
+      "path": "runs/2026-05-04-openai-output-parser-and-handoff-motion-fix.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.602Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-ops-hardening-parallel-step.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-ops-hardening-parallel-step",
+      "path": "runs/2026-05-04-ops-hardening-parallel-step.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.606Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-promote-deliverable-and-index.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-promote-deliverable-and-index",
+      "path": "runs/2026-05-04-promote-deliverable-and-index.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.611Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-runs-review-deliverables-filters.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-runs-review-deliverables-filters",
+      "path": "runs/2026-05-04-runs-review-deliverables-filters.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.615Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-ui-security-review.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-ui-security-review",
+      "path": "runs/2026-05-04-ui-security-review.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.619Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-04-unlink-deliverable-and-index-metadata.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-04-unlink-deliverable-and-index-metadata",
+      "path": "runs/2026-05-04-unlink-deliverable-and-index-metadata.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.623Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-agent-grounding-pass-v1-2.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-agent-grounding-pass-v1-2",
+      "path": "runs/2026-05-05-agent-grounding-pass-v1-2.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.627Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-codex-worker-69f998d1b5e23ae610276a68.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-codex-worker-69f998d1b5e23ae610276a68",
+      "path": "runs/2026-05-05-codex-worker-69f998d1b5e23ae610276a68.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.632Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-codex-worker-evidence-pass-v1-1.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-codex-worker-evidence-pass-v1-1",
+      "path": "runs/2026-05-05-codex-worker-evidence-pass-v1-1.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.636Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-daily-summary.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-daily-summary",
+      "path": "runs/2026-05-05-daily-summary.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.641Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-karpathy-memory-and-next-work.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-karpathy-memory-and-next-work",
+      "path": "runs/2026-05-05-karpathy-memory-and-next-work.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.645Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-mongo-reset.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-mongo-reset",
+      "path": "runs/2026-05-05-mongo-reset.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.650Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-office-ui-redesign-session.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-office-ui-redesign-session",
+      "path": "runs/2026-05-05-office-ui-redesign-session.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.654Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-real-orchestration-button-and-strict-executor.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-real-orchestration-button-and-strict-executor",
+      "path": "runs/2026-05-05-real-orchestration-button-and-strict-executor.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.658Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-runtime-integration-no-sim.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-runtime-integration-no-sim",
+      "path": "runs/2026-05-05-runtime-integration-no-sim.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.661Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-safe-wiki-write-route-and-playwright-cli-ignore.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-safe-wiki-write-route-and-playwright-cli-ignore",
+      "path": "runs/2026-05-05-safe-wiki-write-route-and-playwright-cli-ignore.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.665Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-skill-orchestration-and-llm-wiki-ingest.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-skill-orchestration-and-llm-wiki-ingest",
+      "path": "runs/2026-05-05-skill-orchestration-and-llm-wiki-ingest.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.669Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-ui-ux-session.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-ui-ux-session",
+      "path": "runs/2026-05-05-ui-ux-session.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.673Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-05-unlink-confirm-and-deliverable-filters.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-05-unlink-confirm-and-deliverable-filters",
+      "path": "runs/2026-05-05-unlink-confirm-and-deliverable-filters.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.676Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-08-review-memory-capture.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-08-review-memory-capture",
+      "path": "runs/2026-05-08-review-memory-capture.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.826Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-11-project-state-analysis.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-11-project-state-analysis",
+      "path": "runs/2026-05-11-project-state-analysis.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.827Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-11-wiki-dream-grounding.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-11-wiki-dream-grounding",
+      "path": "runs/2026-05-11-wiki-dream-grounding.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.827Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-11-wiki-dream-ui.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-11-wiki-dream-ui",
+      "path": "runs/2026-05-11-wiki-dream-ui.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.828Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-12-knowledge-graph-direction.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-12-knowledge-graph-direction",
+      "path": "runs/2026-05-12-knowledge-graph-direction.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.829Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-12-knowledge-graph-read-model.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-12-knowledge-graph-read-model",
+      "path": "runs/2026-05-12-knowledge-graph-read-model.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.830Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-12-memory-artifact-hygiene.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-12-memory-artifact-hygiene",
+      "path": "runs/2026-05-12-memory-artifact-hygiene.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.831Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-13-dream-decisions-and-persisted-snapshots.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-13-dream-decisions-and-persisted-snapshots",
+      "path": "runs/2026-05-13-dream-decisions-and-persisted-snapshots.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T03:15:54.631Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-13-knowledge-graph-live-and-curation.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-13-knowledge-graph-live-and-curation",
+      "path": "runs/2026-05-13-knowledge-graph-live-and-curation.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T03:34:45.203Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-13-knowledge-graph-v2.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-13-knowledge-graph-v2",
+      "path": "runs/2026-05-13-knowledge-graph-v2.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.832Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-13-orchestration-override-and-codex-evidence-v1-1.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-13-orchestration-override-and-codex-evidence-v1-1",
+      "path": "runs/2026-05-13-orchestration-override-and-codex-evidence-v1-1.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T03:52:05.665Z"
+    },
+    {
+      "id": "runtime-log:runs/2026-05-13-per-run-executor-override.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "2026-05-13-per-run-executor-override",
+      "path": "runs/2026-05-13-per-run-executor-override.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T03:42:54.089Z"
+    },
+    {
+      "id": "runtime-log:tasks/active.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "active",
+      "path": "tasks/active.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.833Z"
+    },
+    {
+      "id": "runtime-log:tasks/done.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "done",
+      "path": "tasks/done.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:38.685Z"
+    },
+    {
+      "id": "runtime-log:tasks/inbox.md",
+      "type": "runtime-log",
+      "layer": "runtime",
+      "label": "inbox",
+      "path": "tasks/inbox.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-10T08:39:04.956Z"
+    },
+    {
+      "id": "task:2234e1ab-bfb4-4a51-819d-6c349913cc13",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Lint orphan wiki pages",
+      "sourceId": "2234e1ab-bfb4-4a51-819d-6c349913cc13",
+      "status": "inbox",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "task:41fe316d-8d3e-4d36-8a9c-66dc237f06a4",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Promote graph direction note to wiki/synthesis",
+      "sourceId": "41fe316d-8d3e-4d36-8a9c-66dc237f06a4",
+      "status": "active",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "task:519ff11d-612e-4186-9bda-24e8a3bad98d",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Triage Anthropic Code with Claude 2026 keynote takeaways",
+      "sourceId": "519ff11d-612e-4186-9bda-24e8a3bad98d",
+      "status": "done",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "high"
+      }
+    },
+    {
+      "id": "task:7c58e366-a750-4b8d-8c80-3bad1abd88f1",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Verify markdown render in inspector",
+      "sourceId": "7c58e366-a750-4b8d-8c80-3bad1abd88f1",
+      "status": "done",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "task:7fef5d3b-5c6a-455b-8a2b-82e502d44960",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Define spike for Knowledge Graph quality view",
+      "sourceId": "7fef5d3b-5c6a-455b-8a2b-82e502d44960",
+      "status": "active",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "high"
+      }
+    },
+    {
+      "id": "task:a058e7c2-2419-42bc-ab49-f2fafb88893e",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Smoke-test polling under load",
+      "sourceId": "a058e7c2-2419-42bc-ab49-f2fafb88893e",
+      "status": "active",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "task:aa50783f-7483-41e6-a850-c8c8b7b3da26",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Plan release notes for Wiki Dream",
+      "sourceId": "aa50783f-7483-41e6-a850-c8c8b7b3da26",
+      "status": "inbox",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "task:cbbd0539-7f42-4c67-8e81-e2f667159b39",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Polish hover tooltip typography",
+      "sourceId": "cbbd0539-7f42-4c67-8e81-e2f667159b39",
+      "status": "inbox",
+      "quality": "proposed",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "low"
+      }
+    },
+    {
+      "id": "task:ef80873f-deaf-460f-a2f4-ebc359e56cfe",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Wire layer breakdown to backend stats",
+      "sourceId": "ef80873f-deaf-460f-a2f4-ebc359e56cfe",
+      "status": "done",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "high"
+      }
+    },
+    {
+      "id": "task:ff481c94-eac7-428d-a208-d0473d714c89",
+      "type": "task",
+      "layer": "runtime",
+      "label": "Persist viewport across refetches",
+      "sourceId": "ff481c94-eac7-428d-a208-d0473d714c89",
+      "status": "done",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z",
+      "updatedAt": "2026-05-13T04:09:12.238Z",
+      "metadata": {
+        "priority": "high"
+      }
+    },
+    {
+      "id": "wiki-page:wiki/deliverables/index.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "index",
+      "path": "wiki/deliverables/index.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T04:12:13.534Z"
+    },
+    {
+      "id": "wiki-page:wiki/handover-claude-to-codex-2026-05-04.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "handover-claude-to-codex-2026-05-04",
+      "path": "wiki/handover-claude-to-codex-2026-05-04.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.431Z"
+    },
+    {
+      "id": "wiki-page:wiki/index.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "index",
+      "path": "wiki/index.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.839Z"
+    },
+    {
+      "id": "wiki-page:wiki/log.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "log",
+      "path": "wiki/log.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T04:12:30.367Z"
+    },
+    {
+      "id": "wiki-page:wiki/notes/my-note.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "my-note",
+      "path": "wiki/notes/my-note.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.842Z"
+    },
+    {
+      "id": "wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "2026-05-05-karpathy-agentes-llm",
+      "path": "wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.444Z"
+    },
+    {
+      "id": "wiki-page:wiki/sources/2026-05-05-wiki-curator-05-may.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "2026-05-05-wiki-curator-05-may",
+      "path": "wiki/sources/2026-05-05-wiki-curator-05-may.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.448Z"
+    },
+    {
+      "id": "wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "2026-05-08-sprint-goal-live-dashboard",
+      "path": "wiki/sources/2026-05-08-sprint-goal-live-dashboard.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.843Z"
+    },
+    {
+      "id": "wiki-page:wiki/sources/2026-05-08-tech-constraints.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "2026-05-08-tech-constraints",
+      "path": "wiki/sources/2026-05-08-tech-constraints.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.843Z"
+    },
+    {
+      "id": "wiki-page:wiki/sources/query-wiki-log-md.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "query-wiki-log-md",
+      "path": "wiki/sources/query-wiki-log-md.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.455Z"
+    },
+    {
+      "id": "wiki-page:wiki/suggestions-product-2026-05-04.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "suggestions-product-2026-05-04",
+      "path": "wiki/suggestions-product-2026-05-04.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.459Z"
+    },
+    {
+      "id": "wiki-page:wiki/synthesis/2026-05-04-ui-security-review.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "2026-05-04-ui-security-review",
+      "path": "wiki/synthesis/2026-05-04-ui-security-review.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.464Z"
+    },
+    {
+      "id": "wiki-page:wiki/synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard",
+      "path": "wiki/synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-13T02:37:47.844Z"
+    },
+    {
+      "id": "wiki-page:wiki/workflows/agent-skill-orchestration.md",
+      "type": "wiki-page",
+      "layer": "wiki",
+      "label": "agent-skill-orchestration",
+      "path": "wiki/workflows/agent-skill-orchestration.md",
+      "quality": "verified",
+      "updatedAt": "2026-05-06T22:26:39.468Z"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:agent:13102cd6-173b-41b9-8d1d-4b9738feac53->role:builder:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "to": "role:builder",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:13102cd6-173b-41b9-8d1d-4b9738feac53->task:ef80873f-deaf-460f-a2f4-ebc359e56cfe:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "to": "task:ef80873f-deaf-460f-a2f4-ebc359e56cfe",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:13102cd6-173b-41b9-8d1d-4b9738feac53->task:ff481c94-eac7-428d-a208-d0473d714c89:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "to": "task:ff481c94-eac7-428d-a208-d0473d714c89",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:1935d415-7aae-4931-8c68-1d7ab62adb8a->role:intake:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:1935d415-7aae-4931-8c68-1d7ab62adb8a",
+      "to": "role:intake",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:1935d415-7aae-4931-8c68-1d7ab62adb8a->task:519ff11d-612e-4186-9bda-24e8a3bad98d:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:1935d415-7aae-4931-8c68-1d7ab62adb8a",
+      "to": "task:519ff11d-612e-4186-9bda-24e8a3bad98d",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:414906b8-a30d-4fc3-b3ab-ee372429aaec->role:pm:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "to": "role:pm",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:414906b8-a30d-4fc3-b3ab-ee372429aaec->task:7fef5d3b-5c6a-455b-8a2b-82e502d44960:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "to": "task:7fef5d3b-5c6a-455b-8a2b-82e502d44960",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:414906b8-a30d-4fc3-b3ab-ee372429aaec->task:aa50783f-7483-41e6-a850-c8c8b7b3da26:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "to": "task:aa50783f-7483-41e6-a850-c8c8b7b3da26",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54->role:wiki-curator:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "to": "role:wiki-curator",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54->task:2234e1ab-bfb4-4a51-819d-6c349913cc13:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "to": "task:2234e1ab-bfb4-4a51-819d-6c349913cc13",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54->task:41fe316d-8d3e-4d36-8a9c-66dc237f06a4:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "to": "task:41fe316d-8d3e-4d36-8a9c-66dc237f06a4",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:898921b3-1ebe-4221-a886-050fd1be4e98->role:builder:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:898921b3-1ebe-4221-a886-050fd1be4e98",
+      "to": "role:builder",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2->role:qa:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "to": "role:qa",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2->task:7c58e366-a750-4b8d-8c80-3bad1abd88f1:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "to": "task:7c58e366-a750-4b8d-8c80-3bad1abd88f1",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2->task:a058e7c2-2419-42bc-ab49-f2fafb88893e:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "to": "task:a058e7c2-2419-42bc-ab49-f2fafb88893e",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:a26a849e-e7ae-4b8f-8735-95293449635f->role:designer:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:a26a849e-e7ae-4b8f-8735-95293449635f",
+      "to": "role:designer",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:a26a849e-e7ae-4b8f-8735-95293449635f->task:cbbd0539-7f42-4c67-8e81-e2f667159b39:agent_assigned_task",
+      "type": "agent_assigned_task",
+      "from": "agent:a26a849e-e7ae-4b8f-8735-95293449635f",
+      "to": "task:cbbd0539-7f42-4c67-8e81-e2f667159b39",
+      "label": "assigned task",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:agent:b3ffe9d0-fb55-4428-9a62-f138fe0ec93c->role:builder:agent_has_role",
+      "type": "agent_has_role",
+      "from": "agent:b3ffe9d0-fb55-4428-9a62-f138fe0ec93c",
+      "to": "role:builder",
+      "label": "has role",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:run:0a559696-4c24-44fe-8d78-d76ae0d7e1a1->deliverable:wiki/deliverables/0a559696-4c24-44fe-8d78-d76ae0d7e1a1-atellier-build-loop-completed.md:run_created_deliverable",
+      "type": "run_created_deliverable",
+      "from": "run:0a559696-4c24-44fe-8d78-d76ae0d7e1a1",
+      "to": "deliverable:wiki/deliverables/0a559696-4c24-44fe-8d78-d76ae0d7e1a1-atellier-build-loop-completed.md",
+      "label": "created deliverable",
+      "quality": "generated",
+      "createdAt": "2026-05-13T04:12:13.334Z"
+    },
+    {
+      "id": "edge:run:30990e59-2b39-4c6b-b399-c7f7154c6e51->agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:30990e59-2b39-4c6b-b399-c7f7154c6e51",
+      "to": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:11:31.004Z"
+    },
+    {
+      "id": "edge:run:4962c9b8-39fd-4a83-82fc-a00e6c5cf2e0->agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:4962c9b8-39fd-4a83-82fc-a00e6c5cf2e0",
+      "to": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:4962c9b8-39fd-4a83-82fc-a00e6c5cf2e0->task:a058e7c2-2419-42bc-ab49-f2fafb88893e:run_for_task",
+      "type": "run_for_task",
+      "from": "run:4962c9b8-39fd-4a83-82fc-a00e6c5cf2e0",
+      "to": "task:a058e7c2-2419-42bc-ab49-f2fafb88893e",
+      "label": "run for task",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:4fe76d57-0cdd-4ee2-a53e-4b47ad5bee71->agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:4fe76d57-0cdd-4ee2-a53e-4b47ad5bee71",
+      "to": "agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:11:49.037Z"
+    },
+    {
+      "id": "edge:run:86ae20a9-d9ae-441d-a1ba-edbe9c2c273c->agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:86ae20a9-d9ae-441d-a1ba-edbe9c2c273c",
+      "to": "agent:9c6aed50-0269-4844-b84c-f5dd8d3249a2",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:10:52.235Z"
+    },
+    {
+      "id": "edge:run:8b02b86f-c46c-4d01-af7f-467a2707ecfb->agent:13102cd6-173b-41b9-8d1d-4b9738feac53:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:8b02b86f-c46c-4d01-af7f-467a2707ecfb",
+      "to": "agent:13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:8b02b86f-c46c-4d01-af7f-467a2707ecfb->task:ef80873f-deaf-460f-a2f4-ebc359e56cfe:run_for_task",
+      "type": "run_for_task",
+      "from": "run:8b02b86f-c46c-4d01-af7f-467a2707ecfb",
+      "to": "task:ef80873f-deaf-460f-a2f4-ebc359e56cfe",
+      "label": "run for task",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:9658a3e2-4518-4ca0-8c8a-7602e917bf0f->agent:13102cd6-173b-41b9-8d1d-4b9738feac53:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:9658a3e2-4518-4ca0-8c8a-7602e917bf0f",
+      "to": "agent:13102cd6-173b-41b9-8d1d-4b9738feac53",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:9658a3e2-4518-4ca0-8c8a-7602e917bf0f->task:ef80873f-deaf-460f-a2f4-ebc359e56cfe:run_for_task",
+      "type": "run_for_task",
+      "from": "run:9658a3e2-4518-4ca0-8c8a-7602e917bf0f",
+      "to": "task:ef80873f-deaf-460f-a2f4-ebc359e56cfe",
+      "label": "run for task",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:a3483276-52fd-4340-a4a7-c75cb597cdc1->agent:898921b3-1ebe-4221-a886-050fd1be4e98:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:a3483276-52fd-4340-a4a7-c75cb597cdc1",
+      "to": "agent:898921b3-1ebe-4221-a886-050fd1be4e98",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:11:10.100Z"
+    },
+    {
+      "id": "edge:run:ab392230-cb6a-4bf6-be82-8402ec7ce0d3->agent:b3ffe9d0-fb55-4428-9a62-f138fe0ec93c:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:ab392230-cb6a-4bf6-be82-8402ec7ce0d3",
+      "to": "agent:b3ffe9d0-fb55-4428-9a62-f138fe0ec93c",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:10:22.965Z"
+    },
+    {
+      "id": "edge:run:b332bce2-9607-42f5-a968-00ca3d17cd9b->agent:414906b8-a30d-4fc3-b3ab-ee372429aaec:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:b332bce2-9607-42f5-a968-00ca3d17cd9b",
+      "to": "agent:414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:16.666Z"
+    },
+    {
+      "id": "edge:run:d6227d97-c0a6-4b7f-899e-3dc7396e5532->agent:898921b3-1ebe-4221-a886-050fd1be4e98:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:d6227d97-c0a6-4b7f-899e-3dc7396e5532",
+      "to": "agent:898921b3-1ebe-4221-a886-050fd1be4e98",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:46.670Z"
+    },
+    {
+      "id": "edge:run:d7ea6fe9-0f6e-4fa1-af82-448db2f67819->agent:414906b8-a30d-4fc3-b3ab-ee372429aaec:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:d7ea6fe9-0f6e-4fa1-af82-448db2f67819",
+      "to": "agent:414906b8-a30d-4fc3-b3ab-ee372429aaec",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:d7ea6fe9-0f6e-4fa1-af82-448db2f67819->task:7fef5d3b-5c6a-455b-8a2b-82e502d44960:run_for_task",
+      "type": "run_for_task",
+      "from": "run:d7ea6fe9-0f6e-4fa1-af82-448db2f67819",
+      "to": "task:7fef5d3b-5c6a-455b-8a2b-82e502d44960",
+      "label": "run for task",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:e7437914-a2a7-45fd-badf-5d7f10448a83->agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54:run_by_agent",
+      "type": "run_by_agent",
+      "from": "run:e7437914-a2a7-45fd-badf-5d7f10448a83",
+      "to": "agent:7f8d4f13-768d-4b36-9e26-e4c1716e2d54",
+      "label": "run by agent",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:run:e7437914-a2a7-45fd-badf-5d7f10448a83->task:41fe316d-8d3e-4d36-8a9c-66dc237f06a4:run_for_task",
+      "type": "run_for_task",
+      "from": "run:e7437914-a2a7-45fd-badf-5d7f10448a83",
+      "to": "task:41fe316d-8d3e-4d36-8a9c-66dc237f06a4",
+      "label": "run for task",
+      "quality": "verified",
+      "createdAt": "2026-05-13T04:09:12.238Z"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->runtime-log:runs/2026-05-12-knowledge-graph-read-model.md:wiki_page_mentions_runtime_log",
+      "type": "wiki_page_mentions_runtime_log",
+      "from": "wiki-page:wiki/index.md",
+      "to": "runtime-log:runs/2026-05-12-knowledge-graph-read-model.md",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/log.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/log.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/sources/2026-05-08-tech-constraints.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/sources/2026-05-08-tech-constraints.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/synthesis/2026-05-04-ui-security-review.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/synthesis/2026-05-04-ui-security-review.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/index.md->wiki-page:wiki/workflows/agent-skill-orchestration.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/index.md",
+      "to": "wiki-page:wiki/workflows/agent-skill-orchestration.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->raw-source:raw/ingest/2026-05-05-wiki-curator-05-may.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/log.md",
+      "to": "raw-source:raw/ingest/2026-05-05-wiki-curator-05-may.md",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->raw-source:raw/ingest/2026-05-08-sprint-goal-live-dashboard.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/log.md",
+      "to": "raw-source:raw/ingest/2026-05-08-sprint-goal-live-dashboard.md",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->raw-source:raw/ingest/2026-05-08-tech-constraints.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/log.md",
+      "to": "raw-source:raw/ingest/2026-05-08-tech-constraints.md",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->runtime-log:runs/2026-05-05-codex-worker-69f998d1b5e23ae610276a68.md:wiki_page_mentions_runtime_log",
+      "type": "wiki_page_mentions_runtime_log",
+      "from": "wiki-page:wiki/log.md",
+      "to": "runtime-log:runs/2026-05-05-codex-worker-69f998d1b5e23ae610276a68.md",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->runtime-log:tasks/inbox.md:wiki_page_mentions_runtime_log",
+      "type": "wiki_page_mentions_runtime_log",
+      "from": "wiki-page:wiki/log.md",
+      "to": "runtime-log:tasks/inbox.md",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->wiki-page:wiki/deliverables/index.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/log.md",
+      "to": "wiki-page:wiki/deliverables/index.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->wiki-page:wiki/sources/2026-05-05-wiki-curator-05-may.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/log.md",
+      "to": "wiki-page:wiki/sources/2026-05-05-wiki-curator-05-may.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/log.md",
+      "to": "wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->wiki-page:wiki/sources/2026-05-08-tech-constraints.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/log.md",
+      "to": "wiki-page:wiki/sources/2026-05-08-tech-constraints.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/log.md->wiki-page:wiki/synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/log.md",
+      "to": "wiki-page:wiki/synthesis/run-21725b8f-0f36-48ec-b9e4-c8db6a96bb16-review-memory-captured-from-dashboard.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md->lint:stale_index_entry:wiki/sources/2026-05-05-karpathy-agentes-llm.md:wiki_page_has_lint_issue",
+      "type": "wiki_page_has_lint_issue",
+      "from": "wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "to": "lint:stale_index_entry:wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "label": "has lint issue",
+      "quality": "stale",
+      "createdAt": "2026-05-13T04:12:30.364Z"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md->raw-source:raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/sources/2026-05-05-karpathy-agentes-llm.md",
+      "to": "raw-source:raw/references/2026-05-05-insights-karpathy-agentes-llm.pdf",
+      "label": "mentions",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/2026-05-05-wiki-curator-05-may.md->raw-source:raw/ingest/2026-05-05-wiki-curator-05-may.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/sources/2026-05-05-wiki-curator-05-may.md",
+      "to": "raw-source:raw/ingest/2026-05-05-wiki-curator-05-may.md",
+      "label": "raw path",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md->raw-source:raw/ingest/2026-05-08-sprint-goal-live-dashboard.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/sources/2026-05-08-sprint-goal-live-dashboard.md",
+      "to": "raw-source:raw/ingest/2026-05-08-sprint-goal-live-dashboard.md",
+      "label": "raw path",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/2026-05-08-tech-constraints.md->raw-source:raw/ingest/2026-05-08-tech-constraints.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/sources/2026-05-08-tech-constraints.md",
+      "to": "raw-source:raw/ingest/2026-05-08-tech-constraints.md",
+      "label": "raw path",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/query-wiki-log-md.md->lint:stale_index_entry:wiki/sources/query-wiki-log-md.md:wiki_page_has_lint_issue",
+      "type": "wiki_page_has_lint_issue",
+      "from": "wiki-page:wiki/sources/query-wiki-log-md.md",
+      "to": "lint:stale_index_entry:wiki/sources/query-wiki-log-md.md",
+      "label": "has lint issue",
+      "quality": "stale",
+      "createdAt": "2026-05-13T04:12:30.364Z"
+    },
+    {
+      "id": "edge:wiki-page:wiki/sources/query-wiki-log-md.md->wiki-page:wiki/log.md:wiki_page_links_to",
+      "type": "wiki_page_links_to",
+      "from": "wiki-page:wiki/sources/query-wiki-log-md.md",
+      "to": "wiki-page:wiki/log.md",
+      "label": "links to",
+      "quality": "verified"
+    },
+    {
+      "id": "edge:wiki-page:wiki/workflows/agent-skill-orchestration.md->raw-source:raw/references/2026-05-05-llm-wiki-agent-orchestration.md:wiki_page_mentions_raw_source",
+      "type": "wiki_page_mentions_raw_source",
+      "from": "wiki-page:wiki/workflows/agent-skill-orchestration.md",
+      "to": "raw-source:raw/references/2026-05-05-llm-wiki-agent-orchestration.md",
+      "label": "mentions",
+      "quality": "verified"
+    }
+  ],
+  "stats": {
+    "nodes": 103,
+    "edges": 62,
+    "byNodeType": {
+      "agent": 8,
+      "role": 6,
+      "task": 10,
+      "run": 13,
+      "wiki-page": 14,
+      "deliverable": 1,
+      "lint-issue": 2,
+      "raw-source": 5,
+      "runtime-log": 44,
+      "dream-decision": 0
+    },
+    "byQuality": {
+      "verified": 92,
+      "proposed": 8,
+      "contradicted": 0,
+      "stale": 2,
+      "orphaned": 0,
+      "generated": 1
+    },
+    "byLayer": {
+      "wiki": 15,
+      "raw": 5,
+      "runtime": 75,
+      "meta": 8
+    }
+  }
+}

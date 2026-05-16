@@ -58,6 +58,7 @@ describe("operational spine routes", () => {
       executorMode: "mock",
       executorModel: "mock",
       modelProfile: "standard",
+      availableExecutorModes: expect.arrayContaining(["mock"]),
       mongo: {
         connected: false,
       },
@@ -166,6 +167,27 @@ describe("operational spine routes", () => {
       },
     });
 
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/dreams/2026-05-13-dream-report.md",
+        content: "# Dream Report\n\n## Proposed actions\n\n1. Link orphan pages.",
+      },
+    });
+
+    const decisionResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: {
+        reportPath: "wiki/dreams/2026-05-13-dream-report.md",
+        proposal: "Link orphan pages.",
+        decision: "accepted",
+        rationale: "Page cleanup approved.",
+      },
+    });
+    expect(decisionResponse.statusCode).toBe(201);
+
     const graphResponse = await server.inject({
       method: "GET",
       url: "/knowledge/graph",
@@ -182,6 +204,7 @@ describe("operational spine routes", () => {
         expect.objectContaining({ id: "role:builder", type: "role", label: "builder" }),
         expect.objectContaining({ id: `task:${task.id}`, type: "task", label: "Map operational memory" }),
         expect.objectContaining({ id: `run:${run.id}`, type: "run", label: "manual run" }),
+        expect.objectContaining({ type: "dream-decision", label: "Dream accepted" }),
       ]),
     );
     expect(graph.nodes.some((node) => node.path === "wiki/deliverables/45d6e401-5f68-4d6c-a189-809b554cfe25-atellier-build-loop-completed.md")).toBe(false);
@@ -206,6 +229,10 @@ describe("operational spine routes", () => {
           type: "run_for_task",
           from: `run:${run.id}`,
           to: `task:${task.id}`,
+        }),
+        expect.objectContaining({
+          type: "dream_decision_for_report",
+          to: "wiki-page:wiki/dreams/2026-05-13-dream-report.md",
         }),
       ]),
     );
@@ -241,6 +268,235 @@ describe("operational spine routes", () => {
     });
 
     expect(oversizedLogResponse.statusCode).toBe(400);
+  });
+
+  it("creates dream_decision_for_report edge when referenced dream report exists", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/dreams/2026-05-13-existing-report.md",
+        content: "# Dream Report\n\n## Proposed actions\n\n1. Keep curation cadence.",
+      },
+    });
+
+    const decisionResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: {
+        reportPath: "wiki/dreams/2026-05-13-existing-report.md",
+        proposal: "Keep curation cadence.",
+        decision: "accepted",
+      },
+    });
+    expect(decisionResponse.statusCode).toBe(201);
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream-decision",
+          metadata: expect.objectContaining({
+            decision: "accepted",
+            reportPath: "wiki/dreams/2026-05-13-existing-report.md",
+            proposal: "Keep curation cadence.",
+          }),
+        }),
+      ]),
+    );
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream_decision_for_report",
+          to: "wiki-page:wiki/dreams/2026-05-13-existing-report.md",
+        }),
+      ]),
+    );
+  });
+
+  it("does not create dream_decision_for_report edge when referenced dream report is missing", async () => {
+    const decisionResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: {
+        reportPath: "wiki/dreams/2026-05-13-missing-report.md",
+        proposal: "This report is intentionally absent.",
+        decision: "deferred",
+      },
+    });
+    expect(decisionResponse.statusCode).toBe(201);
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream-decision",
+          metadata: expect.objectContaining({
+            decision: "deferred",
+            reportPath: "wiki/dreams/2026-05-13-missing-report.md",
+            proposal: "This report is intentionally absent.",
+          }),
+        }),
+      ]),
+    );
+
+    const hasEdgeToMissingReport = graph.edges.some(
+      (edge) =>
+        edge.type === "dream_decision_for_report" &&
+        edge.to === "wiki-page:wiki/dreams/2026-05-13-missing-report.md",
+    );
+    expect(hasEdgeToMissingReport).toBe(false);
+  });
+
+  it("maps dream decision quality states in the graph", async () => {
+    const reportPath = "wiki/dreams/2026-05-13-quality-map-report.md";
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: reportPath,
+        content: "# Dream Report\n\n## Proposed actions\n\n1. A\n2. B\n3. C",
+      },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: { reportPath, proposal: "A", decision: "accepted" },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: { reportPath, proposal: "B", decision: "deferred" },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: { reportPath, proposal: "C", decision: "rejected" },
+    });
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream-decision",
+          quality: "verified",
+          metadata: expect.objectContaining({ decision: "accepted", proposal: "A" }),
+        }),
+        expect.objectContaining({
+          type: "dream-decision",
+          quality: "proposed",
+          metadata: expect.objectContaining({ decision: "deferred", proposal: "B" }),
+        }),
+        expect.objectContaining({
+          type: "dream-decision",
+          quality: "contradicted",
+          metadata: expect.objectContaining({ decision: "rejected", proposal: "C" }),
+        }),
+      ]),
+    );
+  });
+
+  it("reloads persisted graph snapshots after server restart", async () => {
+    const firstGraphResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph",
+    });
+    expect(firstGraphResponse.statusCode).toBe(200);
+    const firstGraph = firstGraphResponse.json<KnowledgeGraphResponse>();
+
+    const firstListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph/snapshots",
+    });
+    expect(firstListResponse.statusCode).toBe(200);
+    const firstList = firstListResponse.json<{ snapshots: Array<{ id: string }> }>();
+    expect(firstList.snapshots.length).toBeGreaterThan(0);
+
+    await server.close();
+    server = await buildServer({
+      storageMode: "memory",
+      atelierRoot,
+    });
+
+    const reloadedListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph/snapshots",
+    });
+    expect(reloadedListResponse.statusCode).toBe(200);
+    const reloadedList = reloadedListResponse.json<{ snapshots: Array<{ id: string }> }>();
+    expect(reloadedList.snapshots.some((snapshot) => snapshot.id === firstGraph.generatedAt)).toBe(true);
+  });
+
+  it("stores knowledge annotations and filter presets", async () => {
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    const nodeId = graph.nodes[0]?.id;
+    expect(nodeId).toBeDefined();
+
+    const saveAnnotationResponse = await server.inject({
+      method: "POST",
+      url: "/knowledge/annotations",
+      payload: {
+        nodeId,
+        note: "Needs follow-up in the next curation pass.",
+        tags: ["curation", "follow-up"],
+      },
+    });
+    expect(saveAnnotationResponse.statusCode).toBe(201);
+
+    const annotationListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/annotations",
+    });
+    expect(annotationListResponse.statusCode).toBe(200);
+    expect(annotationListResponse.json<{ annotations: Array<{ nodeId: string }> }>().annotations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ nodeId })]),
+    );
+
+    const presetCreateResponse = await server.inject({
+      method: "POST",
+      url: "/knowledge/filter-presets",
+      payload: {
+        name: "Needs curation",
+        nodeTypeFilter: "all",
+        qualityFilter: "stale",
+        activeLayers: ["wiki", "meta"],
+        dreamDecisionFilter: "all",
+        densityMode: "comfort",
+      },
+    });
+    expect(presetCreateResponse.statusCode).toBe(201);
+
+    const presetListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/filter-presets",
+    });
+    expect(presetListResponse.statusCode).toBe(200);
+    expect(presetListResponse.json<{ presets: Array<{ name: string }> }>().presets).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Needs curation" })]),
+    );
+
+    const graphWithAnnotationResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    const graphWithAnnotation = graphWithAnnotationResponse.json<KnowledgeGraphResponse>();
+    expect(graphWithAnnotation.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: nodeId,
+          metadata: expect.objectContaining({
+            annotationNote: "Needs follow-up in the next curation pass.",
+            annotationTags: "curation,follow-up",
+          }),
+        }),
+      ]),
+    );
   });
 
   it("creates runs, appends run logs, and writes wiki log on completion", async () => {
@@ -389,6 +645,59 @@ describe("operational spine routes", () => {
     expect(messageList).toHaveLength(2);
     expect(messageList[0]?.role).toBe("user");
     expect(messageList[1]?.role).toBe("assistant");
+  });
+
+  it("accepts a per-run executor override when the mode is available", async () => {
+    const createAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Override Agent",
+        role: "builder",
+      },
+    });
+
+    const agent = createAgentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run`,
+      payload: {
+        instruction: "Run with an explicit mode override.",
+        executorModeOverride: "mock",
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(200);
+    const result = runResponse.json<RunAgentResult>();
+    expect((result.run.input as { executorMode?: string }).executorMode).toBe("mock");
+  });
+
+  it("rejects per-run executor overrides for unavailable modes", async () => {
+    const createAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Unavailable Override Agent",
+        role: "builder",
+      },
+    });
+
+    const agent = createAgentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run`,
+      payload: {
+        instruction: "Try unavailable override.",
+        executorModeOverride: "openai",
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(400);
+    expect(runResponse.json()).toMatchObject({
+      error: expect.stringContaining("not available"),
+    });
   });
 
   it("updates agent instructions", async () => {
@@ -717,6 +1026,44 @@ describe("operational spine routes", () => {
     expect(wikiLogResponse.json<WikiPageResponse>().content).toContain(
       "run_completed | Pepe PM completed execution and requests review.",
     );
+  });
+
+  it("accepts orchestration executor override when available", async () => {
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: {
+        goal: "Run orchestration with explicit override.",
+        executorModeOverride: "mock",
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(202);
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    const runResponse = await server.inject({
+      method: "GET",
+      url: "/runs",
+    });
+    const runList = runResponse.json<Run[]>();
+    const orchestrationRun = runList.find((run) => run.id === started.runId);
+    expect(orchestrationRun).toBeDefined();
+    expect((orchestrationRun?.input as { executorModeOverride?: string })?.executorModeOverride).toBe("mock");
+  });
+
+  it("rejects orchestration executor override when unavailable", async () => {
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: {
+        goal: "Run orchestration with unavailable override.",
+        executorModeOverride: "openai",
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(400);
+    expect(startResponse.json()).toMatchObject({
+      error: expect.stringContaining("not available"),
+    });
   });
 
   it("returns 400 for invalid object ids on agent run stream route", async () => {

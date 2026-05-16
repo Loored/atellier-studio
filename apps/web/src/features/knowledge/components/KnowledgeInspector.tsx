@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { marked } from "marked";
-import type { KnowledgeGraphEdge, KnowledgeGraphNode, KnowledgeGraphNodeType } from "@atellier/shared";
+import type { KnowledgeGraphEdge, KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeNodeAnnotation } from "@atellier/shared";
 import { useWikiPageApi } from "../../../api/hooks/wiki/useWikiApi";
 import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
 import { cn } from "../../../lib/cn";
@@ -17,6 +17,7 @@ const NODE_TYPE_LABELS: Record<KnowledgeGraphNodeType, string> = {
   "lint-issue": "Lint issue",
   "raw-source": "Raw source",
   "runtime-log": "Runtime log",
+  "dream-decision": "Dream decision",
 };
 
 type Tab = "lectura" | "curacion";
@@ -26,10 +27,23 @@ type Props = {
   edges: KnowledgeGraphEdge[];
   nodeLabelById: Map<string, string>;
   onSelectNode: (id: string) => void;
+  annotation: KnowledgeNodeAnnotation | null;
+  isSavingAnnotation: boolean;
+  onSaveAnnotation: (note: string, tags: string[]) => Promise<void>;
 };
 
-export function KnowledgeInspector({ node, edges, nodeLabelById, onSelectNode }: Props) {
+export function KnowledgeInspector({
+  node,
+  edges,
+  nodeLabelById,
+  onSelectNode,
+  annotation,
+  isSavingAnnotation,
+  onSaveAnnotation,
+}: Props) {
   const [tab, setTab] = useState<Tab>("lectura");
+  const [annotationNote, setAnnotationNote] = useState("");
+  const [annotationTags, setAnnotationTags] = useState("");
   const hasPath = Boolean(node?.path);
   const isTextual = node?.path ? /\.(md|markdown|txt|json|jsonl|yaml|yml|csv)$/i.test(node.path) : false;
   const fetchablePath =
@@ -43,6 +57,15 @@ export function KnowledgeInspector({ node, edges, nodeLabelById, onSelectNode }:
     if (node?.type !== "run" || !node.sourceId) return null;
     return runs?.find((r) => r.id === node.sourceId) ?? null;
   }, [runs, node]);
+
+  const dreamDecision = node?.type === "dream-decision" ? String(node.metadata?.decision ?? "") : null;
+  const dreamProposal = node?.type === "dream-decision" ? String(node.metadata?.proposal ?? "") : null;
+  const dreamReportPath = node?.type === "dream-decision" ? String(node.metadata?.reportPath ?? "") : null;
+
+  useEffect(() => {
+    setAnnotationNote(annotation?.note ?? "");
+    setAnnotationTags((annotation?.tags ?? []).join(", "));
+  }, [annotation?.note, annotation?.tags]);
 
   if (!node) {
     return (
@@ -129,6 +152,31 @@ export function KnowledgeInspector({ node, edges, nodeLabelById, onSelectNode }:
                 </pre>
               </div>
             )}
+            {node.type === "dream-decision" && (
+              <div className="rounded border border-white/10 bg-black/25 p-2">
+                <p className="text-ink-faint">Dream decision</p>
+                <p className="mt-1 text-ink-muted">
+                  <span className="font-bold text-ink">Status:</span> {dreamDecision || "unknown"}
+                </p>
+                {dreamReportPath ? (
+                  <div className="mt-1">
+                    <span className="font-bold text-ink">Report:</span>{" "}
+                    <button
+                      type="button"
+                      onClick={() => onSelectNode(`wiki-page:${dreamReportPath}`)}
+                      className="break-all text-left text-teal hover:text-teal/80"
+                    >
+                      {dreamReportPath}
+                    </button>
+                  </div>
+                ) : null}
+                {dreamProposal ? (
+                  <p className="mt-1 whitespace-pre-wrap text-ink-muted">
+                    <span className="font-bold text-ink">Proposal:</span> {dreamProposal}
+                  </p>
+                ) : null}
+              </div>
+            )}
             {fetchablePath && (
               <div>
                 <p className="text-ink-faint">Contenido fuente</p>
@@ -139,6 +187,40 @@ export function KnowledgeInspector({ node, edges, nodeLabelById, onSelectNode }:
                 {!isFetchingPage && !page?.content && (
                   <p className="mt-1 text-ink-faint">Sin contenido disponible.</p>
                 )}
+              </div>
+            )}
+            {node && (
+              <div className="rounded border border-white/10 bg-black/25 p-2">
+                <p className="text-ink-faint">Annotation</p>
+                <textarea
+                  aria-label="Node annotation note"
+                  value={annotationNote}
+                  onChange={(event) => setAnnotationNote(event.target.value)}
+                  className="mt-1 min-h-16 w-full border border-[var(--border-card)] bg-[var(--bg-card)] p-2 text-[0.72rem] text-ink"
+                />
+                <input
+                  aria-label="Node annotation tags"
+                  value={annotationTags}
+                  onChange={(event) => setAnnotationTags(event.target.value)}
+                  placeholder="tags comma-separated"
+                  className="mt-1 h-8 w-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-[0.72rem] text-ink"
+                />
+                <button
+                  type="button"
+                  disabled={!annotationNote.trim() || isSavingAnnotation}
+                  onClick={() =>
+                    void onSaveAnnotation(
+                      annotationNote.trim(),
+                      annotationTags
+                        .split(",")
+                        .map((tag) => tag.trim())
+                        .filter((tag) => tag.length > 0),
+                    )
+                  }
+                  className="mt-1 h-8 border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-[0.72rem] text-ink"
+                >
+                  {isSavingAnnotation ? "Saving…" : "Save annotation"}
+                </button>
               </div>
             )}
             {runDetail && (

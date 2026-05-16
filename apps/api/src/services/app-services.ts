@@ -5,7 +5,7 @@ import {
   type AgentExecutorMode,
   type AgentExecutorService,
 } from "./agent-executor.service";
-import type { AgentRole, ModelProfile } from "@atellier/shared";
+import type { AgentRole, ExecutorMode, ModelProfile } from "@atellier/shared";
 import { AgentRunService } from "./agent-run.service";
 import path from "node:path";
 import { AgentService } from "./agent.service";
@@ -19,6 +19,7 @@ import { CodexWorkerService } from "./codex-worker.service";
 import { readdir } from "node:fs/promises";
 import { KnowledgeGraphService } from "./knowledge-graph.service";
 import { seedDemoData } from "./seed.service";
+import { KnowledgeLiveService } from "./knowledge-live.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -30,6 +31,11 @@ export type AppServices = {
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
   knowledgeGraph: KnowledgeGraphService;
+  knowledgeLive: KnowledgeLiveService;
+  executor: {
+    activeMode: AgentExecutorMode;
+    availableModes: ExecutorMode[];
+  };
 };
 
 export type CreateAppServicesOptions = {
@@ -158,7 +164,59 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     Object.keys(perRole).length > 0 && executorMode === "ollama"
       ? new RoleAwareAgentExecutorService(fallbackExecutor, perRole)
       : fallbackExecutor;
-  const agentRuns = new AgentRunService(agents, runs, messages, executor, {
+  const executorByMode: Partial<Record<ExecutorMode, AgentExecutorService>> = {
+    mock: createAgentExecutorService({ mode: "mock", repoFileHints }),
+  };
+  if (options.openaiApiKey) {
+    executorByMode.openai = createAgentExecutorService({
+      mode: "openai",
+      openai: {
+        apiKey: options.openaiApiKey,
+        model: options.openaiModel ?? "gpt-4.1-mini",
+      },
+      repoFileHints,
+    });
+  }
+  if (options.anthropicApiKey) {
+    executorByMode.anthropic = createAgentExecutorService({
+      mode: "anthropic",
+      anthropic: {
+        apiKey: options.anthropicApiKey,
+        model: options.anthropicModel ?? "claude-opus-4-7",
+      },
+      repoFileHints,
+    });
+  }
+  if (options.groqApiKey) {
+    executorByMode.groq = createAgentExecutorService({
+      mode: "groq",
+      groq: {
+        apiKey: options.groqApiKey,
+        model: options.groqModel ?? "llama-3.3-70b-versatile",
+      },
+      repoFileHints,
+    });
+  }
+  if (options.ollamaModel) {
+    const ollamaDefaultExecutor = createAgentExecutorService({
+      mode: "ollama",
+      ollama: {
+        baseUrl: options.ollamaBaseUrl,
+        model: options.ollamaModel,
+      },
+      repoFileHints,
+    });
+    executorByMode.ollama =
+      Object.keys(perRole).length > 0
+        ? new RoleAwareAgentExecutorService(ollamaDefaultExecutor, perRole)
+        : ollamaDefaultExecutor;
+  }
+
+  // Ensure the active mode uses the exact runtime wiring (including role-aware
+  // wrapper) that was already selected above.
+  executorByMode[executorMode] = executor;
+
+  const agentRuns = new AgentRunService(agents, runs, messages, executorMode, executorByMode, {
     maxHandoffDepth: options.maxHandoffDepth,
     executionTimeoutMs: options.executionTimeoutMs,
     verifiedRepoFiles: repoFileHints,
@@ -174,6 +232,11 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     wiki,
     codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
     knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki, atelierRootResolved),
+    knowledgeLive: new KnowledgeLiveService(),
+    executor: {
+      activeMode: executorMode,
+      availableModes: Object.keys(executorByMode) as ExecutorMode[],
+    },
   };
 
   if (storageMode === "memory" && options.seedDemoData) {

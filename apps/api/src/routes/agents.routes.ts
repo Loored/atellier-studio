@@ -5,6 +5,8 @@ import {
   AGENT_MESSAGE_MAX_LENGTH,
   AGENT_ROLES,
   AGENT_STATUSES,
+  EXECUTOR_MODES,
+  type ExecutorMode,
   type AgentRunStreamEvent,
   type CreateAgentInput,
   type RunAgentInput,
@@ -149,10 +151,22 @@ export async function agentsRoutes(fastify: FastifyInstance, services: AppServic
       return badRequest(reply, `Handoff instruction must be ${AGENT_MESSAGE_MAX_LENGTH} characters or fewer.`);
     }
     const handoffAgentId = optionalStringField(body, "handoffAgentId");
+    const executorModeOverrideRaw = optionalStringField(body, "executorModeOverride");
+    if (executorModeOverrideRaw && !isOneOf(executorModeOverrideRaw, EXECUTOR_MODES)) {
+      return badRequest(reply, "Executor mode override is invalid.");
+    }
+    const executorModeOverride = executorModeOverrideRaw as ExecutorMode | undefined;
+    if (executorModeOverride && !services.executor.availableModes.includes(executorModeOverride)) {
+      return badRequest(
+        reply,
+        `Executor mode '${executorModeOverride}' is not available in this API session.`,
+      );
+    }
 
     const input: RunAgentInput = {
       instruction,
       context,
+      executorModeOverride,
       handoffAgentId,
       handoffInstruction,
     };
@@ -188,10 +202,22 @@ export async function agentsRoutes(fastify: FastifyInstance, services: AppServic
       return badRequest(reply, `Handoff instruction must be ${AGENT_MESSAGE_MAX_LENGTH} characters or fewer.`);
     }
     const handoffAgentId = optionalStringField(body, "handoffAgentId");
+    const executorModeOverrideRaw = optionalStringField(body, "executorModeOverride");
+    if (executorModeOverrideRaw && !isOneOf(executorModeOverrideRaw, EXECUTOR_MODES)) {
+      return badRequest(reply, "Executor mode override is invalid.");
+    }
+    const executorModeOverride = executorModeOverrideRaw as ExecutorMode | undefined;
+    if (executorModeOverride && !services.executor.availableModes.includes(executorModeOverride)) {
+      return badRequest(
+        reply,
+        `Executor mode '${executorModeOverride}' is not available in this API session.`,
+      );
+    }
 
     const input: RunAgentInput = {
       instruction,
       context,
+      executorModeOverride,
       handoffAgentId,
       handoffInstruction,
     };

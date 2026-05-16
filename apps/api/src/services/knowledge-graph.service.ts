@@ -1,10 +1,14 @@
-import { stat } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import type {
   Agent,
+  KnowledgeFilterPreset,
+  KnowledgeFilterPresetCreateInput,
   KnowledgeGraphEdge,
   KnowledgeGraphLayer,
   KnowledgeGraphNode,
+  KnowledgeNodeAnnotation,
+  KnowledgeNodeAnnotationUpsertInput,
   KnowledgeGraphNodeType,
   KnowledgeGraphQualityState,
   KnowledgeGraphResponse,
@@ -32,6 +36,7 @@ const NODE_TYPE_LAYER: Record<KnowledgeGraphNodeType, KnowledgeGraphLayer> = {
   "lint-issue": "meta",
   "raw-source": "raw",
   "runtime-log": "runtime",
+  "dream-decision": "meta",
 };
 
 const MARKDOWN_LINK = /\[[^\]]+\]\(([^)\s#]+)(?:#[^)]*)?\)/g;
@@ -46,9 +51,15 @@ export type KnowledgeGraphSnapshotMeta = {
 
 const SNAPSHOT_RING_SIZE = 48;
 const SNAPSHOT_MIN_INTERVAL_MS = 60 * 60 * 1000;
+const SNAPSHOT_DIR = path.join("_runtime", "graph-snapshots");
+const ANNOTATIONS_FILE = path.join("_runtime", "graph-annotations.json");
+const FILTER_PRESETS_FILE = path.join("_runtime", "graph-filter-presets.json");
 
 export class KnowledgeGraphService {
   private snapshots: KnowledgeGraphResponse[] = [];
+  private readonly snapshotDirAbsolute: string | null;
+  private readonly annotationsFileAbsolute: string | null;
+  private readonly filterPresetsFileAbsolute: string | null;
 
   constructor(
     private readonly agents: AgentService,
@@ -56,7 +67,72 @@ export class KnowledgeGraphService {
     private readonly runs: RunService,
     private readonly wiki: WikiService,
     private readonly atelierRoot?: string,
-  ) {}
+  ) {
+    this.snapshotDirAbsolute = atelierRoot
+      ? path.resolve(atelierRoot, SNAPSHOT_DIR)
+      : null;
+    this.annotationsFileAbsolute = atelierRoot
+      ? path.resolve(atelierRoot, ANNOTATIONS_FILE)
+      : null;
+    this.filterPresetsFileAbsolute = atelierRoot
+      ? path.resolve(atelierRoot, FILTER_PRESETS_FILE)
+      : null;
+  }
+
+  async initialize(): Promise<void> {
+    await this.loadPersistedSnapshots();
+  }
+
+  async listAnnotations(): Promise<KnowledgeNodeAnnotation[]> {
+    const all = await this.readAnnotationsMap();
+    return Object.values(all).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  }
+
+  async upsertAnnotation(input: KnowledgeNodeAnnotationUpsertInput): Promise<KnowledgeNodeAnnotation> {
+    const nodeId = input.nodeId.trim();
+    if (!nodeId) {
+      throw new Error("Annotation nodeId is required.");
+    }
+    const note = input.note.trim();
+    if (!note) {
+      throw new Error("Annotation note is required.");
+    }
+    const tags = (input.tags ?? []).map((tag) => tag.trim().toLowerCase()).filter((tag) => tag.length > 0);
+    const updatedAt = new Date().toISOString();
+    const next: KnowledgeNodeAnnotation = { nodeId, note, tags: Array.from(new Set(tags)), updatedAt };
+    const all = await this.readAnnotationsMap();
+    all[nodeId] = next;
+    await this.writeJsonFile(this.annotationsFileAbsolute, all);
+    return next;
+  }
+
+  async listFilterPresets(): Promise<KnowledgeFilterPreset[]> {
+    const presets = await this.readFilterPresets();
+    return presets.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  }
+
+  async createFilterPreset(input: KnowledgeFilterPresetCreateInput): Promise<KnowledgeFilterPreset> {
+    const name = input.name.trim();
+    if (!name) {
+      throw new Error("Filter preset name is required.");
+    }
+    const now = new Date().toISOString();
+    const preset: KnowledgeFilterPreset = {
+      id: `preset-${now.replace(/[:.]/g, "-")}`,
+      name,
+      nodeTypeFilter: input.nodeTypeFilter,
+      qualityFilter: input.qualityFilter,
+      activeLayers: input.activeLayers,
+      dreamDecisionFilter: input.dreamDecisionFilter,
+      densityMode: input.densityMode,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const presets = await this.readFilterPresets();
+    presets.push(preset);
+    await this.writeJsonFile(this.filterPresetsFileAbsolute, presets);
+    return preset;
+  }
 
   listSnapshots(): KnowledgeGraphSnapshotMeta[] {
     return this.snapshots.map((snapshot) => ({
@@ -70,7 +146,7 @@ export class KnowledgeGraphService {
     return this.snapshots.find((snapshot) => snapshot.generatedAt === id) ?? null;
   }
 
-  private recordSnapshot(response: KnowledgeGraphResponse): void {
+  private async recordSnapshot(response: KnowledgeGraphResponse): Promise<void> {
     const last = this.snapshots[this.snapshots.length - 1];
     if (last) {
       const lastTime = Date.parse(last.generatedAt);
@@ -85,6 +161,7 @@ export class KnowledgeGraphService {
     if (this.snapshots.length > SNAPSHOT_RING_SIZE) {
       this.snapshots.shift();
     }
+    await this.persistSnapshots();
   }
 
   private async fileMtime(relativePath: string): Promise<string | undefined> {
@@ -290,6 +367,8 @@ export class KnowledgeGraphService {
     }
 
     await this.addWikiInternalLinkEdges(curatedWikiPaths, nodes, edges);
+    await this.addDreamDecisionNodesAndEdges(curatedWikiPaths, nodes, edges);
+    await this.applyAnnotations(nodes);
 
     const nodeList = [...nodes.values()].sort((a, b) => a.id.localeCompare(b.id));
     const edgeList = [...edges.values()].sort((a, b) => a.id.localeCompare(b.id));
@@ -305,8 +384,159 @@ export class KnowledgeGraphService {
         byLayer: this.countByLayer(nodeList),
       },
     };
-    this.recordSnapshot(response);
+    await this.recordSnapshot(response);
     return response;
+  }
+
+  private async applyAnnotations(nodes: Map<string, KnowledgeGraphNode>): Promise<void> {
+    const annotations = await this.readAnnotationsMap();
+    for (const [nodeId, annotation] of Object.entries(annotations)) {
+      const node = nodes.get(nodeId);
+      if (!node) continue;
+      nodes.set(nodeId, {
+        ...node,
+        metadata: {
+          ...(node.metadata ?? {}),
+          annotationNote: annotation.note,
+          annotationTags: annotation.tags.join(","),
+          annotationUpdatedAt: annotation.updatedAt,
+        },
+      });
+    }
+  }
+
+  private async readAnnotationsMap(): Promise<Record<string, KnowledgeNodeAnnotation>> {
+    const raw = await this.readJsonFile<Record<string, KnowledgeNodeAnnotation>>(this.annotationsFileAbsolute);
+    return raw ?? {};
+  }
+
+  private async readFilterPresets(): Promise<KnowledgeFilterPreset[]> {
+    const raw = await this.readJsonFile<KnowledgeFilterPreset[]>(this.filterPresetsFileAbsolute);
+    return Array.isArray(raw) ? raw : [];
+  }
+
+  private async readJsonFile<T>(absolutePath: string | null): Promise<T | null> {
+    if (!absolutePath) return null;
+    try {
+      const content = await readFile(absolutePath, "utf8");
+      return JSON.parse(content) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  private async writeJsonFile<T>(absolutePath: string | null, value: T): Promise<void> {
+    if (!absolutePath) return;
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, JSON.stringify(value, null, 2), "utf8");
+  }
+
+  private async loadPersistedSnapshots(): Promise<void> {
+    if (!this.snapshotDirAbsolute) return;
+    await mkdir(this.snapshotDirAbsolute, { recursive: true });
+    const fileNames = await readdir(this.snapshotDirAbsolute);
+    const snapshots: KnowledgeGraphResponse[] = [];
+    for (const fileName of fileNames) {
+      if (!fileName.endsWith(".json")) continue;
+      try {
+        const absolute = path.join(this.snapshotDirAbsolute, fileName);
+        const content = await readFile(absolute, "utf8");
+        const parsed = JSON.parse(content) as Partial<KnowledgeGraphResponse>;
+        if (
+          typeof parsed.generatedAt !== "string" ||
+          !Array.isArray(parsed.nodes) ||
+          !Array.isArray(parsed.edges) ||
+          typeof parsed.stats !== "object" ||
+          parsed.stats === null
+        ) {
+          continue;
+        }
+        snapshots.push(parsed as KnowledgeGraphResponse);
+      } catch {
+        // Ignore malformed snapshot files so startup remains resilient.
+      }
+    }
+    snapshots.sort((a, b) => Date.parse(a.generatedAt) - Date.parse(b.generatedAt));
+    this.snapshots = snapshots.slice(-SNAPSHOT_RING_SIZE);
+  }
+
+  private async persistSnapshots(): Promise<void> {
+    if (!this.snapshotDirAbsolute) return;
+    await mkdir(this.snapshotDirAbsolute, { recursive: true });
+    const activeFiles = new Set<string>();
+    for (const snapshot of this.snapshots) {
+      const fileName = `${snapshot.generatedAt.replace(/[:.]/g, "-")}.json`;
+      activeFiles.add(fileName);
+      const absolute = path.join(this.snapshotDirAbsolute, fileName);
+      await writeFile(absolute, JSON.stringify(snapshot, null, 2), "utf8");
+    }
+    const fileNames = await readdir(this.snapshotDirAbsolute);
+    for (const fileName of fileNames) {
+      if (!fileName.endsWith(".json")) continue;
+      if (activeFiles.has(fileName)) continue;
+      await rm(path.join(this.snapshotDirAbsolute, fileName), { force: true });
+    }
+  }
+
+  private async addDreamDecisionNodesAndEdges(
+    curatedWikiPaths: string[],
+    nodes: Map<string, KnowledgeGraphNode>,
+    edges: Map<string, KnowledgeGraphEdge>,
+  ): Promise<void> {
+    const decisionPaths = curatedWikiPaths.filter((wikiPath) => wikiPath.startsWith("wiki/decisions/"));
+    if (decisionPaths.length === 0) return;
+    const pages = await this.wiki.readPagesByPaths(decisionPaths);
+    for (const page of pages) {
+      const createdAt = this.captureField(page.content, "Created at");
+      const reportPath = this.captureField(page.content, "Report path");
+      const decision = this.captureField(page.content, "Decision");
+      const taskId = this.captureField(page.content, "Task ID");
+      const proposal = this.captureSection(page.content, "Proposal");
+      if (!reportPath || !decision) continue;
+
+      const decisionNodeId = `dream-decision:${page.path}`;
+      this.addNode(nodes, {
+        id: decisionNodeId,
+        type: "dream-decision",
+        layer: NODE_TYPE_LAYER["dream-decision"],
+        label: `Dream ${decision}`,
+        path: page.path,
+        quality: decision === "accepted" ? "verified" : decision === "deferred" ? "proposed" : "contradicted",
+        createdAt: createdAt ?? undefined,
+        updatedAt: createdAt ?? undefined,
+        metadata: {
+          decision,
+          reportPath,
+          proposal: proposal ?? null,
+          taskId: taskId ?? null,
+        },
+      });
+
+      const reportNodeId = this.wikiPageNodeId(reportPath);
+      if (nodes.has(reportNodeId)) {
+        this.addEdge(edges, {
+          id: `edge:${decisionNodeId}->${reportNodeId}:dream_decision_for_report`,
+          type: "dream_decision_for_report",
+          from: decisionNodeId,
+          to: reportNodeId,
+          label: "decision for report",
+          quality: decision === "accepted" ? "verified" : decision === "deferred" ? "proposed" : "contradicted",
+          createdAt: createdAt ?? undefined,
+        });
+      }
+    }
+  }
+
+  private captureField(content: string, name: string): string | null {
+    const regex = new RegExp(`^- ${name}:\\s*(.+)$`, "m");
+    const value = content.match(regex)?.[1]?.trim();
+    return value && value.length > 0 ? value : null;
+  }
+
+  private captureSection(content: string, sectionName: string): string | null {
+    const regex = new RegExp(`## ${sectionName}\\n\\n([\\s\\S]*?)(?:\\n## |$)`);
+    const section = content.match(regex)?.[1]?.trim();
+    return section && section.length > 0 ? section : null;
   }
 
   private async addWikiInternalLinkEdges(

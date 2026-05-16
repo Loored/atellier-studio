@@ -10,6 +10,7 @@ export type CodexWorkerStepStatus = (typeof CODEX_WORKER_STEP_STATUSES)[number];
 export type CodexWorkerStepEvidenceArtifact = {
   label: string;
   path: string;
+  byteSize?: number;
 };
 
 export type CodexWorkerStepEvidence = {
@@ -17,6 +18,7 @@ export type CodexWorkerStepEvidence = {
   capturedAt: string;
   command: string;
   workingDirectory: string;
+  durationMs?: number;
   notes: string[];
   artifacts: CodexWorkerStepEvidenceArtifact[];
 };
@@ -24,6 +26,10 @@ export type CodexWorkerStepEvidence = {
 export type CodexWorkerFinalizeEvidence = {
   completedSteps: number;
   totalSteps: number;
+  failedSteps?: number;
+  blockedSteps?: number;
+  totalDurationMs?: number;
+  artifactCount?: number;
   changedFiles: string[];
   testEvidence: string[];
 };

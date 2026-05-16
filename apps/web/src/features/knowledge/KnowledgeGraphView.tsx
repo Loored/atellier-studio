@@ -26,6 +26,7 @@ const NODE_COLORS: Record<KnowledgeGraphNodeType, string> = {
   "lint-issue": "#ef4444",
   "raw-source": "#fb7185",
   "runtime-log": "#0ea5e9",
+  "dream-decision": "#eab308",
 };
 
 const NODE_TYPE_LABELS: Record<KnowledgeGraphNodeType, string> = {
@@ -38,6 +39,7 @@ const NODE_TYPE_LABELS: Record<KnowledgeGraphNodeType, string> = {
   "lint-issue": "Lint issue",
   "raw-source": "Raw source",
   "runtime-log": "Runtime log",
+  "dream-decision": "Dream decision",
 };
 
 const LAYER_LABELS: Record<KnowledgeLayer, string> = {
@@ -77,9 +79,15 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
     setDensityMode,
     selectedNodeId,
     setSelectedNodeId,
+    dreamDecisionFilter,
+    setDreamDecisionFilter,
+    dreamDecisionCounts,
+    filterPresets,
+    selectedNodeAnnotation,
     selectedNode,
     selectedNodeEdges,
     isFetchingKnowledgeGraph,
+    isKnowledgeLiveConnected,
     knowledgeGraphError,
     refetch,
     dataUpdatedAt,
@@ -91,6 +99,11 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
     timelineCursor,
     setTimelineCursor,
     nodeTimestamps,
+    isSavingAnnotation,
+    isSavingFilterPreset,
+    saveSelectedNodeAnnotation,
+    saveCurrentFilterPreset,
+    applyFilterPreset,
   } = useKnowledgeGraphPanel();
 
   const { data: snapshots } = useKnowledgeSnapshotsApi();
@@ -103,6 +116,7 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 800, height: 520 });
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [presetName, setPresetName] = useState("");
 
   const hoveredNode = useMemo(
     () => (hoveredNodeId ? filteredNodes.find((n) => n.id === hoveredNodeId) ?? null : null),
@@ -200,7 +214,7 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
               )}
             />
             <span className="font-bold uppercase tracking-wider text-ink-muted">
-              {isFetchingKnowledgeGraph ? "Refrescando" : "Sesión viva"}
+              {isFetchingKnowledgeGraph ? "Refrescando" : isKnowledgeLiveConnected ? "Sesión viva" : "Modo fallback"}
             </span>
           </div>
           <span className="text-ink-faint">
@@ -306,6 +320,62 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
             </option>
           ))}
         </select>
+        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 p-0.5">
+          {(["all", "accepted", "rejected", "deferred"] as const).map((decision) => (
+            <button
+              key={decision}
+              type="button"
+              onClick={() => setDreamDecisionFilter(decision)}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide",
+                dreamDecisionFilter === decision ? "bg-white/15 text-ink" : "text-ink-faint hover:text-ink-muted",
+              )}
+            >
+              {decision}
+              {decision !== "all" ? (
+                <span className="ml-1 text-[0.64rem] text-ink-faint">
+                  ({dreamDecisionCounts[decision]})
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+        <select
+          aria-label="Apply graph filter preset"
+          defaultValue=""
+          onChange={(event) => {
+            const value = event.target.value;
+            if (!value) return;
+            applyFilterPreset(value);
+            event.currentTarget.value = "";
+          }}
+          className="h-8 border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-xs text-ink"
+        >
+          <option value="">Apply preset…</option>
+          {filterPresets.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <input
+          aria-label="Filter preset name"
+          value={presetName}
+          onChange={(event) => setPresetName(event.target.value)}
+          placeholder="Preset name"
+          className="h-8 border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-xs text-ink"
+        />
+        <button
+          type="button"
+          disabled={!presetName.trim() || isSavingFilterPreset}
+          onClick={() => {
+            void saveCurrentFilterPreset(presetName.trim());
+            setPresetName("");
+          }}
+          className="h-8 border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-xs text-ink"
+        >
+          {isSavingFilterPreset ? "Saving…" : "Save preset"}
+        </button>
         {(Object.keys(NODE_COLORS) as KnowledgeGraphNodeType[]).map((type) => (
           <span
             key={type}
@@ -363,6 +433,9 @@ export function KnowledgeGraphView({ onNavigate }: KnowledgeGraphViewProps = {})
           edges={selectedNodeEdges}
           nodeLabelById={nodeLabelById}
           onSelectNode={setSelectedNodeId}
+          annotation={selectedNodeAnnotation}
+          isSavingAnnotation={isSavingAnnotation}
+          onSaveAnnotation={saveSelectedNodeAnnotation}
         />
       </div>
     </div>

@@ -18,6 +18,7 @@ const NODE_COLORS: Record<KnowledgeGraphNodeType, string> = {
   "lint-issue": "#ef4444",
   "raw-source": "#fb7185",
   "runtime-log": "#0ea5e9",
+  "dream-decision": "#eab308",
 };
 
 const LAYER_ANCHORS: Record<KnowledgeGraphLayer, { x: number; y: number }> = {

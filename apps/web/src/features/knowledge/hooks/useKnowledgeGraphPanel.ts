@@ -10,11 +10,19 @@ import {
   KNOWLEDGE_GRAPH_NODE_TYPES,
   KNOWLEDGE_GRAPH_QUALITY_STATES,
 } from "@atellier/shared";
-import { useKnowledgeGraphApi } from "../../../api/hooks/knowledge/useKnowledgeApi";
+import {
+  useCreateKnowledgeFilterPresetApi,
+  useKnowledgeAnnotationsApi,
+  useKnowledgeFilterPresetsApi,
+  useKnowledgeGraphApi,
+  useKnowledgeLiveUpdates,
+  useSaveKnowledgeAnnotationApi,
+} from "../../../api/hooks/knowledge/useKnowledgeApi";
 import { useUrlNullable, useUrlSetState, useUrlState } from "./useUrlState";
 
 const ALL_NODE_TYPES = "all";
 const ALL_QUALITIES = "all";
+const ALL_DREAM_DECISIONS = "all";
 
 export const KNOWLEDGE_LAYERS = KNOWLEDGE_GRAPH_LAYERS;
 export type KnowledgeLayer = KnowledgeGraphLayer;
@@ -71,6 +79,12 @@ export function useKnowledgeGraphPanel() {
     isValid: isValidDensityMode,
   });
   const [selectedNodeId, setSelectedNodeId] = useUrlNullable<string>("selected");
+  const [dreamDecisionFilter, setDreamDecisionFilter] = useUrlState<
+    "all" | "accepted" | "rejected" | "deferred"
+  >("dreamDecision", ALL_DREAM_DECISIONS, {
+    isValid: (raw): raw is "all" | "accepted" | "rejected" | "deferred" =>
+      raw === "all" || raw === "accepted" || raw === "rejected" || raw === "deferred",
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [timelineCursor, setTimelineCursor] = useState<number | null>(null);
 
@@ -81,6 +95,11 @@ export function useKnowledgeGraphPanel() {
     refetch,
     dataUpdatedAt,
   } = useKnowledgeGraphApi();
+  const { isKnowledgeLiveConnected } = useKnowledgeLiveUpdates();
+  const { data: annotationsData } = useKnowledgeAnnotationsApi();
+  const { data: filterPresetsData } = useKnowledgeFilterPresetsApi();
+  const saveAnnotationMutation = useSaveKnowledgeAnnotationApi();
+  const createPresetMutation = useCreateKnowledgeFilterPresetApi();
 
   const previousNodeIdsRef = useRef<Set<string>>(new Set());
   const [recentlyAddedNodeIds, setRecentlyAddedNodeIds] = useState<Set<string>>(new Set());
@@ -119,13 +138,20 @@ export function useKnowledgeGraphPanel() {
       const matchesType = nodeTypeFilter === ALL_NODE_TYPES || node.type === nodeTypeFilter;
       const matchesQuality = qualityFilter === ALL_QUALITIES || node.quality === qualityFilter;
       const matchesLayer = activeLayers.has(layerForNode(node));
+      const nodeDreamDecision =
+        node.type === "dream-decision" && typeof node.metadata?.decision === "string"
+          ? node.metadata.decision
+          : null;
+      const matchesDreamDecision =
+        dreamDecisionFilter === ALL_DREAM_DECISIONS ||
+        nodeDreamDecision === dreamDecisionFilter;
       const matchesTimeline =
         timelineCursor === null ||
         !node.updatedAt ||
         Date.parse(node.updatedAt) <= timelineCursor;
-      return matchesType && matchesQuality && matchesLayer && matchesTimeline;
+      return matchesType && matchesQuality && matchesLayer && matchesDreamDecision && matchesTimeline;
     });
-  }, [knowledgeGraph?.nodes, nodeTypeFilter, qualityFilter, activeLayers, timelineCursor]);
+  }, [knowledgeGraph?.nodes, nodeTypeFilter, qualityFilter, activeLayers, dreamDecisionFilter, timelineCursor]);
 
   const nodeTimestamps = useMemo(
     () => (knowledgeGraph?.nodes ?? []).map((n) => n.updatedAt).filter((t): t is string => Boolean(t)),
@@ -152,6 +178,10 @@ export function useKnowledgeGraphPanel() {
     () => filteredNodes.find((node) => node.id === selectedNodeId) ?? null,
     [filteredNodes, selectedNodeId],
   );
+  const selectedNodeAnnotation = useMemo(() => {
+    if (!selectedNodeId) return null;
+    return annotationsData?.annotations.find((annotation) => annotation.nodeId === selectedNodeId) ?? null;
+  }, [annotationsData?.annotations, selectedNodeId]);
 
   const searchMatches = useMemo(() => {
     const trimmed = searchQuery.trim().toLowerCase();
@@ -172,6 +202,18 @@ export function useKnowledgeGraphPanel() {
     return filteredEdges.filter((edge) => edge.from === selectedNodeId || edge.to === selectedNodeId);
   }, [filteredEdges, selectedNodeId]);
 
+  const dreamDecisionCounts = useMemo(() => {
+    const counts = { accepted: 0, rejected: 0, deferred: 0 };
+    for (const node of knowledgeGraph?.nodes ?? []) {
+      if (node.type !== "dream-decision") continue;
+      const decision = node.metadata?.decision;
+      if (decision === "accepted" || decision === "rejected" || decision === "deferred") {
+        counts[decision] += 1;
+      }
+    }
+    return counts;
+  }, [knowledgeGraph?.nodes]);
+
   function toggleLayer(layer: KnowledgeLayer): void {
     const next = new Set(activeLayers);
     if (next.has(layer)) {
@@ -181,6 +223,36 @@ export function useKnowledgeGraphPanel() {
       next.add(layer);
     }
     setActiveLayers(next);
+  }
+
+  async function saveSelectedNodeAnnotation(note: string, tags: string[]): Promise<void> {
+    if (!selectedNodeId) return;
+    await saveAnnotationMutation.mutateAsync({
+      nodeId: selectedNodeId,
+      note,
+      tags,
+    });
+  }
+
+  async function saveCurrentFilterPreset(name: string): Promise<void> {
+    await createPresetMutation.mutateAsync({
+      name,
+      nodeTypeFilter,
+      qualityFilter,
+      activeLayers: Array.from(activeLayers),
+      dreamDecisionFilter,
+      densityMode,
+    });
+  }
+
+  function applyFilterPreset(presetId: string): void {
+    const preset = filterPresetsData?.presets.find((item) => item.id === presetId);
+    if (!preset) return;
+    setNodeTypeFilter(preset.nodeTypeFilter);
+    setQualityFilter(preset.qualityFilter);
+    setActiveLayers(new Set(preset.activeLayers));
+    setDreamDecisionFilter(preset.dreamDecisionFilter);
+    setDensityMode(preset.densityMode);
   }
 
   return {
@@ -199,9 +271,15 @@ export function useKnowledgeGraphPanel() {
     setDensityMode,
     selectedNodeId,
     setSelectedNodeId,
+    dreamDecisionFilter,
+    setDreamDecisionFilter,
+    dreamDecisionCounts,
+    filterPresets: filterPresetsData?.presets ?? [],
+    selectedNodeAnnotation,
     selectedNode,
     selectedNodeEdges,
     isFetchingKnowledgeGraph,
+    isKnowledgeLiveConnected,
     knowledgeGraphError,
     refetch,
     dataUpdatedAt,
@@ -213,5 +291,10 @@ export function useKnowledgeGraphPanel() {
     timelineCursor,
     setTimelineCursor,
     nodeTimestamps,
+    isSavingAnnotation: saveAnnotationMutation.isPending,
+    isSavingFilterPreset: createPresetMutation.isPending,
+    saveSelectedNodeAnnotation,
+    saveCurrentFilterPreset,
+    applyFilterPreset,
   };
 }
