@@ -435,6 +435,33 @@ describe("operational spine routes", () => {
     expect(reloadedList.snapshots.some((snapshot) => snapshot.id === firstGraph.generatedAt)).toBe(true);
   });
 
+  it("returns snapshot diff for a valid snapshot pair", async () => {
+    const firstGraphResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph",
+    });
+    expect(firstGraphResponse.statusCode).toBe(200);
+    const firstGraph = firstGraphResponse.json<KnowledgeGraphResponse>();
+
+    const diffResponse = await server.inject({
+      method: "GET",
+      url: `/knowledge/graph/diff?base=${encodeURIComponent(firstGraph.generatedAt)}&head=${encodeURIComponent(firstGraph.generatedAt)}`,
+    });
+    expect(diffResponse.statusCode).toBe(200);
+    const diff = diffResponse.json<{
+      baseId: string;
+      headId: string;
+      nodes: { added: number; removed: number };
+      edges: { added: number; removed: number };
+    }>();
+    expect(diff.baseId).toBe(firstGraph.generatedAt);
+    expect(diff.headId).toBe(firstGraph.generatedAt);
+    expect(diff.nodes.added).toBe(0);
+    expect(diff.nodes.removed).toBe(0);
+    expect(diff.edges.added).toBe(0);
+    expect(diff.edges.removed).toBe(0);
+  });
+
   it("stores knowledge annotations and filter presets", async () => {
     const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
     const graph = graphResponse.json<KnowledgeGraphResponse>();
@@ -1389,6 +1416,65 @@ describe("operational spine routes", () => {
           issue.path === "wiki/log.md" &&
           issue.message.includes("duplicate entries") &&
           issue.suggestion?.includes("Deduplicate the index rows"),
+      ),
+    ).toBe(true);
+  });
+
+  it("surfaces curation signals from graph annotations and deferred dream decisions", async () => {
+    const runtimeDir = path.join(atelierRoot, "_runtime");
+    await mkdir(runtimeDir, { recursive: true });
+    await writeFile(
+      path.join(runtimeDir, "graph-annotations.json"),
+      JSON.stringify({
+        "wiki-page:wiki/sources/query-wiki-log-md.md": {
+          nodeId: "wiki-page:wiki/sources/query-wiki-log-md.md",
+          note: "Needs review after repeated lint churn.",
+          tags: ["needs-review", "stale"],
+          updatedAt: "2026-05-16T00:00:00.000Z",
+        },
+      }, null, 2),
+      "utf8",
+    );
+
+    const decisionPath = path.join(atelierRoot, "wiki", "decisions", "2026-05-16-dream-decision-test.md");
+    await mkdir(path.dirname(decisionPath), { recursive: true });
+    await writeFile(
+      decisionPath,
+      [
+        "# Dream Proposal Decision",
+        "",
+        "- Created at: 2026-05-16T00:00:00.000Z",
+        "- Report path: wiki/dreams/2026-05-16-dream-report.md",
+        "- Decision: deferred",
+        "",
+        "## Proposal",
+        "",
+        "Link orphan pages into synthesis index.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const lintResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/lint",
+    });
+    expect(lintResponse.statusCode).toBe(200);
+    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string }> }>();
+    expect(
+      lint.issues.some(
+        (issue) =>
+          issue.code === "curation_signal" &&
+          issue.path === "wiki/sources/query-wiki-log-md.md" &&
+          issue.message.includes("Annotation marks this page for curation"),
+      ),
+    ).toBe(true);
+    expect(
+      lint.issues.some(
+        (issue) =>
+          issue.code === "curation_signal" &&
+          issue.path === "wiki/dreams/2026-05-16-dream-report.md" &&
+          issue.message.includes("Dream decision is deferred"),
       ),
     ).toBe(true);
   });

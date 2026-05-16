@@ -95,6 +95,24 @@ export type KnowledgeGraphSnapshotListResponse = {
   snapshots: KnowledgeGraphSnapshotMeta[];
 };
 
+export type KnowledgeGraphSnapshotDiffResponse = {
+  generatedAt: string;
+  baseId: string;
+  headId: string;
+  nodes: {
+    added: number;
+    removed: number;
+    addedNodeIds: string[];
+    removedNodeIds: string[];
+  };
+  edges: {
+    added: number;
+    removed: number;
+    addedEdgeIds: string[];
+    removedEdgeIds: string[];
+  };
+};
+
 export type KnowledgeNodeAnnotation = {
   nodeId: string;
   note: string;
@@ -135,4 +153,36 @@ export type KnowledgeFilterPresetCreateInput = {
 
 export type KnowledgeFilterPresetListResponse = {
   presets: KnowledgeFilterPreset[];
+};
+
+export type RoleMemoryRunSummary = {
+  runId: string;
+  type: string;
+  status: string;
+  reviewStatus?: string;
+  taskId?: string;
+  updatedAt: string;
+};
+
+export type RoleMemoryEntry = {
+  role: string;
+  agentIds: string[];
+  agentNames: string[];
+  stats: {
+    agents: number;
+    tasks: number;
+    runs: number;
+    completed: number;
+    blocked: number;
+    failed: number;
+    pendingReview: number;
+  };
+  recentRuns: RoleMemoryRunSummary[];
+  blockers: string[];
+  focus: string[];
+};
+
+export type RoleMemoryResponse = {
+  generatedAt: string;
+  roles: RoleMemoryEntry[];
 };

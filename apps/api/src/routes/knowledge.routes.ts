@@ -11,6 +11,7 @@ import { bodyRecord, optionalStringField, stringField } from "./route-utils";
 
 export async function knowledgeRoutes(fastify: FastifyInstance, services: AppServices): Promise<void> {
   fastify.get("/knowledge/graph", async () => services.knowledgeGraph.buildGraph());
+  fastify.get("/knowledge/role-memory", async () => services.knowledgeGraph.buildRoleMemory());
 
   fastify.get("/knowledge/graph/snapshots", async () => ({
     snapshots: services.knowledgeGraph.listSnapshots(),
@@ -27,6 +28,20 @@ export async function knowledgeRoutes(fastify: FastifyInstance, services: AppSer
       return reply.code(404).send({ error: "Snapshot not found." });
     }
     return snapshot;
+  });
+
+  fastify.get("/knowledge/graph/diff", async (request, reply) => {
+    const query = request.query as { base?: string; head?: string };
+    const base = typeof query.base === "string" ? decodeURIComponent(query.base) : "";
+    const head = typeof query.head === "string" ? decodeURIComponent(query.head) : "";
+    if (!base || !head) {
+      return reply.code(400).send({ error: "base and head snapshot ids are required." });
+    }
+    const diff = services.knowledgeGraph.buildSnapshotDiff(base, head);
+    if (!diff) {
+      return reply.code(404).send({ error: "Snapshot not found." });
+    }
+    return diff;
   });
 
   fastify.get("/knowledge/annotations", async () => ({
