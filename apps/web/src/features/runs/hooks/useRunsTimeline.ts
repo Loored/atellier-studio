@@ -31,18 +31,48 @@ export function useRunsTimeline() {
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredRunList = runList.filter((run) => {
     const relatedAgent = run.agentId ? agentList.find((agent) => agent.id === run.agentId) : undefined;
     const agentMatches =
       agentFilter === "all" ? true : relatedAgent?.status === agentFilter;
     const reviewMatches =
       reviewFilter === "all" ? true : run.reviewStatus === reviewFilter;
-    return agentMatches && reviewMatches;
+    const searchMatches =
+      normalizedSearch.length === 0
+        ? true
+        : [
+            run.type,
+            run.id,
+            run.status,
+            run.reviewStatus ?? "",
+            run.deliverablePath ?? "",
+            relatedAgent?.name ?? "",
+            relatedAgent?.role ?? "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedSearch);
+    return agentMatches && reviewMatches && searchMatches;
   });
+  const reviewStatusCounts = runList.reduce<Record<RunReviewStatus, number>>(
+    (counts, run) => {
+      if (run.reviewStatus) {
+        counts[run.reviewStatus] += 1;
+      }
+      return counts;
+    },
+    {
+      pending: 0,
+      approved: 0,
+      "changes-requested": 0,
+    },
+  );
 
   const deliverableRuns = runList.filter((run) => Boolean(run.deliverablePath));
 
@@ -96,6 +126,8 @@ export function useRunsTimeline() {
     runLogMessages,
     agentFilter,
     reviewFilter,
+    searchQuery,
+    reviewStatusCounts,
     isFetchingRuns,
     isLoadingRunsWithoutCache,
     isOpenAiExecution,
@@ -112,6 +144,7 @@ export function useRunsTimeline() {
     setRunLogMessage,
     setAgentFilter,
     setReviewFilter,
+    setSearchQuery,
     handleAppendRunLog,
     startManualRun: () => {
       if (isOpenAiExecution) {

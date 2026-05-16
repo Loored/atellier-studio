@@ -11,6 +11,8 @@ export function RunsTimeline() {
     runLogMessages,
     agentFilter,
     reviewFilter,
+    searchQuery,
+    reviewStatusCounts,
     isOpenAiExecution,
     executorModel,
     modelProfile,
@@ -23,6 +25,7 @@ export function RunsTimeline() {
     isLoadingRunsWithoutCache,
     setAgentFilter,
     setReviewFilter,
+    setSearchQuery,
     setRunLogMessage,
     handleAppendRunLog,
     startManualRun,
@@ -63,6 +66,25 @@ export function RunsTimeline() {
               <option key={status} value={status}>{status}</option>
             ))}
           </select>
+        </div>
+        <div className="mt-2">
+          <input
+            aria-label="Run search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search runs"
+          />
+        </div>
+        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+          <span className="inline-flex items-center justify-between rounded-md border border-[var(--border-card)] px-2 py-1 text-[0.72rem] text-ink-muted">
+            pending <strong className="text-ink">{reviewStatusCounts.pending}</strong>
+          </span>
+          <span className="inline-flex items-center justify-between rounded-md border border-[var(--border-card)] px-2 py-1 text-[0.72rem] text-ink-muted">
+            approved <strong className="text-ink">{reviewStatusCounts.approved}</strong>
+          </span>
+          <span className="inline-flex items-center justify-between rounded-md border border-[var(--border-card)] px-2 py-1 text-[0.72rem] text-ink-muted">
+            changes <strong className="text-ink">{reviewStatusCounts["changes-requested"]}</strong>
+          </span>
         </div>
         {isOpenAiExecution ? (
           <p className="mt-2 m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">

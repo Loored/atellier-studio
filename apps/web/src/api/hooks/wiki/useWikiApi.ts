@@ -9,6 +9,8 @@ import type {
   WikiWritePageInput,
   WikiQueryInput,
   WikiQueryResponse,
+  WikiDreamDecisionRecord,
+  WikiDreamDecisionRecordInput,
 } from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
@@ -133,6 +135,35 @@ export function useWikiWritePageApi(options: UseWikiWritePageApiOptions = {}) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type UseWikiRecordDreamDecisionApiOptions = UseMutationOptions<
+  WikiDreamDecisionRecord,
+  Error,
+  WikiDreamDecisionRecordInput
+>;
+
+export function useWikiRecordDreamDecisionApi(options: UseWikiRecordDreamDecisionApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<WikiDreamDecisionRecord, Error, WikiDreamDecisionRecordInput>(
+    {
+      mutationFn: (input) => wikiService.recordDreamDecision(input),
+      ...options,
+    },
+    {
+      onSuccess: async () => {
+        notifySuccess("Dream decision saved");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.graph }),
         ]);
       },
       onError: (error) => notifyError(error),

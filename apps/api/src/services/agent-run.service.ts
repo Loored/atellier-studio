@@ -1,4 +1,4 @@
-import type { AgentRunStreamEvent, RunAgentInput, RunAgentResult } from "@atellier/shared";
+import type { AgentRunStreamEvent, ExecutorMode, RunAgentInput, RunAgentResult } from "@atellier/shared";
 import type { AgentExecutorService, ExecuteAgentInstructionInput } from "./agent-executor.service";
 import { AgentService } from "./agent.service";
 import { MessageService } from "./message.service";
@@ -14,7 +14,8 @@ export class AgentRunService {
     private readonly agents: AgentService,
     private readonly runs: RunService,
     private readonly messages: MessageService,
-    private readonly executor: AgentExecutorService,
+    private readonly defaultExecutorMode: ExecutorMode,
+    private readonly executorByMode: Partial<Record<ExecutorMode, AgentExecutorService>>,
     options: {
       maxHandoffDepth?: number;
       executionTimeoutMs?: number;
@@ -40,6 +41,18 @@ export class AgentRunService {
     return this.runInternal(agentId, input, emit);
   }
 
+  private resolveExecutor(modeOverride?: ExecutorMode): { mode: ExecutorMode; executor: AgentExecutorService } {
+    const mode = modeOverride ?? this.defaultExecutorMode;
+    const executor = this.executorByMode[mode];
+    if (!executor) {
+      const availableModes = Object.keys(this.executorByMode).sort().join(", ");
+      throw new Error(
+        `Executor mode '${mode}' is not available in this API session. Available modes: ${availableModes || "none"}.`,
+      );
+    }
+    return { mode, executor };
+  }
+
   private async runInternal(
     agentId: string,
     input: RunAgentInput,
@@ -53,6 +66,7 @@ export class AgentRunService {
     }
     lineage.add(agentId);
 
+    const { mode: selectedExecutorMode, executor } = this.resolveExecutor(input.executorModeOverride);
     emit?.({ type: "status", status: "queued" });
 
     const run = await this.runs.create({
@@ -62,6 +76,7 @@ export class AgentRunService {
       input: {
         instruction: input.instruction,
         context: input.context,
+        executorMode: selectedExecutorMode,
         verifiedRepoFiles: this.verifiedRepoFiles,
         ...(input.orchestrationStep && {
           orchestrationRunId: input.orchestrationStep.orchestrationRunId,
@@ -98,7 +113,7 @@ export class AgentRunService {
     });
 
     try {
-      const execution = await this.executeWithTimeout({
+      const execution = await this.executeWithTimeout(executor, {
         agent,
         instruction: input.instruction,
         context: input.context,
@@ -209,6 +224,8 @@ export class AgentRunService {
             handoffInstruction: input.handoffInstruction,
             remainingHandoffDepth: remainingHandoffDepth - 1,
             lineage: new Set(lineage),
+            executor,
+            executorMode: selectedExecutorMode,
             emit,
           });
         }
@@ -253,6 +270,8 @@ export class AgentRunService {
     handoffInstruction?: string;
     remainingHandoffDepth: number;
     lineage: Set<string>;
+    executor: AgentExecutorService;
+    executorMode: ExecutorMode;
     emit?: (event: AgentRunStreamEvent) => void;
   }): Promise<void> {
     const targetAgent = await this.agents.getById(options.handoffAgentId);
@@ -281,6 +300,7 @@ export class AgentRunService {
       input: {
         handoffFromAgentId: options.sourceAgent.id,
         handoffFromRunId: options.sourceRunId,
+        executorMode: options.executorMode,
         instruction: composedInstruction,
       },
     });
@@ -309,7 +329,7 @@ export class AgentRunService {
       content: `\n\n[handoff] ${options.sourceAgent.name} -> ${targetAgent.name}\n`,
     });
 
-    const handoffExecution = await this.executeWithTimeout({
+    const handoffExecution = await this.executeWithTimeout(options.executor, {
       agent: targetAgent,
       instruction: composedInstruction,
       context: `handoff from ${options.sourceAgent.name}`,
@@ -355,11 +375,11 @@ export class AgentRunService {
     }
   }
 
-  private async executeWithTimeout(input: ExecuteAgentInstructionInput) {
+  private async executeWithTimeout(executor: AgentExecutorService, input: ExecuteAgentInstructionInput) {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
-        this.executor.execute(input),
+        executor.execute(input),
         new Promise<never>((_resolve, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error(`Execution timeout after ${this.executionTimeoutMs}ms.`));

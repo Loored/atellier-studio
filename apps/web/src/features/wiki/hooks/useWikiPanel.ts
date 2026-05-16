@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Run } from "@atellier/shared";
+import type { Run, WikiDreamDecisionValue } from "@atellier/shared";
 import {
   useOrchestrationStatusApi,
   useStartSkillOrchestrationApi,
@@ -16,6 +16,7 @@ import {
   useWikiPageApi,
   useWikiQueryApi,
   useWikiWritePageApi,
+  useWikiRecordDreamDecisionApi,
 } from "../../../api/hooks/wiki/useWikiApi";
 import { queryKeys } from "../../../api/query/queryKeys";
 
@@ -37,6 +38,7 @@ export function useWikiPanel() {
   const [dreamRunId, setDreamRunId] = useState<string | null>(null);
   const [dreamActionError, setDreamActionError] = useState<string | null>(null);
   const [lastSavedDreamPath, setLastSavedDreamPath] = useState<string | null>(null);
+  const [dreamDecisionFeedback, setDreamDecisionFeedback] = useState<string | null>(null);
 
   const { data: healthStatus } = useHealthApi();
   const isMeteredDreamExecution =
@@ -78,6 +80,7 @@ export function useWikiPanel() {
   const writePageMutation = useWikiWritePageApi();
   const dreamWritePageMutation = useWikiWritePageApi();
   const { mutateAsync: appendWikiLog } = useAppendWikiLogApi();
+  const dreamDecisionMutation = useWikiRecordDreamDecisionApi();
 
   const latestLog = wikiLog?.content
     .split("\n")
@@ -114,6 +117,7 @@ export function useWikiPanel() {
   );
   const canRunDream = !startDreamOrchestration.isPending && !isDreamRunning;
   const canSaveDreamReport = Boolean(dreamReportContent && dreamSuggestedPath) && !dreamWritePageMutation.isPending;
+  const dreamProposals = useMemo(() => extractDreamProposals(dreamReportContent), [dreamReportContent]);
   const lintSummary = useMemo(() => {
     if (!lintResult) {
       return "";
@@ -341,6 +345,23 @@ export function useWikiPanel() {
     setSelectedSummaryPath(result.path);
   }
 
+  async function decideDreamProposal(proposal: string, decision: WikiDreamDecisionValue): Promise<void> {
+    if (!dreamSuggestedPath || !proposal.trim() || dreamDecisionMutation.isPending) {
+      return;
+    }
+    setDreamDecisionFeedback(null);
+    try {
+      const result = await dreamDecisionMutation.mutateAsync({
+        reportPath: dreamSuggestedPath,
+        proposal: proposal.trim(),
+        decision,
+      });
+      setDreamDecisionFeedback(`Decision saved: ${decision} (${result.path})`);
+    } catch (error) {
+      setDreamDecisionFeedback(error instanceof Error ? error.message : "Failed to save dream decision.");
+    }
+  }
+
   return {
     wikiIndex,
     wikiLog,
@@ -378,6 +399,7 @@ export function useWikiPanel() {
     dreamStatus,
     dreamDraftRunId,
     dreamReportContent,
+    dreamProposals,
     dreamSuggestedPath,
     dreamActionError,
     lastSavedDreamPath,
@@ -385,6 +407,7 @@ export function useWikiPanel() {
     isFetchingRuns,
     isStartingDream: startDreamOrchestration.isPending,
     isSavingDreamReport: dreamWritePageMutation.isPending,
+    isSavingDreamDecision: dreamDecisionMutation.isPending,
     canRunDream,
     canSaveDreamReport,
     canRunIngest,
@@ -403,6 +426,8 @@ export function useWikiPanel() {
     runLint,
     runDream,
     saveDreamReport,
+    decideDreamProposal,
+    dreamDecisionFeedback,
     submitWritePage,
   };
 }
@@ -418,4 +443,14 @@ function extractRunResponse(run: Run | null): string {
 function extractDreamPath(content: string): string | null {
   const match = content.match(/wiki\/dreams\/[a-z0-9._/-]+\.md/i);
   return match?.[0] ?? null;
+}
+
+function extractDreamProposals(content: string): string[] {
+  const sectionMatch = content.match(/## Proposed actions\s*\n([\s\S]*?)(?:\n## |\s*$)/i);
+  if (!sectionMatch?.[1]) return [];
+  return sectionMatch[1]
+    .split("\n")
+    .map((line) => line.trim())
+    .map((line) => line.replace(/^\d+\.\s+/, ""))
+    .filter((line) => line.length > 0);
 }

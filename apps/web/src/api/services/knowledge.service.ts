@@ -1,4 +1,10 @@
 import type {
+  KnowledgeFilterPreset,
+  KnowledgeFilterPresetCreateInput,
+  KnowledgeFilterPresetListResponse,
+  KnowledgeNodeAnnotation,
+  KnowledgeNodeAnnotationListResponse,
+  KnowledgeNodeAnnotationUpsertInput,
   KnowledgeGraphResponse,
   KnowledgeGraphSnapshotListResponse,
 } from "@atellier/shared";
@@ -21,6 +27,26 @@ export const knowledgeService = {
     const response = await httpClient.get<KnowledgeGraphResponse>(
       `/knowledge/graph/snapshots/${encodeURIComponent(id)}`,
     );
+    return response.data;
+  },
+
+  async listAnnotations(): Promise<KnowledgeNodeAnnotationListResponse> {
+    const response = await httpClient.get<KnowledgeNodeAnnotationListResponse>("/knowledge/annotations");
+    return response.data;
+  },
+
+  async saveAnnotation(input: KnowledgeNodeAnnotationUpsertInput): Promise<KnowledgeNodeAnnotation> {
+    const response = await httpClient.post<KnowledgeNodeAnnotation>("/knowledge/annotations", input);
+    return response.data;
+  },
+
+  async listFilterPresets(): Promise<KnowledgeFilterPresetListResponse> {
+    const response = await httpClient.get<KnowledgeFilterPresetListResponse>("/knowledge/filter-presets");
+    return response.data;
+  },
+
+  async createFilterPreset(input: KnowledgeFilterPresetCreateInput): Promise<KnowledgeFilterPreset> {
+    const response = await httpClient.post<KnowledgeFilterPreset>("/knowledge/filter-presets", input);
     return response.data;
   },
 };

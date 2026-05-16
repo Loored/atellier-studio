@@ -1,6 +1,6 @@
 # Roadmap
 
-**Last updated:** 2026-05-13 — Knowledge Graph v2 (live force-directed map + inspector + sessions + snapshots) shipped.
+**Last updated:** 2026-05-13 — Knowledge Graph v2 plus persisted snapshots and Dream decision graph curation trail.
 **Active plan:** [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (P1–P4 complete; Knowledge Graph v2 complete; current candidates under "Now planning" below).
 
 ## Strategic stance
@@ -59,25 +59,33 @@ After P2 v2 the obvious gaps before declaring the surface "done":
 - **WebSocket live updates** instead of 15s polling — closes the "sesión viva" loop properly.
 - **Graph annotations** — operator notes/tags on nodes that persist to disk; would feed back into curation.
 - **Filter presets** saved to URL or settings (e.g. "needs curation", "this week", "wiki orphans").
-- **Diff snapshot view** — pick two snapshots, render +/- nodes/edges.
+- **Diff snapshot view** — pick two persisted snapshots, render +/- nodes/edges.
 - **Sub-tabs inside Office** (mock alignment) — promote Office to host the graph as one of its panes.
 - **Performance hardening** for >300 nodes (sprite caching, WebGL toggle, virtualised neighbour calc).
 
-### P3 — Dream report review trail and graph curation
+### P3 — Dream report review trail and graph curation ✅ shipped 2026-05-13
 
-When the operator applies a proposed dream action, record whether the proposal was accepted, rejected, or deferred. Use those decisions to improve the graph: link orphan pages, flag contradictions, identify stale nodes, and create follow-up tasks.
+When the operator applies a proposed dream action, record whether the proposal was accepted, rejected, or deferred. This now ships end-to-end: decisions persist under `wiki/decisions`, update `wiki/log`, and appear in the graph as `dream-decision` nodes with `dream_decision_for_report` edges plus UI filters.
 
 ### P4 — Role memory
 
 Give each agent role a curated memory surface derived from the graph: builder implementation patterns, QA blockers, wiki-curator maintenance themes, PM decisions, and recurring handoff/cohesion issues.
 
-### P5 — Per-run executor override
+### P5 — Per-run executor override ✅ shipped 2026-05-13
 
-Today the executor is env-only; switching requires restarting the API. A Settings UI toggle (and a per-run override on orchestration start) was deferred in the original plan. Worth revisiting now that 4 providers exist.
+Manual agent runs now support `executorModeOverride` with backend availability validation and a UI selector in the Office agent composer. Default env-driven behavior is unchanged.
+
+### P5.b — Orchestration-level executor override
+
+Extend the same override concept to orchestration start flows so multi-step skills can run under an explicitly selected mode per orchestration run.
+
+Status: ✅ shipped 2026-05-13. Orchestration start now accepts `executorModeOverride` with backend availability validation and frontend selector support.
 
 ### P6 — Codex Worker Evidence Pass v1.1
 
 Still useful, and it becomes more valuable once evidence can appear as graph nodes/edges. Persist richer per-step evidence metadata, render step + finalize evidence in the Codex Worker panel, strengthen finalize summary structure and counts, and keep the fake executor for now.
+
+Status: ✅ shipped 2026-05-13. Step-level evidence now includes durations and artifact sizes; finalize evidence now includes failed/blocked counts, artifact totals, and total step duration, and the dashboard panel renders the enriched view.
 
 ### Later candidate — auto-persist toggle for the dream report
 

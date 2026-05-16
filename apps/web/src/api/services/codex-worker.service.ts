@@ -43,8 +43,12 @@ export const codexWorkerService = {
     const response = await httpClient.post(`/codex/runs/${runId}/cancel`);
     return response.data;
   },
-  async finalize(runId: string, summary?: string) {
-    const response = await httpClient.post(`/codex/runs/${runId}/finalize`, { summary });
+  async finalize(runId: string, input?: { summary?: string; changedFiles?: string[]; testEvidence?: string[] }) {
+    const response = await httpClient.post(`/codex/runs/${runId}/finalize`, {
+      summary: input?.summary,
+      changedFiles: input?.changedFiles,
+      testEvidence: input?.testEvidence,
+    });
     return response.data;
   },
 };

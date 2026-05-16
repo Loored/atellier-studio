@@ -162,11 +162,13 @@ pnpm codex:wiki-lint
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
 1. **Memory artifact hygiene**: curate generated run/deliverable files so durable wiki memory stays readable and publishable.
-2. **Graph visual QA and curation polish**: inspect the new graph view against real local data, improve layout/readability, and add richer wiki link extraction.
-3. **Dream report review trail + graph curation**: record accepted/rejected/deferred dream proposals and feed those decisions back into graph links and follow-up tasks.
-4. **Role memory**: curate what Builder, QA, Wiki Curator, PM, and other roles learn over time.
-5. **Per-run executor override**: evaluate whether Settings/UI should choose mock/OpenAI/Anthropic/Groq/Ollama per run or stay env-driven.
-6. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata. No real Codex CLI integration yet.
+2. **Role memory**: curate what Builder, QA, Wiki Curator, PM, and other roles learn over time.
+3. **Graph snapshot diff view**: compare two snapshots and expose +/− node/edge deltas.
+4. **Knowledge graph performance pass (>300 nodes)**: sprite caching/WebGL toggle/neighbor calc profiling.
+5. **Role memory overlays in graph/inspector**: link curated role learnings directly to graph entities.
+6. **Codex Worker real executor adapter (future)**: keep current fake executor until controlled real execution integration.
+
+Already shipped on 2026-05-13: graph curation polish, Dream report decision trail, per-run executor override, orchestration-level executor override, and Codex Worker Evidence Pass v1.1.
 
 Auth, cloud deploy, multiplayer, vector search, graph DB, external meeting/chat/drive integrations, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
 

@@ -1,5 +1,10 @@
 # Atellier Studio Wiki Log
 
+## [2026-05-13T00:00:00.000Z] decision | Dream decision trail and persisted graph snapshots landed
+- Summary: Added explicit Dream proposal decisions (`accepted/rejected/deferred`) with durable records under `wiki/decisions`, connected those decisions to Knowledge Graph nodes/edges, and persisted graph snapshots to disk so timeline history survives API restarts.
+- runLog: atelier/runs/2026-05-13-dream-decisions-and-persisted-snapshots.md
+- docs: docs/knowledge-graph.md, docs/roadmap.md
+
 ## [2026-05-12T00:00:00.000Z] decision | Knowledge Graph direction added
 - Summary: Added the next product direction: a local Knowledge Graph read model and Graph View that visualize the operational memory agents are building across sources, wiki pages, agents, roles, tasks, runs, reviews, deliverables, decisions, contradictions, dream reports, and skills. Initial scope avoids external integrations, vector DB, graph DB, and silent autonomous curation.
 - runLog: atelier/runs/2026-05-12-knowledge-graph-direction.md
@@ -11481,5 +11486,209 @@
 - issues: 2
 
 ## [2026-05-13T01:06:58.579Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T03:40:00.000Z] knowledge_graph_upgrade | Live updates + curation presets
+- Summary: Knowledge Graph now uses WebSocket push with polling fallback, and supports persisted node annotations plus saved filter presets.
+- api_endpoints: /knowledge/annotations, /knowledge/filter-presets
+- runtime_files: atelier/_runtime/graph-annotations.json, atelier/_runtime/graph-filter-presets.json
+
+## [2026-05-13T04:10:00.000Z] executor_override | Per-run executor override
+- Summary: Manual agent runs can now select an optional executor mode per run while preserving env-driven defaults.
+- api_fields: executorModeOverride, availableExecutorModes
+
+## [2026-05-13T04:40:00.000Z] orchestration_and_codex_evidence | Orchestration override + Codex evidence v1.1
+- Summary: Skill orchestrations now support per-run executor override; Codex Worker finalize/step evidence now includes richer metrics (duration, artifact sizes, failed/blocked counters).
+- api_fields: executorModeOverride, availableExecutorModes, codex finalize evidence metrics
+
+## [2026-05-13T04:09:46.670Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: b332bce2-9607-42f5-a968-00ca3d17cd9b
+- Agent ID: 414906b8-a30d-4fc3-b3ab-ee372429aaec
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:10:22.963Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: d6227d97-c0a6-4b7f-899e-3dc7396e5532
+- Agent ID: 898921b3-1ebe-4221-a886-050fd1be4e98
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:10:52.233Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: ab392230-cb6a-4bf6-be82-8402ec7ce0d3
+- Agent ID: b3ffe9d0-fb55-4428-9a62-f138fe0ec93c
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:11:10.098Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 86ae20a9-d9ae-441d-a1ba-edbe9c2c273c
+- Agent ID: 9c6aed50-0269-4844-b84c-f5dd8d3249a2
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:11:31.002Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: a3483276-52fd-4340-a4a7-c75cb597cdc1
+- Agent ID: 898921b3-1ebe-4221-a886-050fd1be4e98
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:11:49.035Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 30990e59-2b39-4c6b-b399-c7f7154c6e51
+- Agent ID: 9c6aed50-0269-4844-b84c-f5dd8d3249a2
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:12:13.328Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 4fe76d57-0cdd-4ee2-a53e-4b47ad5bee71
+- Agent ID: 7f8d4f13-768d-4b36-9e26-e4c1716e2d54
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-05-13T04:12:13.535Z] run_completed | Atellier Build Loop completed
+- Run ID: 0a559696-4c24-44fe-8d78-d76ae0d7e1a1
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/0a559696-4c24-44fe-8d78-d76ae0d7e1a1-atellier-build-loop-completed.md
+
+## [2026-05-13T04:12:30.365Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:12:45.563Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:13:00.815Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:13:16.059Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:13:31.291Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:13:46.459Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:14:01.652Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:14:16.788Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:14:31.892Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:14:47.092Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:15:02.268Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:15:17.315Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:15:32.364Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:15:47.422Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:16:02.484Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:16:17.536Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:16:32.600Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:16:47.663Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:17:02.704Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:17:17.739Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:17:32.802Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:17:47.853Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:18:02.905Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:18:17.994Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:18:33.035Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:18:48.082Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:19:03.145Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:19:18.194Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:19:33.254Z] wiki_lint | Wiki lint run
+- Summary: Found 2 issue(s).
+- issues: 2
+
+## [2026-05-13T04:19:48.331Z] wiki_lint | Wiki lint run
 - Summary: Found 2 issue(s).
 - issues: 2

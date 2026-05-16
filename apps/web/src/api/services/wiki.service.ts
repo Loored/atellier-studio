@@ -8,6 +8,8 @@ import type {
   WikiWritePageInput,
   WikiQueryInput,
   WikiQueryResponse,
+  WikiDreamDecisionRecord,
+  WikiDreamDecisionRecordInput,
 } from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
@@ -51,6 +53,11 @@ export const wikiService = {
 
   async lint(): Promise<WikiLintResponse> {
     const response = await httpClient.post<WikiLintResponse>("/wiki/lint");
+    return response.data;
+  },
+
+  async recordDreamDecision(input: WikiDreamDecisionRecordInput): Promise<WikiDreamDecisionRecord> {
+    const response = await httpClient.post<WikiDreamDecisionRecord>("/wiki/dream-decisions", input);
     return response.data;
   },
 };

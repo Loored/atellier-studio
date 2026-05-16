@@ -320,6 +320,7 @@ export class SkillOrchestrationService {
         skillId: input.skillId,
         goal: input.goal,
         context: input.context,
+        executorModeOverride: input.executorModeOverride,
       },
     });
     await this.runs.appendLog(orchestrationRun.id, {
@@ -349,6 +350,7 @@ export class SkillOrchestrationService {
         const result = await this.agentRuns.run(agent.id, {
           instruction: this.buildStepInstruction(template, step, input.goal),
           context: await this.buildStepContext(template, step, orchestrationRun.id, input.context, previousOutputs),
+          executorModeOverride: input.executorModeOverride,
           recordDeliverable: false,
           orchestrationStep: {
             orchestrationRunId: orchestrationRun.id,

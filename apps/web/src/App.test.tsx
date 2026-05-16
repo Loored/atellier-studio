@@ -25,6 +25,7 @@ const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
 const appendWikiLogMock = vi.hoisted(() => vi.fn());
 const writeWikiPageMock = vi.hoisted(() => vi.fn());
+const recordDreamDecisionMock = vi.hoisted(() => vi.fn());
 const createCodexRunMock = vi.hoisted(() => vi.fn());
 const getCodexRunMock = vi.hoisted(() => vi.fn());
 const planCodexRunMock = vi.hoisted(() => vi.fn());
@@ -33,6 +34,11 @@ const executeNextCodexMock = vi.hoisted(() => vi.fn());
 const cancelCodexMock = vi.hoisted(() => vi.fn());
 const finalizeCodexMock = vi.hoisted(() => vi.fn());
 const readKnowledgeGraphMock = vi.hoisted(() => vi.fn());
+const listKnowledgeSnapshotsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ snapshots: [] }));
+const listKnowledgeAnnotationsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ annotations: [] }));
+const listKnowledgeFilterPresetsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ presets: [] }));
+const saveKnowledgeAnnotationMock = vi.hoisted(() => vi.fn());
+const createKnowledgeFilterPresetMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -156,6 +162,7 @@ vi.mock("./api/services/wiki.service", () => ({
     query: queryWikiMock,
     lint: lintWikiMock,
     writePage: writeWikiPageMock,
+    recordDreamDecision: recordDreamDecisionMock,
   },
 }));
 
@@ -190,6 +197,11 @@ vi.mock("./api/services/codex-worker.service", () => ({
 vi.mock("./api/services/knowledge.service", () => ({
   knowledgeService: {
     readGraph: readKnowledgeGraphMock,
+    listSnapshots: listKnowledgeSnapshotsMock,
+    listAnnotations: listKnowledgeAnnotationsMock,
+    listFilterPresets: listKnowledgeFilterPresetsMock,
+    saveAnnotation: saveKnowledgeAnnotationMock,
+    createFilterPreset: createKnowledgeFilterPresetMock,
   },
 }));
 
@@ -350,6 +362,14 @@ describe("App", () => {
       content: "# Wiki Brain v2\n\n- Safe write route active.",
       ready: true,
     });
+    recordDreamDecisionMock.mockResolvedValue({
+      id: "decision-1",
+      path: "wiki/decisions/2026-05-13-dream-decision-1.md",
+      reportPath: "wiki/dreams/2026-05-11-dream-report.md",
+      proposal: "Keep the report as a proposed maintenance page.",
+      decision: "accepted",
+      createdAt: "2026-05-13T00:00:00.000Z",
+    });
     createCodexRunMock.mockResolvedValue({ id: "codex-run-1" });
     getCodexRunMock.mockResolvedValue({
       run: {
@@ -493,7 +513,7 @@ describe("App", () => {
     expect(await screen.findByText("Prepare project spine")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Wiki Log" })).toBeInTheDocument();
     // Executor mode badge in header shows the mode name
-    expect(await screen.findByText("openai")).toBeInTheDocument();
+    expect((await screen.findAllByText("openai")).length).toBeGreaterThan(0);
   });
 
   it("renders the knowledge graph view from the graph API chain", async () => {
@@ -555,6 +575,24 @@ describe("App", () => {
         reviewStatus: "approved",
       });
     });
+  });
+
+  it("shows review counters and combines review filter with run search", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
+
+    expect((await screen.findAllByText(/pending/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/approved/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/changes/i)).length).toBeGreaterThan(0);
+
+    const reviewSelects = screen.getAllByRole("combobox");
+    await user.selectOptions(reviewSelects[1] as HTMLElement, "approved");
+    await user.type(screen.getByLabelText("Run search"), "run-3");
+
+    expect(await screen.findByRole("button", { name: /unlink/i })).toBeInTheDocument();
+    expect(screen.queryByText(/No runs match current filters/i)).not.toBeInTheDocument();
   });
 
   it("promotes a completed run to deliverable from timeline", async () => {
@@ -704,9 +742,29 @@ describe("App", () => {
           query: "raw sources",
           relatedPages: 1,
           contradictions: 1,
-        },
-      });
+      },
     });
+    listKnowledgeSnapshotsMock.mockResolvedValue({ snapshots: [] });
+    listKnowledgeAnnotationsMock.mockResolvedValue({ annotations: [] });
+    listKnowledgeFilterPresetsMock.mockResolvedValue({ presets: [] });
+    saveKnowledgeAnnotationMock.mockResolvedValue({
+      nodeId: "run:run-1",
+      note: "sample",
+      tags: ["sample"],
+      updatedAt: "2026-05-13T00:00:00.000Z",
+    });
+    createKnowledgeFilterPresetMock.mockResolvedValue({
+      id: "preset-1",
+      name: "Preset",
+      nodeTypeFilter: "all",
+      qualityFilter: "all",
+      activeLayers: ["wiki", "raw", "runtime", "meta"],
+      dreamDecisionFilter: "all",
+      densityMode: "auto",
+      createdAt: "2026-05-13T00:00:00.000Z",
+      updatedAt: "2026-05-13T00:00:00.000Z",
+    });
+  });
 
     await user.click(screen.getByRole("button", { name: /run wiki lint/i }));
     expect(await screen.findByText(/Fix the Raw path reference or restore the missing raw source\./i)).toBeInTheDocument();
@@ -792,6 +850,16 @@ describe("App", () => {
       });
     });
     expect(await screen.findByText(/Saved: wiki\/dreams\/2026-05-11-dream-report\.md/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /accept/i }));
+    await waitFor(() => {
+      expect(recordDreamDecisionMock).toHaveBeenCalledWith({
+        reportPath: "wiki/dreams/2026-05-11-dream-report.md",
+        proposal: "Keep the report as a proposed maintenance page.",
+        decision: "accepted",
+      });
+    });
+    expect(await screen.findByText(/Decision saved: accepted/i)).toBeInTheDocument();
   });
 
   it("runs codex worker panel actions", async () => {

@@ -1,4 +1,5 @@
 import type { Agent, AgentRole } from "./agent";
+import type { ExecutorMode } from "./health";
 import type { AgentMessage } from "./message";
 import type { Run } from "./run";
 
@@ -33,6 +34,7 @@ export type AgentValidationResult = {
 export type RunAgentInput = {
   instruction: string;
   context?: string;
+  executorModeOverride?: ExecutorMode;
   handoffAgentId?: string;
   handoffInstruction?: string;
   recordDeliverable?: boolean;

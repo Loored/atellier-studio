@@ -8,6 +8,7 @@ export const KNOWLEDGE_GRAPH_NODE_TYPES = [
   "lint-issue",
   "raw-source",
   "runtime-log",
+  "dream-decision",
 ] as const;
 
 export type KnowledgeGraphNodeType = (typeof KNOWLEDGE_GRAPH_NODE_TYPES)[number];
@@ -23,6 +24,8 @@ export const KNOWLEDGE_GRAPH_EDGE_TYPES = [
   "wiki_page_links_to",
   "wiki_page_mentions_raw_source",
   "wiki_page_mentions_runtime_log",
+  "dream_decision_for_report",
+  "dream_decision_for_proposal",
 ] as const;
 
 export type KnowledgeGraphEdgeType = (typeof KNOWLEDGE_GRAPH_EDGE_TYPES)[number];
@@ -90,4 +93,46 @@ export type KnowledgeGraphSnapshotMeta = {
 
 export type KnowledgeGraphSnapshotListResponse = {
   snapshots: KnowledgeGraphSnapshotMeta[];
+};
+
+export type KnowledgeNodeAnnotation = {
+  nodeId: string;
+  note: string;
+  tags: string[];
+  updatedAt: string;
+};
+
+export type KnowledgeNodeAnnotationUpsertInput = {
+  nodeId: string;
+  note: string;
+  tags?: string[];
+};
+
+export type KnowledgeNodeAnnotationListResponse = {
+  annotations: KnowledgeNodeAnnotation[];
+};
+
+export type KnowledgeFilterPreset = {
+  id: string;
+  name: string;
+  nodeTypeFilter: KnowledgeGraphNodeType | "all";
+  qualityFilter: KnowledgeGraphQualityState | "all";
+  activeLayers: KnowledgeGraphLayer[];
+  dreamDecisionFilter: "all" | "accepted" | "rejected" | "deferred";
+  densityMode: "auto" | "comfort" | "sparse";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type KnowledgeFilterPresetCreateInput = {
+  name: string;
+  nodeTypeFilter: KnowledgeGraphNodeType | "all";
+  qualityFilter: KnowledgeGraphQualityState | "all";
+  activeLayers: KnowledgeGraphLayer[];
+  dreamDecisionFilter: "all" | "accepted" | "rejected" | "deferred";
+  densityMode: "auto" | "comfort" | "sparse";
+};
+
+export type KnowledgeFilterPresetListResponse = {
+  presets: KnowledgeFilterPreset[];
 };

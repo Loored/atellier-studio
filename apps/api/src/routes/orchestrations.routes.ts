@@ -1,8 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import {
+  EXECUTOR_MODES,
   ORCHESTRATION_CONTEXT_MAX_LENGTH,
   ORCHESTRATION_GOAL_MAX_LENGTH,
   ORCHESTRATION_SKILL_IDS,
+  type ExecutorMode,
   type StartSkillOrchestrationInput,
   type StartSkillOrchestrationResponse,
 } from "@atellier/shared";
@@ -57,12 +59,24 @@ export async function orchestrationsRoutes(fastify: FastifyInstance, services: A
     if (taskId && !isValidObjectId(taskId)) {
       return badRequest(reply, "Task id is invalid.");
     }
+    const executorModeOverrideRaw = optionalStringField(body, "executorModeOverride");
+    if (executorModeOverrideRaw && !isOneOf(executorModeOverrideRaw, EXECUTOR_MODES)) {
+      return badRequest(reply, "Executor mode override is invalid.");
+    }
+    const executorModeOverride = executorModeOverrideRaw as ExecutorMode | undefined;
+    if (executorModeOverride && !services.executor.availableModes.includes(executorModeOverride)) {
+      return badRequest(
+        reply,
+        `Executor mode '${executorModeOverride}' is not available in this API session.`,
+      );
+    }
 
     const input: StartSkillOrchestrationInput = {
       skillId,
       goal,
       context,
       taskId,
+      executorModeOverride,
     };
 
     const result: StartSkillOrchestrationResponse = await services.skillOrchestrations.startBackground(input);

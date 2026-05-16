@@ -10,6 +10,7 @@ const NODE_TYPE_LABELS: Record<KnowledgeGraphNodeType, string> = {
   "lint-issue": "Lint issue",
   "raw-source": "Raw source",
   "runtime-log": "Runtime log",
+  "dream-decision": "Dream decision",
 };
 
 const LAYER_DOT: Record<string, string> = {

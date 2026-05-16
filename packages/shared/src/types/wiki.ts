@@ -101,3 +101,25 @@ export type WikiLintResponse = {
   issues: WikiLintIssue[];
   checkedAt: string;
 };
+
+export const WIKI_DREAM_DECISION_VALUES = ["accepted", "rejected", "deferred"] as const;
+export type WikiDreamDecisionValue = (typeof WIKI_DREAM_DECISION_VALUES)[number];
+
+export type WikiDreamDecisionRecordInput = {
+  reportPath: string;
+  proposal: string;
+  decision: WikiDreamDecisionValue;
+  rationale?: string;
+  taskId?: string;
+};
+
+export type WikiDreamDecisionRecord = {
+  id: string;
+  path: string;
+  reportPath: string;
+  proposal: string;
+  decision: WikiDreamDecisionValue;
+  rationale?: string;
+  taskId?: string;
+  createdAt: string;
+};

@@ -36,7 +36,17 @@ export function useCodexWorkerApi(runId: string | null) {
     mutationFn: (id: string) => codexWorkerService.cancel(id),
   });
   const finalizeCodexWorkerMutation = useMutation({
-    mutationFn: ({ id, summary }: { id: string; summary?: string }) => codexWorkerService.finalize(id, summary),
+    mutationFn: ({
+      id,
+      summary,
+      changedFiles,
+      testEvidence,
+    }: {
+      id: string;
+      summary?: string;
+      changedFiles?: string[];
+      testEvidence?: string[];
+    }) => codexWorkerService.finalize(id, { summary, changedFiles, testEvidence }),
   });
 
   return {

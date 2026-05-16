@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ORCHESTRATION_SKILL_IDS, type OrchestrationSkillId } from "@atellier/shared";
+import { ORCHESTRATION_SKILL_IDS, type ExecutorMode, type OrchestrationSkillId } from "@atellier/shared";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
   useOrchestrationSkillsApi,
@@ -23,6 +23,7 @@ export function useSkillOrchestrationPanel() {
   const [selectedSkillId, setSelectedSkillId] = useState<OrchestrationSkillId>(ORCHESTRATION_SKILL_IDS[0]);
   const [goal, setGoal] = useState("");
   const [context, setContext] = useState("");
+  const [executorModeOverride, setExecutorModeOverride] = useState<ExecutorMode | "">("");
   const [mode, setMode] = useState<Mode>("form");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const invalidatedRef = useRef(false);
@@ -33,6 +34,8 @@ export function useSkillOrchestrationPanel() {
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
+  const availableExecutorModes: ExecutorMode[] = healthStatus?.availableExecutorModes
+    ?? [healthStatus?.executorMode ?? "mock"];
 
   const selectedSkill = useMemo(
     () => orchestrationSkillList.find((s) => s.id === selectedSkillId) ?? orchestrationSkillList[0],
@@ -63,7 +66,12 @@ export function useSkillOrchestrationPanel() {
     }
 
     startSkillOrchestration.mutate(
-      { skillId: selectedSkill.id, goal: trimmedGoal, context: context.trim() || undefined },
+      {
+        skillId: selectedSkill.id,
+        goal: trimmedGoal,
+        context: context.trim() || undefined,
+        executorModeOverride: executorModeOverride || undefined,
+      },
       {
         onSuccess: (result) => {
           invalidatedRef.current = false;
@@ -71,6 +79,7 @@ export function useSkillOrchestrationPanel() {
           setMode("live");
           setGoal("");
           setContext("");
+          setExecutorModeOverride("");
         },
       },
     );
@@ -93,6 +102,8 @@ export function useSkillOrchestrationPanel() {
     isOpenAiExecution,
     executorModel,
     modelProfile,
+    executorModeOverride,
+    availableExecutorModes,
     isFetchingOrchestrationSkills,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration: startSkillOrchestration.isPending,
@@ -100,6 +111,7 @@ export function useSkillOrchestrationPanel() {
     setSelectedSkillId,
     setGoal,
     setContext,
+    setExecutorModeOverride,
     handleStartOrchestration,
     resetToForm,
   };

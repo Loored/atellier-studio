@@ -13,6 +13,8 @@ import {
   type WikiQueryMatch,
   type WikiQueryResponse,
   type WikiRelatedPage,
+  type WikiDreamDecisionRecord,
+  type WikiDreamDecisionRecordInput,
 } from "@atellier/shared";
 
 const DEFAULT_INDEX = `# Atellier Studio Wiki Index
@@ -137,6 +139,64 @@ export class WikiService {
     return {
       path: this.logPath,
       entry,
+    };
+  }
+
+  async recordDreamDecision(input: WikiDreamDecisionRecordInput): Promise<WikiDreamDecisionRecord> {
+    await this.ensureWiki();
+    const reportPath = this.normalizeWritableWikiMarkdownPath(input.reportPath);
+    if (!reportPath.startsWith("wiki/dreams/")) {
+      throw new Error("Dream decision report path must be under wiki/dreams/.");
+    }
+    const proposal = input.proposal.trim();
+    if (!proposal) {
+      throw new Error("Dream proposal is required.");
+    }
+    const createdAt = new Date().toISOString();
+    const id = this.slugify(`${createdAt}-${proposal}`).slice(0, 64);
+    const datePrefix = createdAt.slice(0, 10);
+    const decisionPath = `wiki/decisions/${datePrefix}-dream-decision-${id}.md`;
+    const content = [
+      "# Dream Proposal Decision",
+      "",
+      `- Created at: ${createdAt}`,
+      `- Report path: ${reportPath}`,
+      `- Decision: ${input.decision}`,
+      ...(input.taskId ? [`- Task ID: ${input.taskId}`] : []),
+      "",
+      "## Proposal",
+      "",
+      proposal,
+      "",
+      "## Rationale",
+      "",
+      input.rationale?.trim() || "_No rationale provided._",
+      "",
+    ].join("\n");
+
+    await this.writeAtelierPage(decisionPath, content);
+    await this.upsertWikiIndexEntry(decisionPath, content);
+    await this.appendLog({
+      eventType: "decision",
+      title: `Dream action ${input.decision}`,
+      summary: `Dream proposal decision recorded for ${reportPath}`,
+      taskId: input.taskId,
+      details: {
+        reportPath,
+        proposal,
+        decision: input.decision,
+      },
+    });
+
+    return {
+      id,
+      path: decisionPath,
+      reportPath,
+      proposal,
+      decision: input.decision,
+      rationale: input.rationale,
+      taskId: input.taskId,
+      createdAt,
     };
   }
 

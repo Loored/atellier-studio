@@ -1,5 +1,5 @@
 import { Check, Loader2, Play, Route, RotateCcw, Workflow, X } from "lucide-react";
-import type { OrchestrationSkillId, OrchestrationStepStatusEntry } from "@atellier/shared";
+import type { ExecutorMode, OrchestrationSkillId, OrchestrationStepStatusEntry } from "@atellier/shared";
 import { cn } from "../../../lib/cn";
 import { useSkillOrchestrationPanel } from "../hooks/useSkillOrchestrationPanel";
 
@@ -51,12 +51,15 @@ export function SkillOrchestrationPanel() {
     isOpenAiExecution,
     executorModel,
     modelProfile,
+    executorModeOverride,
+    availableExecutorModes,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration,
     orchestrationErrorMessage,
     setSelectedSkillId,
     setGoal,
     setContext,
+    setExecutorModeOverride,
     handleStartOrchestration,
     resetToForm,
   } = useSkillOrchestrationPanel();
@@ -193,6 +196,17 @@ export function SkillOrchestrationPanel() {
               disabled={isStartingOrchestration}
               className="w-full border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-ink bg-[var(--bg-input)] font-[inherit] text-[0.82rem] leading-[1.45] resize-y outline-none focus:border-purple placeholder:text-ink-faint"
             />
+            <select
+              aria-label="Orchestration executor override"
+              value={executorModeOverride}
+              onChange={(e) => setExecutorModeOverride((e.target.value as ExecutorMode | "") ?? "")}
+              disabled={isStartingOrchestration}
+            >
+              <option value="">Executor por entorno (default)</option>
+              {availableExecutorModes.map((mode) => (
+                <option key={mode} value={mode}>{mode}</option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={handleStartOrchestration}

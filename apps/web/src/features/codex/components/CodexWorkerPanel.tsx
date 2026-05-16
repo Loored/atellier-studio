@@ -173,6 +173,9 @@ export function CodexWorkerPanel() {
                 <p className="m-0 mt-1">Captured: <span className="text-ink">{new Date(step.evidence.capturedAt).toLocaleString()}</span></p>
                 <p className="m-0 mt-1">Working dir: <span className="text-ink">{step.evidence.workingDirectory}</span></p>
                 <p className="m-0 mt-1">Command: <span className="text-ink">{step.evidence.command}</span></p>
+                {step.evidence.durationMs !== undefined ? (
+                  <p className="m-0 mt-1">Duration: <span className="text-ink">{step.evidence.durationMs} ms</span></p>
+                ) : null}
                 {step.evidence.notes.length > 0 ? (
                   <ul className="mt-1 mb-0 pl-4">
                     {step.evidence.notes.map((note) => (
@@ -187,6 +190,9 @@ export function CodexWorkerPanel() {
                     {step.evidence.artifacts.map((artifact) => (
                       <p key={`${artifact.label}-${artifact.path}`} className="m-0">
                         {artifact.label}: <span className="text-ink">{artifact.path}</span>
+                        {artifact.byteSize !== undefined ? (
+                          <span> · <span className="text-ink">{artifact.byteSize}</span> bytes</span>
+                        ) : null}
                       </p>
                     ))}
                   </div>
@@ -204,8 +210,12 @@ export function CodexWorkerPanel() {
           {finalizeEvidence ? (
             <p className="mb-2 text-xs text-ink-muted">
               Finalize evidence: <span className="text-ink">{finalizeEvidence.completedSteps}/{finalizeEvidence.totalSteps}</span> completed steps,{" "}
+              <span className="text-ink">{finalizeEvidence.failedSteps ?? 0}</span> failed,{" "}
+              <span className="text-ink">{finalizeEvidence.blockedSteps ?? 0}</span> blocked,{" "}
               <span className="text-ink">{finalizeEvidence.changedFiles.length}</span> changed file(s),{" "}
-              <span className="text-ink">{finalizeEvidence.testEvidence.length}</span> test evidence item(s)
+              <span className="text-ink">{finalizeEvidence.testEvidence.length}</span> test evidence item(s),{" "}
+              <span className="text-ink">{finalizeEvidence.artifactCount ?? 0}</span> artifact(s),{" "}
+              <span className="text-ink">{finalizeEvidence.totalDurationMs ?? 0}</span> ms total
             </p>
           ) : null}
           <button type="button" className="icon-only-button" onClick={() => void openRunLog()}>
