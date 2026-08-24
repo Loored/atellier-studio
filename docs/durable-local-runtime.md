@@ -21,6 +21,7 @@ Memory storage uses the same runtime services with an inline worker. It is inten
 - The maximum automatic attempt count defaults to three, with bounded exponential backoff.
 - Completed child steps are idempotent commits. A recovered or manually retried orchestration reuses them instead of running them again.
 - When a parent is reclaimed or retried, non-terminal child runs left by an interrupted worker are marked `failed` with a superseded warning before execution resumes. This keeps the global run timeline from reporting stale work as active.
+- Heartbeats, worker-owned transitions, and step events require both matching ownership and an unexpired parent lease. A paused or reclaimed worker cannot revive an expired lease or append late activity.
 - The persisted definition snapshot prevents a code deployment from silently changing an already queued orchestration.
 - Manual retry resets the attempt budget but retains completed child runs.
 
@@ -73,3 +74,21 @@ RUN_WORKER_POLL_MS=1000
 ```
 
 Do not run the standalone worker with `API_STORAGE=memory`; memory state is process-local and cannot be shared with the API.
+
+## Mongo concurrency verification
+
+With the local Mongo container running, execute:
+
+```bash
+pnpm test:api:mongo-runtime
+```
+
+The opt-in suite creates and drops an isolated database. It starts independent queue/service instances over the same Mongo state and verifies:
+
+- exactly one winner when two workers claim the same queued run
+- exactly one winner when multiple workers race to reclaim an expired lease
+- rejection of late heartbeats, transitions, and step events after lease expiry or ownership change
+- atomic, ordered, unique event sequences under concurrent appends
+- the Mongo unique index rejects a duplicate `(runId, sequence)` pair
+
+Normal API tests skip this suite so they remain self-contained and never require local infrastructure.

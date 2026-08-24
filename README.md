@@ -132,6 +132,14 @@ pnpm test:api
 pnpm test:web
 ```
 
+With the local Mongo container running, execute the dedicated durable-runtime concurrency suite:
+
+```bash
+pnpm test:api:mongo-runtime
+```
+
+The suite creates a uniquely named test database and removes it after the run. Normal `pnpm test:api` remains deterministic and skips this opt-in Mongo suite.
+
 ## Build
 
 ```bash

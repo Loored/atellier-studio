@@ -49,7 +49,7 @@ export class ExecutionQueueService {
       phase: execution.phase,
       message: `Execution claimed by ${workerId}.`,
       payload: { attempt: execution.attempt },
-    });
+    }, workerId);
     return run;
   }
 
@@ -81,37 +81,37 @@ export class ExecutionQueueService {
       phase,
       stepId: currentStepId ?? undefined,
       message: currentStepId ? `Execution entered step ${currentStepId}.` : `Execution phase changed to ${phase}.`,
-    });
+    }, workerId);
     return run;
   }
 
-  async recordStepStarted(runId: string, stepId: string, message: string): Promise<void> {
+  async recordStepStarted(runId: string, workerId: string, stepId: string, message: string): Promise<void> {
     await this.events.append(runId, {
       type: "step_started",
       phase: "running",
       stepId,
       message,
-    });
+    }, workerId);
   }
 
-  async recordStepCompleted(runId: string, stepId: string, payload?: unknown): Promise<void> {
+  async recordStepCompleted(runId: string, workerId: string, stepId: string, payload?: unknown): Promise<void> {
     await this.events.append(runId, {
       type: "step_completed",
       phase: "running",
       stepId,
       message: `Step ${stepId} completed.`,
       payload,
-    });
+    }, workerId);
   }
 
-  async recordStepReused(runId: string, stepId: string, payload?: unknown): Promise<void> {
+  async recordStepReused(runId: string, workerId: string, stepId: string, payload?: unknown): Promise<void> {
     await this.events.append(runId, {
       type: "step_reused",
       phase: "recovering",
       stepId,
       message: `Reused the completed result for step ${stepId}.`,
       payload,
-    });
+    }, workerId);
   }
 
   async markCompleted(runId: string, workerId: string): Promise<Run> {

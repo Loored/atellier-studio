@@ -11892,3 +11892,9 @@
 - fixes: retry from Runs history; interrupted child runs settle as failed/superseded during recovery.
 - validation: 87 API and 22 web tests passed; monorepo typecheck/build passed; fresh browser console clean.
 - next: multi-worker contention coverage, worker diagnostics/graceful shutdown, provider abort support, and idempotency rules for irreversible tools.
+
+## [2026-08-24T08:56:57.000Z] run_log | Durable runtime multi-worker hardening
+- Summary: Verified atomic Mongo claim/reclaim and event sequencing across independent worker services; fenced heartbeats, transitions, progress, completion, and step events by active unexpired lease.
+- run: `atelier/runs/2026-08-24-durable-runtime-multi-worker-hardening.md`
+- validation: dedicated Mongo suite 3/3; normal API suite 87/87; API typecheck/build passed.
+- next: worker lifecycle diagnostics and graceful shutdown, then provider abort/idempotency requirements.

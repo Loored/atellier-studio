@@ -182,9 +182,19 @@ export class RunService {
     return next;
   }
 
-  async complete(id: string, input: CompleteRunInput): Promise<Run | null> {
+  async complete(
+    id: string,
+    input: CompleteRunInput,
+    expectedLeaseOwner?: string,
+  ): Promise<Run | null> {
     if (this.storageMode === "mongo") {
-      const existing = await RunModel.findById(id);
+      const nowIso = new Date().toISOString();
+      const query: Record<string, unknown> = { _id: id };
+      if (expectedLeaseOwner) {
+        query["execution.leaseOwner"] = expectedLeaseOwner;
+        query["execution.leaseExpiresAt"] = { $gt: nowIso };
+      }
+      const existing = await RunModel.findOne(query);
       if (!existing) {
         return null;
       }
@@ -197,9 +207,12 @@ export class RunService {
         (input.suppressAutoDeliverable
           ? undefined
           : this.buildAutoDeliverablePath(existingRun, input.summary));
+      if (expectedLeaseOwner) {
+        query["execution.leaseExpiresAt"] = { $gt: new Date().toISOString() };
+      }
 
-      const run = await RunModel.findByIdAndUpdate(
-        id,
+      const run = await RunModel.findOneAndUpdate(
+        query,
         cleanUndefined({
           status: "completed",
           output: input.output,
@@ -226,7 +239,14 @@ export class RunService {
     }
 
     const current = this.records.get(id);
-    if (!current) {
+    if (
+      !current
+      || (expectedLeaseOwner && (
+        current.execution?.leaseOwner !== expectedLeaseOwner
+        || !current.execution.leaseExpiresAt
+        || current.execution.leaseExpiresAt <= new Date().toISOString()
+      ))
+    ) {
       return null;
     }
 
@@ -251,10 +271,20 @@ export class RunService {
     return next;
   }
 
-  async updateStatus(id: string, status: RunStatus, output?: unknown): Promise<Run | null> {
+  async updateStatus(
+    id: string,
+    status: RunStatus,
+    output?: unknown,
+    expectedLeaseOwner?: string,
+  ): Promise<Run | null> {
     if (this.storageMode === "mongo") {
-      const run = await RunModel.findByIdAndUpdate(
-        id,
+      const query: Record<string, unknown> = { _id: id };
+      if (expectedLeaseOwner) {
+        query["execution.leaseOwner"] = expectedLeaseOwner;
+        query["execution.leaseExpiresAt"] = { $gt: new Date().toISOString() };
+      }
+      const run = await RunModel.findOneAndUpdate(
+        query,
         cleanUndefined({
           status,
           output,
@@ -266,7 +296,14 @@ export class RunService {
     }
 
     const current = this.records.get(id);
-    if (!current) {
+    if (
+      !current
+      || (expectedLeaseOwner && (
+        current.execution?.leaseOwner !== expectedLeaseOwner
+        || !current.execution.leaseExpiresAt
+        || current.execution.leaseExpiresAt <= new Date().toISOString()
+      ))
+    ) {
       return null;
     }
 
@@ -362,6 +399,7 @@ export class RunService {
           _id: id,
           status: "running",
           "execution.leaseOwner": workerId,
+          "execution.leaseExpiresAt": { $gt: heartbeatAt },
           "execution.cancelRequestedAt": { $exists: false },
         },
         {
@@ -380,6 +418,8 @@ export class RunService {
       !current?.execution ||
       current.status !== "running" ||
       current.execution.leaseOwner !== workerId ||
+      !current.execution.leaseExpiresAt ||
+      current.execution.leaseExpiresAt <= heartbeatAt ||
       current.execution.cancelRequestedAt
     ) {
       return false;
@@ -430,6 +470,7 @@ export class RunService {
       const query: Record<string, unknown> = { _id: id };
       if (expectedLeaseOwner) {
         query["execution.leaseOwner"] = expectedLeaseOwner;
+        query["execution.leaseExpiresAt"] = { $gt: now.toISOString() };
       }
       const update: Record<string, unknown> = { $set: set };
       if (Object.keys(unset).length > 0) {
@@ -440,7 +481,14 @@ export class RunService {
     }
 
     const current = this.records.get(id);
-    if (!current?.execution || (expectedLeaseOwner && current.execution.leaseOwner !== expectedLeaseOwner)) {
+    if (
+      !current?.execution
+      || (expectedLeaseOwner && (
+        current.execution.leaseOwner !== expectedLeaseOwner
+        || !current.execution.leaseExpiresAt
+        || current.execution.leaseExpiresAt <= now.toISOString()
+      ))
+    ) {
       return null;
     }
     const nextExecution = { ...current.execution };
@@ -464,10 +512,17 @@ export class RunService {
     return next;
   }
 
-  async allocateEventSequence(id: string): Promise<number | null> {
+  async allocateEventSequence(id: string, expectedLeaseOwner?: string): Promise<number | null> {
+    const nowIso = new Date().toISOString();
     if (this.storageMode === "mongo") {
-      const run = await RunModel.findByIdAndUpdate(
-        id,
+      const query: Record<string, unknown> = { _id: id };
+      if (expectedLeaseOwner) {
+        query.status = "running";
+        query["execution.leaseOwner"] = expectedLeaseOwner;
+        query["execution.leaseExpiresAt"] = { $gt: nowIso };
+      }
+      const run = await RunModel.findOneAndUpdate(
+        query,
         { $inc: { "execution.nextEventSequence": 1 } },
         { new: true },
       );
@@ -475,7 +530,15 @@ export class RunService {
     }
 
     const current = this.records.get(id);
-    if (!current?.execution) {
+    if (
+      !current?.execution
+      || (expectedLeaseOwner && (
+        current.status !== "running"
+        || current.execution.leaseOwner !== expectedLeaseOwner
+        || !current.execution.leaseExpiresAt
+        || current.execution.leaseExpiresAt <= nowIso
+      ))
+    ) {
       return null;
     }
     const sequence = current.execution.nextEventSequence + 1;

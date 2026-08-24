@@ -99,7 +99,7 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Durable Runtime hardening v1.1**: multi-worker Mongo contention/reclaim coverage, ordered-event concurrency, worker diagnostics, graceful shutdown, and optional provider abort support.
+1. **Durable Runtime hardening v1.1**: worker diagnostics, graceful shutdown, optional provider abort support, and idempotency requirements for irreversible tools. Multi-worker Mongo claim/reclaim and ordered-event concurrency coverage is complete.
 2. **Controlled real Codex Worker adapter**: replace the fake adapter only behind a feature flag, existing approvals, constrained working directories/commands, and durable evidence capture.
 3. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
 4. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
@@ -107,6 +107,12 @@ Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 pla
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-24 - Multi-worker Mongo hardening
+
+- A dedicated opt-in Mongo suite verifies one-winner queue claims, expired-lease reclaim, stale-owner rejection, concurrent event sequencing, and duplicate-index protection with independent queue/service instances.
+- Heartbeats, worker-owned transitions, and step events now require a matching, unexpired parent lease, preventing a paused or reclaimed worker from reviving its lease or appending late activity.
+- Run with `pnpm test:api:mongo-runtime`; it uses a unique database and drops it after completion. Normal API tests skip the Mongo suite.
 
 ### 2026-08-24 - Post-merge durability drill and hardening fixes
 

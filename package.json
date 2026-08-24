@@ -13,6 +13,7 @@
     "test:watch": "pnpm -r test:watch",
     "test:coverage": "pnpm -r test:coverage",
     "test:api": "pnpm --filter @atellier/api test",
+    "test:api:mongo-runtime": "pnpm --filter @atellier/api test:mongo-runtime",
     "test:web": "pnpm --filter @atellier/web test",
     "typecheck": "pnpm -r typecheck",
     "codex:review": "codex exec --cd . --ask-for-approval never \"Review the current changes using the atellier-reviewer skill. Do not modify files.\"",

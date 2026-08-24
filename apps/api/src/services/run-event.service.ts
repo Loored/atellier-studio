@@ -17,9 +17,16 @@ export class RunEventService {
     private readonly runs: RunService,
   ) {}
 
-  async append(runId: string, input: AppendRunEventInput): Promise<RunEvent> {
-    const sequence = await this.runs.allocateEventSequence(runId);
+  async append(
+    runId: string,
+    input: AppendRunEventInput,
+    expectedLeaseOwner?: string,
+  ): Promise<RunEvent> {
+    const sequence = await this.runs.allocateEventSequence(runId, expectedLeaseOwner);
     if (sequence === null) {
+      if (expectedLeaseOwner) {
+        throw new Error(`Execution lease lost while appending ${input.type} event for run ${runId}.`);
+      }
       throw new Error(`Cannot append an event to missing execution run ${runId}.`);
     }
 

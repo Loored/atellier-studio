@@ -11,6 +11,7 @@
     "start": "node dist/main.js",
     "start:worker": "node dist/worker.js",
     "test": "vitest run",
+    "test:mongo-runtime": "ATELLIER_TEST_MONGO=1 vitest run src/test/durable-runtime.mongo.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"

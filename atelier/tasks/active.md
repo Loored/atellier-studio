@@ -86,7 +86,8 @@ Tasks currently in progress.
 - [ ] Durable Runtime hardening v1.1
   - [x] Expose retry for failed/blocked orchestrations from Runs history.
   - [x] Settle interrupted child runs when a parent is reclaimed or retried.
-  - Add multi-worker Mongo contention/reclaim integration coverage.
+  - [x] Add multi-worker Mongo contention/reclaim integration coverage.
+  - [x] Reject stale-worker step events after lease ownership changes.
   - Add worker lifecycle diagnostics and graceful shutdown behavior.
   - Define provider idempotency and abort requirements before irreversible side effects.
 
