@@ -11904,3 +11904,10 @@
 - run: `atelier/runs/2026-08-24-worker-lifecycle-hardening.md`
 - validation: lifecycle 3/3; normal API 90/90; API typecheck/build passed; live isolated worker signal check passed.
 - next: provider abort support and idempotency rules for irreversible tools.
+
+## [2026-08-24T09:45:24.000Z] run_log | Execution safety and controlled Codex adapter
+- Summary: Added durable provider cancellation, atomic idempotency for irreversible effects, and a disabled-by-default real Codex Worker adapter with fixed no-shell commands, repository confinement, approval, timeout, cancellation, retry, and evidence controls.
+- run: `atelier/runs/2026-08-24-execution-safety-adapter.md`
+- docs: `docs/tool-effect-idempotency.md`, `docs/codex-worker.md`
+- validation: 115 API and 22 web tests passed; shared/API/web/MCP typechecks and builds passed; no real Codex or external LLM was invoked by tests.
+- next: daily-use operational loop, then review-to-memory completion.

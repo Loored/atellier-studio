@@ -185,3 +185,29 @@ Codex Worker v1 is done when:
 - execute safely with logs and cancel control,
 - review evidence,
 - and close with durable markdown memory updates.
+
+## Controlled Local Adapter
+
+The real adapter is available only when `CODEX_WORKER_REAL_ENABLED=true`; fake-safe execution remains the default. The API records the active adapter in `/health`, each Codex run, step evidence, and the dashboard safety badge.
+
+The fixed plan uses four ordered envelopes:
+
+1. `rg --files` for repository inspection
+2. `codex exec` for the approved implementation effect
+3. `git diff --no-ext-diff` for a durable patch artifact
+4. `pnpm typecheck` for the final contract check
+
+Persisted command names are lookup keys, not shell input. The adapter constructs argv internally, uses `shell: false`, confines real paths to the configured repository/allowed subpaths, bounds output and runtime, and rejects dangerous Codex bypass/configuration flags. The implementation prompt is passed as one argv value.
+
+`codex exec` runs with `--sandbox workspace-write`, the installed CLI's `--approve-for-me` automatic review, and `--ephemeral` only after the Atellier operator approves that step. It is wrapped by the irreversible-effect ledger using a key derived from run, step, and approved attempt plus a deterministic execution fingerprint. Explicit retries increment the attempt and require fresh approval.
+
+Cancelling the run aborts the active process, then persists blocked step state and stdout/stderr evidence. Automated tests inject a fake process runner and never invoke Codex or another external executor.
+
+Configuration:
+
+```bash
+CODEX_WORKER_REAL_ENABLED=true
+CODEX_WORKER_ALLOWED_DIRS=.,apps/api
+CODEX_WORKER_TIMEOUT_MS=120000
+CODEX_WORKER_MAX_OUTPUT_BYTES=1048576
+```

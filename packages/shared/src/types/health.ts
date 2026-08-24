@@ -12,6 +12,11 @@ export type HealthStatus = {
   executorModel: string;
   modelProfile: ModelProfile;
   availableExecutorModes?: ExecutorMode[];
+  codexWorker: {
+    executionAdapter: "fake" | "real";
+    label: string;
+    realExecutionEnabled: boolean;
+  };
   /**
    * Per-agent-role model overrides. Present only when the active executor
    * supports per-role routing (currently Ollama only) and at least one

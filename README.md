@@ -78,11 +78,31 @@ The API accepts and persists work even while the worker is offline. When the wor
 
 `SIGINT` and `SIGTERM` stop new polling immediately, keep the heartbeat alive for any already claimed run, wait for that run to settle, and only then disconnect Mongo. The standalone worker prints structured lifecycle diagnostics with its worker ID, state, active run, processed count, lease/poll settings, and latest error.
 
+Cancelling a running durable orchestration now propagates an `AbortSignal` to fetch-based OpenAI, Anthropic, Groq, and Ollama calls. A separate worker detects a persisted cancellation within one second; providers that cannot abort still stop at the next safe step boundary.
+
+Irreversible tool effects must pass through the durable idempotency ledger with a stable key and deterministic fingerprint. Completed outcomes are reused, concurrent duplicates are reported as in progress, and conflicting key reuse fails closed. See [`docs/tool-effect-idempotency.md`](docs/tool-effect-idempotency.md).
+
 Optional worker controls:
 
 ```bash
 RUN_WORKER_LEASE_MS=30000
 RUN_WORKER_POLL_MS=1000
+```
+
+Codex Worker command execution stays fake by default. To opt into the controlled local adapter, start the API with an authenticated `codex` CLI available on `PATH`:
+
+```bash
+CODEX_WORKER_REAL_ENABLED=true pnpm --filter @atellier/api dev
+```
+
+The real adapter executes only the fixed `rg --files`, `codex exec`, `git diff --no-ext-diff`, and `pnpm typecheck` envelopes with `shell: false`. The implementation step still requires explicit approval in Atellier; Codex runs with `--sandbox workspace-write`, the installed CLI's `--approve-for-me` automatic review, and `--ephemeral`, and dangerous bypass flags are rejected.
+
+Optional boundaries:
+
+```bash
+CODEX_WORKER_ALLOWED_DIRS=.,apps/api
+CODEX_WORKER_TIMEOUT_MS=120000
+CODEX_WORKER_MAX_OUTPUT_BYTES=1048576
 ```
 
 Run the API with OpenAI-backed agent execution:
@@ -191,14 +211,10 @@ pnpm codex:wiki-lint
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-1. **Memory artifact hygiene**: curate generated run/deliverable files so durable wiki memory stays readable and publishable.
-2. **Role memory**: curate what Builder, QA, Wiki Curator, PM, and other roles learn over time.
-3. **Graph snapshot diff view**: compare two snapshots and expose +/− node/edge deltas.
-4. **Knowledge graph performance pass (>300 nodes)**: sprite caching/WebGL toggle/neighbor calc profiling.
-5. **Role memory overlays in graph/inspector**: link curated role learnings directly to graph entities.
-6. **Codex Worker real executor adapter (future)**: keep current fake executor until controlled real execution integration.
+1. **Complete daily-use operational loop**: validate one recoverable `source -> wiki -> task -> durable run -> change -> QA -> review -> memory` workflow.
+2. **Review-to-memory learning loop**: promote approved outcomes into curated role memory and contradiction/staleness signals without silent writes.
 
-Already shipped on 2026-05-13: graph curation polish, Dream report decision trail, per-run executor override, orchestration-level executor override, and Codex Worker Evidence Pass v1.1.
+Already shipped: memory hygiene, Knowledge Graph v2 and follow-ups, role memory, Durable Runtime v1/v1.1, provider cancellation, irreversible-effect idempotency, and the feature-flagged controlled Codex Worker adapter.
 
 Auth, cloud deploy, multiplayer, vector search, graph DB, external meeting/chat/drive integrations, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
 

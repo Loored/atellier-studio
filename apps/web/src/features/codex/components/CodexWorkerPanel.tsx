@@ -11,6 +11,8 @@ export function CodexWorkerPanel() {
     runId,
     runStatus,
     isOpenAiExecution,
+    isRealCodexExecution,
+    executionAdapter,
     executorModel,
     modelProfile,
     runLogPath,
@@ -31,6 +33,7 @@ export function CodexWorkerPanel() {
     plan,
     approve,
     executeNext,
+    retry,
     cancel,
     finalize,
     openRunLog,
@@ -72,6 +75,20 @@ export function CodexWorkerPanel() {
         <p className="mt-0 mb-3 text-xs text-ink-muted">
           Status: <span className="text-ink">{runStatus}</span>
           {finalizedAtLabel ? <span> · Finalized at: <span className="text-ink">{finalizedAtLabel}</span></span> : null}
+        </p>
+      ) : null}
+      <p
+        className={`mt-0 mb-3 inline-flex rounded-md border px-2.5 py-1 text-[0.72rem] font-bold uppercase tracking-[0.08em] ${
+          isRealCodexExecution
+            ? "border-orange/35 bg-orange/10 text-orange"
+            : "border-[var(--border-card)] bg-black/20 text-ink-muted"
+        }`}
+      >
+        Codex adapter: {executionAdapter.mode} · {executionAdapter.label}
+      </p>
+      {isRealCodexExecution ? (
+        <p className="mt-0 mb-3 border border-orange/35 rounded-lg px-2.5 py-2 text-[0.78rem] text-orange bg-orange/10">
+          Real execution is enabled. Only allowlisted commands run, implementation requires step approval, and Codex stays inside the configured workspace-write sandbox.
         </p>
       ) : null}
       {isOpenAiExecution ? (
@@ -141,6 +158,11 @@ export function CodexWorkerPanel() {
               {step.needsApproval && step.status === "pending" ? (
                 <button type="button" className="icon-only-button" onClick={() => void approve(step.id)} title="Approve protected step">
                   Approve step
+                </button>
+              ) : null}
+              {step.status === "failed" || step.status === "blocked" ? (
+                <button type="button" className="icon-only-button" onClick={() => void retry(step.id)} title="Retry failed or blocked step">
+                  Retry step
                 </button>
               ) : null}
             </div>

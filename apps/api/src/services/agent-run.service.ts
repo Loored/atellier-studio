@@ -1,9 +1,30 @@
 import type { AgentRunStreamEvent, ExecutorMode, RunAgentInput, RunAgentResult } from "@atellier/shared";
-import type { AgentExecutorService, ExecuteAgentInstructionInput } from "./agent-executor.service";
+import {
+  AgentExecutionCancelledError,
+  type AgentExecutorService,
+  type ExecuteAgentInstructionInput,
+} from "./agent-executor.service";
 import { AgentService } from "./agent.service";
 import { MessageService } from "./message.service";
 import { RunService } from "./run.service";
 import { validateAgentResponse } from "./agent-response-validator";
+
+export type AgentRunExecutionOptions = {
+  signal?: AbortSignal;
+};
+
+export class AgentExecutionTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Execution timeout after ${timeoutMs}ms.`);
+    this.name = "AgentExecutionTimeoutError";
+  }
+}
+
+function assertExecutionActive(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new AgentExecutionCancelledError("Agent execution cancelled.");
+  }
+}
 
 export class AgentRunService {
   private readonly maxHandoffDepth: number;
@@ -29,16 +50,21 @@ export class AgentRunService {
     this.verifiedRepoFiles = [...new Set(options.verifiedRepoFiles ?? [])].sort();
   }
 
-  async run(agentId: string, input: RunAgentInput): Promise<RunAgentResult | null> {
-    return this.runInternal(agentId, input);
+  async run(
+    agentId: string,
+    input: RunAgentInput,
+    options: AgentRunExecutionOptions = {},
+  ): Promise<RunAgentResult | null> {
+    return this.runInternal(agentId, input, undefined, this.maxHandoffDepth, new Set(), options.signal);
   }
 
   async runWithStream(
     agentId: string,
     input: RunAgentInput,
     emit: (event: AgentRunStreamEvent) => void,
+    options: AgentRunExecutionOptions = {},
   ): Promise<RunAgentResult | null> {
-    return this.runInternal(agentId, input, emit);
+    return this.runInternal(agentId, input, emit, this.maxHandoffDepth, new Set(), options.signal);
   }
 
   private resolveExecutor(modeOverride?: ExecutorMode): { mode: ExecutorMode; executor: AgentExecutorService } {
@@ -59,6 +85,7 @@ export class AgentRunService {
     emit?: (event: AgentRunStreamEvent) => void,
     remainingHandoffDepth = this.maxHandoffDepth,
     lineage = new Set<string>(),
+    signal?: AbortSignal,
   ): Promise<RunAgentResult | null> {
     const agent = await this.agents.getById(agentId);
     if (!agent) {
@@ -118,7 +145,9 @@ export class AgentRunService {
         agent,
         instruction: input.instruction,
         context: input.context,
+        signal,
       });
+      assertExecutionActive(signal);
 
       const validation = validateAgentResponse({
         role: agent.role,
@@ -144,6 +173,8 @@ export class AgentRunService {
         }
       }
 
+      assertExecutionActive(signal);
+
       for (const chunk of this.chunkText(execution.response, 80)) {
         emit?.({ type: "chunk", content: chunk });
       }
@@ -155,6 +186,8 @@ export class AgentRunService {
         role: "assistant",
         content: execution.response,
       });
+
+      assertExecutionActive(signal);
 
       await this.runs.appendLog(run.id, {
         level: "info",
@@ -228,6 +261,7 @@ export class AgentRunService {
             executor,
             executorMode: selectedExecutorMode,
             emit,
+            signal,
           });
         }
       }
@@ -236,13 +270,14 @@ export class AgentRunService {
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown agent execution error.";
+      const cancelled = error instanceof AgentExecutionCancelledError || Boolean(signal?.aborted);
       await this.runs.appendLog(run.id, {
-        level: "error",
+        level: cancelled ? "warn" : "error",
         message,
       });
-      await this.runs.updateStatus(run.id, "failed", { error: message });
+      await this.runs.updateStatus(run.id, cancelled ? "cancelled" : "failed", { error: message });
       await this.agents.updateStatus(agentId, {
-        status: "blocked",
+        status: cancelled ? "idle" : "blocked",
         lastRunId: run.id,
         currentStep: null,
       });
@@ -274,6 +309,7 @@ export class AgentRunService {
     executor: AgentExecutorService;
     executorMode: ExecutorMode;
     emit?: (event: AgentRunStreamEvent) => void;
+    signal?: AbortSignal;
   }): Promise<void> {
     const targetAgent = await this.agents.getById(options.handoffAgentId);
     if (!targetAgent) {
@@ -334,7 +370,9 @@ export class AgentRunService {
       agent: targetAgent,
       instruction: composedInstruction,
       context: `handoff from ${options.sourceAgent.name}`,
+      signal: options.signal,
     });
+    assertExecutionActive(options.signal);
 
     const validation = validateAgentResponse({
       role: targetAgent.role,
@@ -377,20 +415,50 @@ export class AgentRunService {
   }
 
   private async executeWithTimeout(executor: AgentExecutorService, input: ExecuteAgentInstructionInput) {
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        executor.execute(input),
-        new Promise<never>((_resolve, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error(`Execution timeout after ${this.executionTimeoutMs}ms.`));
-          }, this.executionTimeoutMs);
-        }),
-      ]);
-    } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+    const controller = new AbortController();
+    const timeoutError = new AgentExecutionTimeoutError(this.executionTimeoutMs);
+    let timedOut = false;
+    const cancelFromUpstream = (): void => {
+      controller.abort(input.signal?.reason);
+    };
+
+    if (input.signal?.aborted) {
+      cancelFromUpstream();
+    } else {
+      input.signal?.addEventListener("abort", cancelFromUpstream, { once: true });
+    }
+
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort(timeoutError);
+    }, this.executionTimeoutMs);
+
+    const aborted = new Promise<never>((_resolve, reject) => {
+      const rejectForAbort = (): void => {
+        reject(timedOut
+          ? timeoutError
+          : new AgentExecutionCancelledError("Agent execution cancelled."));
+      };
+      if (controller.signal.aborted) {
+        rejectForAbort();
+        return;
       }
+      controller.signal.addEventListener("abort", rejectForAbort, { once: true });
+    });
+
+    try {
+      return await Promise.race([executor.execute({ ...input, signal: controller.signal }), aborted]);
+    } catch (error) {
+      if (timedOut) {
+        throw timeoutError;
+      }
+      if (input.signal?.aborted || error instanceof AgentExecutionCancelledError) {
+        throw new AgentExecutionCancelledError("Agent execution cancelled.", { cause: error });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      input.signal?.removeEventListener("abort", cancelFromUpstream);
     }
   }
 }

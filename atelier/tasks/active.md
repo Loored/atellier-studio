@@ -83,15 +83,16 @@ Tasks currently in progress.
   - Verify offline queueing, restart/reclaim, completed-step reuse, event replay, cancellation, retry, and UI rehydration.
   - Record evidence and convert any failure into a bounded hardening task.
 
-- [ ] Durable Runtime hardening v1.1
+- [x] Durable Runtime hardening v1.1
   - [x] Expose retry for failed/blocked orchestrations from Runs history.
   - [x] Settle interrupted child runs when a parent is reclaimed or retried.
   - [x] Add multi-worker Mongo contention/reclaim integration coverage.
   - [x] Reject stale-worker step events after lease ownership changes.
   - [x] Add worker lifecycle diagnostics and graceful shutdown behavior.
-  - Define provider idempotency and abort requirements before irreversible side effects.
+  - [x] Propagate cancellation to supported provider requests with a cooperative fallback.
+  - [x] Require a durable idempotency key and fingerprint before irreversible effects.
 
-- [ ] Controlled real Codex Worker adapter
-  - Keep the adapter behind a feature flag and human approval flow.
-  - Constrain working directories and command execution.
-  - Persist diffs, logs, tests, artifacts, and durations as review evidence.
+- [x] Controlled real Codex Worker adapter
+  - [x] Keep the adapter behind a feature flag and human approval flow.
+  - [x] Constrain working directories and command execution.
+  - [x] Persist diffs, logs, tests, artifacts, and durations as review evidence.

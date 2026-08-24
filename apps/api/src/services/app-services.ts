@@ -16,6 +16,10 @@ import { TaskService } from "./task.service";
 import { WikiService } from "./wiki.service";
 import { type StorageMode } from "./service-utils";
 import { CodexWorkerService } from "./codex-worker.service";
+import {
+  FakeCodexWorkerExecutor,
+  RealCodexWorkerExecutor,
+} from "./codex-worker-executor.service";
 import { readdir } from "node:fs/promises";
 import { KnowledgeGraphService } from "./knowledge-graph.service";
 import { seedDemoData } from "./seed.service";
@@ -26,6 +30,8 @@ import {
   DurableRuntimeService,
   type DurableWorkerDiagnosticSink,
 } from "./durable-runtime.service";
+import { createEffectIdempotencyRepository } from "./effect-idempotency.repository";
+import { EffectIdempotencyService } from "./effect-idempotency.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -36,6 +42,7 @@ export type AppServices = {
   runEvents: RunEventService;
   executionQueue: ExecutionQueueService;
   durableRuntime: DurableRuntimeService;
+  effectIdempotency: EffectIdempotencyService;
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
@@ -88,6 +95,11 @@ export type CreateAppServicesOptions = {
   runtimePollMs?: number;
   runtimeWorkerId?: string;
   runtimeDiagnosticSink?: DurableWorkerDiagnosticSink;
+  /** Explicit opt-in. Real Codex execution remains disabled unless this is true. */
+  codexWorkerRealEnabled?: boolean;
+  codexWorkerTimeoutMs?: number;
+  codexWorkerMaxOutputBytes?: number;
+  codexWorkerAllowedWorkingDirectories?: string[];
 };
 
 export function resolveAtellierRoot(input?: string): string {
@@ -243,6 +255,17 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     leaseMs: options.runtimeLeaseMs,
     retryBaseDelayMs: storageMode === "memory" ? 0 : undefined,
   });
+  const effectIdempotency = new EffectIdempotencyService(
+    createEffectIdempotencyRepository(storageMode),
+  );
+  const codexWorkerExecutor = options.codexWorkerRealEnabled
+    ? new RealCodexWorkerExecutor({
+        repositoryRoot: repoRootResolved,
+        allowedWorkingDirectories: options.codexWorkerAllowedWorkingDirectories,
+        timeoutMs: options.codexWorkerTimeoutMs,
+        maxOutputBytes: options.codexWorkerMaxOutputBytes,
+      })
+    : new FakeCodexWorkerExecutor();
   const durableRuntime = new DurableRuntimeService(executionQueue, skillOrchestrations, {
     inline: options.inlineDurableRuntime ?? storageMode === "memory",
     onDiagnostic: options.runtimeDiagnosticSink,
@@ -259,9 +282,16 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     runEvents,
     executionQueue,
     durableRuntime,
+    effectIdempotency,
     skillOrchestrations,
     wiki,
-    codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
+    codexWorkers: new CodexWorkerService(
+      runs,
+      wiki,
+      atelierRootResolved,
+      codexWorkerExecutor,
+      effectIdempotency,
+    ),
     knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki, atelierRootResolved),
     knowledgeLive: new KnowledgeLiveService(),
     executor: {

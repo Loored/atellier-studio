@@ -6,6 +6,7 @@ import {
 } from "../services/durable-runtime.service";
 import type { ExecutionQueueService } from "../services/execution-queue.service";
 import type { SkillOrchestrationService } from "../services/skill-orchestration.service";
+import { OrchestrationCancelledError } from "../services/skill-orchestration.service";
 
 function deferred() {
   let resolve!: () => void;
@@ -69,6 +70,36 @@ function createOrchestrations(executeClaimed: ReturnType<typeof vi.fn>) {
 }
 
 describe("durable runtime lifecycle", () => {
+  it("aborts only the matching active orchestration after cancellation is persisted", async () => {
+    const run = createClaimedRun();
+    const executionStarted = deferred();
+    const claim = vi.fn().mockResolvedValueOnce(run);
+    const queue = createQueue(claim);
+    const executeClaimed = vi.fn(async (_run, hooks) => {
+      executionStarted.resolve();
+      await new Promise<void>((_resolve, reject) => {
+        hooks.signal?.addEventListener("abort", () => reject(new OrchestrationCancelledError()), { once: true });
+      });
+    });
+    const runtime = new DurableRuntimeService(queue, createOrchestrations(executeClaimed), {
+      workerId: "worker-lifecycle",
+    });
+
+    const execution = runtime.runOnce();
+    await executionStarted.promise;
+    const signal = executeClaimed.mock.calls[0]?.[1]?.signal as AbortSignal;
+
+    await runtime.requestCancel("another-run");
+    expect(signal.aborted).toBe(false);
+
+    await runtime.requestCancel(run.id);
+    await execution;
+
+    expect(signal.aborted).toBe(true);
+    expect(queue.markCancelled).toHaveBeenCalledWith(run.id, "worker-lifecycle");
+    expect(queue.markCompleted).not.toHaveBeenCalled();
+  });
+
   it("waits for active work before stopping and prevents another claim", async () => {
     const run = createClaimedRun();
     const executionStarted = deferred();

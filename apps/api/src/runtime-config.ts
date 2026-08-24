@@ -41,6 +41,14 @@ function readOllamaRoleOverrides(): Partial<Record<AgentRole, string>> | undefin
   return Object.keys(overrides).length > 0 ? overrides : undefined;
 }
 
+function readCodexWorkerAllowedDirectories(): string[] | undefined {
+  const directories = process.env.CODEX_WORKER_ALLOWED_DIRS
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return directories && directories.length > 0 ? directories : undefined;
+}
+
 export function readRuntimeConfig(): RuntimeEnvironmentConfig {
   const storageMode: StorageMode = process.env.API_STORAGE === "memory" ? "memory" : "mongo";
   const agentExecutorMode = resolveExecutorMode();
@@ -71,6 +79,10 @@ export function readRuntimeConfig(): RuntimeEnvironmentConfig {
       executionTimeoutMs: Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 45_000),
       runtimeLeaseMs: Number(process.env.RUN_WORKER_LEASE_MS ?? 30_000),
       runtimePollMs: Number(process.env.RUN_WORKER_POLL_MS ?? 1_000),
+      codexWorkerRealEnabled: process.env.CODEX_WORKER_REAL_ENABLED === "true",
+      codexWorkerTimeoutMs: Number(process.env.CODEX_WORKER_TIMEOUT_MS ?? 120_000),
+      codexWorkerMaxOutputBytes: Number(process.env.CODEX_WORKER_MAX_OUTPUT_BYTES ?? 1_048_576),
+      codexWorkerAllowedWorkingDirectories: readCodexWorkerAllowedDirectories(),
       seedDemoData: storageMode === "memory" && process.env.SEED_DEMO_DATA !== "false",
     },
   };
