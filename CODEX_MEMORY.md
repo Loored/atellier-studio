@@ -62,6 +62,8 @@ See `docs/operations/local-setup.md` for install commands and solved setup pitfa
 - API hooks own TanStack Query cache, invalidation, and API alerts.
 - Feature hooks coordinate UI state and rename generic query fields.
 - Fastify routes should stay thin; services own business logic.
+- Mongo-backed skill orchestrations are queued by the API and executed by the separate `apps/api/src/worker.ts` process. Memory mode uses an inline worker only for tests/local UI review.
+- Durable orchestration recovery is at-least-once: leases and heartbeats reclaim abandoned runs, while completed child steps keyed by `orchestrationStepId` are reused.
 - Tests must not call real OpenAI, Codex, MCP, or external LLM tools.
 - Important work should update `atelier/runs` and `atelier/wiki/log.md`.
 - Raw sources under `atelier/raw` are immutable.
@@ -106,6 +108,16 @@ Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 pla
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-24 - Durable local orchestration runtime v1
+
+- Skill orchestration dispatch now persists a queued run with a versioned execution envelope, immutable definition snapshot/hash, attempt budget, lease metadata, and cancellation state.
+- `RunEvent` records ordered replayable activity; APIs expose detail, filtered discovery, event replay/SSE, cancellation, and retry.
+- `apps/api/src/worker.ts` is the separate Mongo worker entrypoint (`pnpm dev:worker`). API and worker share parsed provider/runtime environment configuration.
+- Recovery reuses completed step runs by stable `orchestrationStepId`; cancellation is cooperative at step boundaries.
+- The dashboard rehydrates queued/running orchestrations after refresh and shows durable phase, attempt, events, cancel, and retry controls through the required frontend API chain.
+- Knowledge Graph and Wiki Dream grounding lint reads no longer append Wiki log entries; explicit lint API calls still do.
+- Runtime semantics and limitations are documented in `docs/durable-local-runtime.md`.
 
 ### 2026-05-13 - Dream decision trail + persisted snapshots shipped
 

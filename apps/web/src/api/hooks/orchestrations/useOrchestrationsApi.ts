@@ -1,4 +1,4 @@
-import type { UseMutationOptions } from "@tanstack/react-query";
+import { useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
 import type {
   OrchestrationSkillSummary,
   OrchestrationStatusResult,
@@ -27,7 +27,7 @@ export function useOrchestrationStatusApi(runId: string | null) {
     refetchInterval: (query) => {
       const data = query.state.data as OrchestrationStatusResult | undefined;
       if (!data) return 2_000;
-      return data.status === "completed" || data.status === "failed" ? false : 2_000;
+      return ["completed", "failed", "blocked", "cancelled"].includes(data.status) ? false : 2_000;
     },
   });
 }
@@ -36,6 +36,7 @@ export type UseStartSkillOrchestrationApiOptions =
   UseMutationOptions<StartSkillOrchestrationResponse, Error, StartSkillOrchestrationInput>;
 
 export function useStartSkillOrchestrationApi(options: UseStartSkillOrchestrationApiOptions = {}) {
+  const queryClient = useQueryClient();
   const { notifyError } = useApiAlerts();
 
   return useMutationInstance<StartSkillOrchestrationResponse, Error, StartSkillOrchestrationInput>(
@@ -44,6 +45,13 @@ export function useStartSkillOrchestrationApi(options: UseStartSkillOrchestratio
       ...options,
     },
     {
+      onSuccess: async (result) => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.orchestrations.status(result.runId) }),
+        ]);
+      },
       onError: (error) => notifyError(error),
     },
   );

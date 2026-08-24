@@ -2,9 +2,47 @@ export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint"
 
 export type RunType = (typeof RUN_TYPES)[number];
 
-export const RUN_STATUSES = ["queued", "running", "failed", "completed", "blocked"] as const;
+export const RUN_STATUSES = ["queued", "running", "failed", "completed", "blocked", "cancelled"] as const;
 
 export type RunStatus = (typeof RUN_STATUSES)[number];
+
+export const RUN_EXECUTION_KINDS = ["skill-orchestration"] as const;
+
+export type RunExecutionKind = (typeof RUN_EXECUTION_KINDS)[number];
+
+export const RUN_EXECUTION_PHASES = [
+  "queued",
+  "running",
+  "recovering",
+  "finalizing",
+  "blocked",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+export type RunExecutionPhase = (typeof RUN_EXECUTION_PHASES)[number];
+
+export type RunExecution = {
+  schemaVersion: 1;
+  kind: RunExecutionKind;
+  phase: RunExecutionPhase;
+  definitionHash: string;
+  definitionSnapshot: unknown;
+  idempotencyKey: string;
+  attempt: number;
+  maxAttempts: number;
+  nextEventSequence: number;
+  availableAt: string;
+  leaseOwner?: string;
+  leaseExpiresAt?: string;
+  heartbeatAt?: string;
+  cancelRequestedAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  lastError?: string;
+  currentStepId?: string;
+};
 
 export const RUN_LOG_LEVELS = ["info", "warn", "error"] as const;
 
@@ -32,6 +70,7 @@ export type Run = {
   deliverablePath?: string;
   input?: unknown;
   output?: unknown;
+  execution?: RunExecution;
   logs: RunLogEntry[];
   createdAt: string;
   updatedAt: string;
@@ -43,6 +82,13 @@ export type CreateRunInput = {
   type: RunType;
   status?: RunStatus;
   input?: unknown;
+  execution?: RunExecution;
+};
+
+export type ListRunsInput = {
+  type?: RunType;
+  statuses?: RunStatus[];
+  limit?: number;
 };
 
 export type AppendRunLogInput = {

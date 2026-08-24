@@ -17,8 +17,84 @@ import { runsService } from "../../services/runs.service";
 export function useRunsApi() {
   return useQueryInstance<Run[]>({
     queryKey: queryKeys.runs.all,
-    queryFn: runsService.list,
+    queryFn: () => runsService.list(),
   });
+}
+
+export function useActiveOrchestrationsApi() {
+  return useQueryInstance<Run[]>({
+    queryKey: queryKeys.runs.activeOrchestrations,
+    queryFn: async () => {
+      const runs = await runsService.list({
+        type: "orchestration",
+        statuses: ["queued", "running"],
+        limit: 10,
+      });
+      return runs.filter((run) => run.type === "orchestration" && ["queued", "running"].includes(run.status));
+    },
+    staleTime: 0,
+    refetchInterval: 2_000,
+  });
+}
+
+export function useRunEventsApi(runId: string | null, shouldPoll = true) {
+  return useQueryInstance({
+    queryKey: queryKeys.runs.events(runId ?? ""),
+    queryFn: () => runsService.listEvents(runId!),
+    enabled: Boolean(runId),
+    staleTime: 0,
+    refetchInterval: shouldPoll ? 1_000 : false,
+  });
+}
+
+export type RunControlVariables = { runId: string };
+
+export function useCancelRunApi(options: UseMutationOptions<Run, Error, RunControlVariables> = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+  return useMutationInstance<Run, Error, RunControlVariables>(
+    {
+      mutationFn: ({ runId }) => runsService.cancel(runId),
+      ...options,
+    },
+    {
+      onSuccess: async (run) => {
+        notifySuccess(run.status === "cancelled" ? "Run cancelled" : "Cancellation requested");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.events(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.orchestrations.status(run.id) }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export function useRetryRunApi(options: UseMutationOptions<Run, Error, RunControlVariables> = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+  return useMutationInstance<Run, Error, RunControlVariables>(
+    {
+      mutationFn: ({ runId }) => runsService.retry(runId),
+      ...options,
+    },
+    {
+      onSuccess: async (run) => {
+        notifySuccess("Run retry queued");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.events(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.orchestrations.status(run.id) }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
 }
 
 export type UseCreateRunApiOptions = UseMutationOptions<Run, Error, CreateRunInput>;

@@ -11879,3 +11879,9 @@
 ## [2026-05-16T04:41:02.817Z] wiki_lint | Wiki lint run
 - Summary: No issues found.
 - issues: 0
+
+## [2026-08-24T07:38:03.000Z] run_log | Durable local runtime v1
+- Summary: Replaced ephemeral skill orchestration dispatch with a Mongo-backed local queue, separate lease-based worker, replayable events, resumable completed steps, cancellation/retry controls, and refresh-safe UI rehydration.
+- run: `atelier/runs/2026-08-24-durable-local-runtime-v1.md`
+- docs: `docs/durable-local-runtime.md`
+- validation: shared/API/web/MCP typechecks and builds passed; 86 API and 21 web tests passed with mock executors only.

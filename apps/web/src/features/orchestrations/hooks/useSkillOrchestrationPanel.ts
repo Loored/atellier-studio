@@ -7,6 +7,12 @@ import {
   useOrchestrationStatusApi,
   useStartSkillOrchestrationApi,
 } from "../../../api/hooks/orchestrations/useOrchestrationsApi";
+import {
+  useActiveOrchestrationsApi,
+  useCancelRunApi,
+  useRetryRunApi,
+  useRunEventsApi,
+} from "../../../api/hooks/runs/useRunsApi";
 import { queryKeys } from "../../../api/query/queryKeys";
 
 type Mode = "form" | "live";
@@ -27,10 +33,18 @@ export function useSkillOrchestrationPanel() {
   const [mode, setMode] = useState<Mode>("form");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const invalidatedRef = useRef(false);
+  const dismissedRunIdRef = useRef<string | null>(null);
   const { data: healthStatus } = useHealthApi();
 
   const startSkillOrchestration = useStartSkillOrchestrationApi();
+  const cancelRun = useCancelRunApi();
+  const retryRun = useRetryRunApi();
+  const { data: activeOrchestrationRuns = [] } = useActiveOrchestrationsApi();
   const { data: liveStatus } = useOrchestrationStatusApi(activeRunId);
+  const isTerminal = liveStatus
+    ? ["completed", "failed", "blocked", "cancelled"].includes(liveStatus.status)
+    : false;
+  const { data: runEventsResponse } = useRunEventsApi(activeRunId, !isTerminal);
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
@@ -43,12 +57,22 @@ export function useSkillOrchestrationPanel() {
   );
 
   useEffect(() => {
+    if (activeRunId || activeOrchestrationRuns.length === 0) return;
+    const recoverableRun = activeOrchestrationRuns.find((run) => run.id !== dismissedRunIdRef.current);
+    if (!recoverableRun) return;
+    invalidatedRef.current = false;
+    setActiveRunId(recoverableRun.id);
+    setMode("live");
+  }, [activeOrchestrationRuns, activeRunId]);
+
+  useEffect(() => {
     if (!liveStatus || invalidatedRef.current) return;
-    if (liveStatus.status === "completed" || liveStatus.status === "failed") {
+    if (["completed", "failed", "blocked", "cancelled"].includes(liveStatus.status)) {
       invalidatedRef.current = true;
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page("wiki/deliverables/index.md") }),
       ]);
@@ -75,6 +99,7 @@ export function useSkillOrchestrationPanel() {
       {
         onSuccess: (result) => {
           invalidatedRef.current = false;
+          dismissedRunIdRef.current = null;
           setActiveRunId(result.runId);
           setMode("live");
           setGoal("");
@@ -86,9 +111,21 @@ export function useSkillOrchestrationPanel() {
   }
 
   function resetToForm() {
+    dismissedRunIdRef.current = activeRunId;
     setMode("form");
     setActiveRunId(null);
     invalidatedRef.current = false;
+  }
+
+  function handleCancelRun() {
+    if (!activeRunId) return;
+    cancelRun.mutate({ runId: activeRunId });
+  }
+
+  function handleRetryRun() {
+    if (!activeRunId) return;
+    invalidatedRef.current = false;
+    retryRun.mutate({ runId: activeRunId });
   }
 
   return {
@@ -99,6 +136,7 @@ export function useSkillOrchestrationPanel() {
     context,
     mode,
     liveStatus,
+    runEvents: runEventsResponse?.events ?? [],
     isOpenAiExecution,
     executorModel,
     modelProfile,
@@ -107,12 +145,16 @@ export function useSkillOrchestrationPanel() {
     isFetchingOrchestrationSkills,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration: startSkillOrchestration.isPending,
+    isCancellingRun: cancelRun.isPending,
+    isRetryingRun: retryRun.isPending,
     orchestrationErrorMessage: startSkillOrchestration.error?.message,
     setSelectedSkillId,
     setGoal,
     setContext,
     setExecutorModeOverride,
     handleStartOrchestration,
+    handleCancelRun,
+    handleRetryRun,
     resetToForm,
   };
 }

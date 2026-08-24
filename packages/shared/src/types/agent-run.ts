@@ -7,6 +7,7 @@ export const AGENT_INSTRUCTION_MAX_LENGTH = 2000;
 
 export type OrchestrationStepRef = {
   orchestrationRunId: string;
+  stepId: string;
   label: string;
   phase: string;
   nextAgentName?: string;

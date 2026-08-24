@@ -375,7 +375,7 @@ export class WikiService {
     };
   }
 
-  async lint(): Promise<WikiLintResponse> {
+  async lint(options: { recordLog?: boolean } = {}): Promise<WikiLintResponse> {
     await this.ensureWiki();
     const issues: WikiLintIssue[] = [];
     const issueKeys = new Set<string>();
@@ -462,14 +462,16 @@ export class WikiService {
     }
 
     const checkedAt = new Date().toISOString();
-    await this.appendLog({
-      eventType: "wiki_lint",
-      title: "Wiki lint run",
-      summary: issues.length === 0 ? "No issues found." : `Found ${issues.length} issue(s).`,
-      details: {
-        issues: issues.length,
-      },
-    });
+    if (options.recordLog !== false) {
+      await this.appendLog({
+        eventType: "wiki_lint",
+        title: "Wiki lint run",
+        summary: issues.length === 0 ? "No issues found." : `Found ${issues.length} issue(s).`,
+        details: {
+          issues: issues.length,
+        },
+      });
+    }
 
     return {
       ok: issues.length === 0,

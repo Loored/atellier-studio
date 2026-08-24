@@ -1,4 +1,4 @@
-import { Check, Loader2, Play, Route, RotateCcw, Workflow, X } from "lucide-react";
+import { Ban, Check, Loader2, Play, Route, RotateCcw, Workflow, X } from "lucide-react";
 import type { ExecutorMode, OrchestrationSkillId, OrchestrationStepStatusEntry } from "@atellier/shared";
 import { cn } from "../../../lib/cn";
 import { useSkillOrchestrationPanel } from "../hooks/useSkillOrchestrationPanel";
@@ -18,7 +18,7 @@ function StepIndicator({ step, index }: { step: OrchestrationStepStatusEntry; in
       </span>
     );
   }
-  if (step.status === "failed") {
+  if (["failed", "blocked", "cancelled"].includes(step.status)) {
     return (
       <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-orange bg-orange/15">
         <X size={11} strokeWidth={3} />
@@ -34,9 +34,12 @@ function StepIndicator({ step, index }: { step: OrchestrationStepStatusEntry; in
 
 const STEP_CLASS: Record<OrchestrationStepStatusEntry["status"] | "pending", string> = {
   pending:   "border-[var(--border-card)] bg-white/[0.02]",
+  queued:    "border-[var(--border-card)] bg-white/[0.02]",
   running:   "border-teal/30 bg-teal/[0.04] shadow-[0_0_12px_rgba(16,242,170,0.06)]",
   completed: "border-green-400/[0.22] bg-green-400/[0.03]",
   failed:    "border-orange/[0.28] bg-orange/[0.04]",
+  blocked:   "border-orange/[0.28] bg-orange/[0.04]",
+  cancelled: "border-[var(--border-card)] bg-white/[0.02] opacity-70",
 };
 
 export function SkillOrchestrationPanel() {
@@ -48,6 +51,7 @@ export function SkillOrchestrationPanel() {
     context,
     mode,
     liveStatus,
+    runEvents,
     isOpenAiExecution,
     executorModel,
     modelProfile,
@@ -55,23 +59,29 @@ export function SkillOrchestrationPanel() {
     availableExecutorModes,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration,
+    isCancellingRun,
+    isRetryingRun,
     orchestrationErrorMessage,
     setSelectedSkillId,
     setGoal,
     setContext,
     setExecutorModeOverride,
     handleStartOrchestration,
+    handleCancelRun,
+    handleRetryRun,
     resetToForm,
   } = useSkillOrchestrationPanel();
 
   const orchStatus = liveStatus?.status;
-  const isTerminal = orchStatus === "completed" || orchStatus === "failed";
+  const isTerminal = orchStatus
+    ? ["completed", "failed", "blocked", "cancelled"].includes(orchStatus)
+    : false;
   const doneCount = liveStatus?.steps.filter((s) => s.status === "completed").length ?? 0;
   const totalCount = liveStatus?.steps.length ?? selectedSkill?.steps.length ?? 0;
 
   const statusBadgeClass = orchStatus === "completed"
     ? "status-badge status-badge-completed"
-    : orchStatus === "failed"
+    : orchStatus && ["failed", "blocked", "cancelled"].includes(orchStatus)
       ? "status-badge status-badge-failed"
       : "status-badge status-badge-running";
 
@@ -87,14 +97,39 @@ export function SkillOrchestrationPanel() {
           {mode === "live" ? (
             <>
               {orchStatus && <span className={statusBadgeClass}>{orchStatus}</span>}
-              <button
-                type="button"
-                className="icon-only-button"
-                onClick={resetToForm}
-                title="Nueva orquestación"
-              >
-                <RotateCcw size={14} />
-              </button>
+              {!isTerminal ? (
+                <button
+                  type="button"
+                  className="icon-only-button"
+                  onClick={handleCancelRun}
+                  disabled={isCancellingRun || Boolean(liveStatus?.execution?.cancelRequestedAt)}
+                  title="Cancelar al terminar el paso actual"
+                >
+                  {isCancellingRun ? <Loader2 size={14} className="spin" /> : <Ban size={14} />}
+                </button>
+              ) : (
+                <>
+                  {(orchStatus === "failed" || orchStatus === "blocked") && (
+                    <button
+                      type="button"
+                      className="icon-only-button"
+                      onClick={handleRetryRun}
+                      disabled={isRetryingRun}
+                      title="Reintentar conservando pasos completados"
+                    >
+                      {isRetryingRun ? <Loader2 size={14} className="spin" /> : <RotateCcw size={14} />}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="icon-only-button"
+                    onClick={resetToForm}
+                    title="Nueva orquestación"
+                  >
+                    <Play size={14} />
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
@@ -117,6 +152,15 @@ export function SkillOrchestrationPanel() {
               </span>
             )}
           </div>
+
+          {liveStatus?.execution && (
+            <div className="flex items-center justify-between gap-2 mb-3 text-[0.68rem] text-ink-faint">
+              <span>phase: {liveStatus.execution.phase}</span>
+              <span className="tabular-nums">
+                attempt {liveStatus.execution.attempt}/{liveStatus.execution.maxAttempts}
+              </span>
+            </div>
+          )}
 
           {/* Step list */}
           <ol className="grid gap-2 list-none m-0 p-0 max-h-[280px] overflow-auto">
@@ -158,6 +202,24 @@ export function SkillOrchestrationPanel() {
                   </li>
                 ))}
           </ol>
+
+          {runEvents.length > 0 && (
+            <div className="mt-3 border-t border-[var(--border-card)] pt-2.5">
+              <p className="m-0 mb-1.5 text-[0.65rem] font-bold tracking-[0.1em] uppercase text-ink-faint">
+                Durable activity
+              </p>
+              <ol className="grid gap-1 list-none m-0 p-0 max-h-28 overflow-auto">
+                {runEvents.slice(-6).reverse().map((event) => (
+                  <li key={event.id} className="grid grid-cols-[auto_1fr] gap-2 text-[0.7rem] leading-[1.35]">
+                    <span className="text-purple tabular-nums">#{event.sequence}</span>
+                    <span className="text-ink-muted overflow-wrap-anywhere">
+                      {event.message ?? event.type}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       ) : (
         <>

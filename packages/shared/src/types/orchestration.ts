@@ -1,6 +1,6 @@
 import type { AgentRole } from "./agent";
 import type { ExecutorMode } from "./health";
-import type { Run, RunStatus } from "./run";
+import type { Run, RunExecution, RunStatus } from "./run";
 
 export const ORCHESTRATION_SKILL_IDS = [
   "atellier-build-loop",
@@ -27,6 +27,14 @@ export type OrchestrationSkillSummary = {
   name: string;
   description: string;
   steps: OrchestrationSkillStepSummary[];
+};
+
+export type OrchestrationExecutionStep = OrchestrationSkillStepSummary & {
+  instruction: string;
+};
+
+export type OrchestrationExecutionDefinition = Omit<OrchestrationSkillSummary, "steps"> & {
+  steps: OrchestrationExecutionStep[];
 };
 
 export type StartSkillOrchestrationInput = {
@@ -63,7 +71,7 @@ export type OrchestrationStepStatusEntry = {
   agentName: string;
   agentId?: string;
   runId?: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | RunStatus;
   isActive: boolean;
 };
 
@@ -71,7 +79,8 @@ export type OrchestrationStatusResult = {
   orchestrationRunId: string;
   skillId: OrchestrationSkillId;
   goal: string;
-  status: string;
+  status: RunStatus;
+  execution?: RunExecution;
   steps: OrchestrationStepStatusEntry[];
   activeStep: OrchestrationStepStatusEntry | null;
   nextStep: OrchestrationStepStatusEntry | null;

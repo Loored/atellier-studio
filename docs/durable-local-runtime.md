@@ -1,0 +1,57 @@
+# Durable Local Runtime v1
+
+Atellier skill orchestrations use a Mongo-backed local queue. The API persists intent; a separate worker owns execution. This keeps accepted work recoverable across API and worker restarts without adding Redis, a cloud queue, or remote infrastructure.
+
+## Process model
+
+1. `POST /orchestrations/skills/:skillId/run` creates a `queued` orchestration `Run` and returns `202`.
+2. The run stores a versioned execution envelope and an immutable snapshot/hash of the selected skill definition.
+3. `pnpm dev:worker` claims available work with a lease and heartbeat.
+4. Each orchestration step remains an ordinary child run linked by `orchestrationRunId` and `orchestrationStepId`.
+5. State transitions are appended to `RunEvent` with a per-run sequence number.
+6. The dashboard discovers queued/running orchestrations after refresh and rebuilds the activity view from persisted status and events.
+
+Memory storage uses the same runtime services with an inline worker. It is intended for tests and UI review, not restart durability.
+
+## Delivery and recovery semantics
+
+- Delivery is at least once.
+- A worker lease defaults to 30 seconds and is renewed while a step runs.
+- A lease-expired run can be reclaimed by another worker.
+- The maximum automatic attempt count defaults to three, with bounded exponential backoff.
+- Completed child steps are idempotent commits. A recovered or manually retried orchestration reuses them instead of running them again.
+- The persisted definition snapshot prevents a code deployment from silently changing an already queued orchestration.
+- Manual retry resets the attempt budget but retains completed child runs.
+
+There is no exactly-once promise. A process crash during an external provider call may leave a non-terminal child run and cause that in-flight step to execute again. Provider-side idempotency will be a separate concern if Atellier later adds tools with irreversible side effects.
+
+## Cancellation
+
+`POST /runs/:id/cancel` immediately cancels queued work. Running work records `cancelRequestedAt` and stops at the next orchestration step boundary. v1 does not forcibly abort an in-flight LLM request.
+
+Terminal statuses are `completed`, `failed`, `blocked`, and `cancelled`. `POST /runs/:id/retry` accepts failed or blocked durable orchestration runs.
+
+## Read APIs
+
+- `GET /runs/:id` returns the execution envelope.
+- `GET /runs/:id/events?after=<sequence>` returns replayable ordered events.
+- `GET /runs/:id/events/stream?after=<sequence>` provides an SSE tail and closes at a terminal state.
+- `GET /runs?type=orchestration&status=queued,running` discovers active work for UI rehydration.
+
+## Local operation
+
+Start Mongo, then run API/web and worker in separate terminals:
+
+```bash
+pnpm dev
+pnpm dev:worker
+```
+
+The worker reads the same provider variables as the API. Useful runtime settings:
+
+```bash
+RUN_WORKER_LEASE_MS=30000
+RUN_WORKER_POLL_MS=1000
+```
+
+Do not run the standalone worker with `API_STORAGE=memory`; memory state is process-local and cannot be shared with the API.

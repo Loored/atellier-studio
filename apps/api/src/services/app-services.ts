@@ -20,6 +20,9 @@ import { readdir } from "node:fs/promises";
 import { KnowledgeGraphService } from "./knowledge-graph.service";
 import { seedDemoData } from "./seed.service";
 import { KnowledgeLiveService } from "./knowledge-live.service";
+import { RunEventService } from "./run-event.service";
+import { ExecutionQueueService } from "./execution-queue.service";
+import { DurableRuntimeService } from "./durable-runtime.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -27,6 +30,9 @@ export type AppServices = {
   messages: MessageService;
   tasks: TaskService;
   runs: RunService;
+  runEvents: RunEventService;
+  executionQueue: ExecutionQueueService;
+  durableRuntime: DurableRuntimeService;
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
@@ -73,6 +79,10 @@ export type CreateAppServicesOptions = {
    * content out of the box. Ignored when storageMode is "mongo".
    */
   seedDemoData?: boolean;
+  /** Runs the durable worker in-process. Intended for tests and memory-mode development only. */
+  inlineDurableRuntime?: boolean;
+  runtimeLeaseMs?: number;
+  runtimePollMs?: number;
 };
 
 export function resolveAtellierRoot(input?: string): string {
@@ -222,13 +232,27 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     verifiedRepoFiles: repoFileHints,
   });
 
+  const skillOrchestrations = new SkillOrchestrationService(agents, agentRuns, runs, wiki);
+  const runEvents = new RunEventService(storageMode, runs);
+  const executionQueue = new ExecutionQueueService(runs, runEvents, {
+    leaseMs: options.runtimeLeaseMs,
+    retryBaseDelayMs: storageMode === "memory" ? 0 : undefined,
+  });
+  const durableRuntime = new DurableRuntimeService(executionQueue, skillOrchestrations, {
+    inline: options.inlineDurableRuntime ?? storageMode === "memory",
+    pollMs: options.runtimePollMs,
+  });
+
   const services: AppServices = {
     agents,
     agentRuns,
     messages,
     tasks,
     runs,
-    skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs, wiki),
+    runEvents,
+    executionQueue,
+    durableRuntime,
+    skillOrchestrations,
     wiki,
     codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
     knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki, atelierRootResolved),

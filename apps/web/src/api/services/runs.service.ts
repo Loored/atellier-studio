@@ -4,14 +4,44 @@ import type {
   CaptureRunMemoryResponse,
   CompleteRunInput,
   CreateRunInput,
+  ListRunsInput,
   Run,
+  RunEventsResponse,
   UpdateRunReviewInput,
 } from "@atellier/shared";
 import { httpClient } from "../client/httpClient";
 
 export const runsService = {
-  async list(): Promise<Run[]> {
-    const response = await httpClient.get<Run[]>("/runs");
+  async list(input: ListRunsInput = {}): Promise<Run[]> {
+    const response = await httpClient.get<Run[]>("/runs", {
+      params: {
+        type: input.type,
+        status: input.statuses?.join(","),
+        limit: input.limit,
+      },
+    });
+    return response.data;
+  },
+
+  async getById(runId: string): Promise<Run> {
+    const response = await httpClient.get<Run>(`/runs/${runId}`);
+    return response.data;
+  },
+
+  async listEvents(runId: string): Promise<RunEventsResponse> {
+    const response = await httpClient.get<RunEventsResponse>(`/runs/${runId}/events`, {
+      params: { limit: 200 },
+    });
+    return response.data;
+  },
+
+  async cancel(runId: string): Promise<Run> {
+    const response = await httpClient.post<Run>(`/runs/${runId}/cancel`);
+    return response.data;
+  },
+
+  async retry(runId: string): Promise<Run> {
+    const response = await httpClient.post<Run>(`/runs/${runId}/retry`);
     return response.data;
   },
 

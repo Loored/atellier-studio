@@ -80,6 +80,7 @@ export class AgentRunService {
         verifiedRepoFiles: this.verifiedRepoFiles,
         ...(input.orchestrationStep && {
           orchestrationRunId: input.orchestrationStep.orchestrationRunId,
+          orchestrationStepId: input.orchestrationStep.stepId,
           orchestrationStepLabel: input.orchestrationStep.label,
           orchestrationPhase: input.orchestrationStep.phase,
         }),
