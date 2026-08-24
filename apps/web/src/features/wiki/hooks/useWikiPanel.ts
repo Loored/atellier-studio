@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Run, WikiDreamDecisionValue } from "@atellier/shared";
+import {
+  TASK_TITLE_MAX_LENGTH,
+  type Run,
+  type Task,
+  type WikiDreamDecisionValue,
+} from "@atellier/shared";
 import {
   useOrchestrationStatusApi,
   useStartSkillOrchestrationApi,
 } from "../../../api/hooks/orchestrations/useOrchestrationsApi";
 import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
+import { useCreateTaskApi } from "../../../api/hooks/tasks/useTasksApi";
 import {
   useAppendWikiLogApi,
   useWikiIndexApi,
@@ -27,6 +33,8 @@ export function useWikiPanel() {
   const queryClient = useQueryClient();
   const [ingestTitle, setIngestTitle] = useState("");
   const [ingestContent, setIngestContent] = useState("");
+  const [lastIngestTitle, setLastIngestTitle] = useState("");
+  const [createdLinkedTask, setCreatedLinkedTask] = useState<Task | null>(null);
   const [ingestSourceType, setIngestSourceType] = useState<"note" | "research" | "client" | "decision" | "other">("note");
   const [queryInput, setQueryInput] = useState("");
   const [querySourceType, setQuerySourceType] = useState<"all" | "note" | "research" | "client" | "decision" | "other">("all");
@@ -72,6 +80,7 @@ export function useWikiPanel() {
     isPending: isIngesting,
     data: ingestResult,
   } = useWikiIngestApi();
+  const createLinkedTaskMutation = useCreateTaskApi();
   const {
     mutateAsync: lintWiki,
     isPending: isLinting,
@@ -92,6 +101,12 @@ export function useWikiPanel() {
   const relatedPages = queryResult?.relatedPages ?? [];
   const contradictions = queryResult?.contradictions ?? [];
   const proposedTasks = ingestResult?.proposedTasks ?? [];
+  const canCreateLinkedTask = Boolean(
+    ingestResult?.rawPath &&
+    ingestResult.summaryPagePath &&
+    !createdLinkedTask &&
+    !createLinkedTaskMutation.isPending,
+  );
   const canRunIngest = ingestTitle.trim().length > 0 && ingestContent.trim().length > 0 && !isIngesting;
   const canRunQuery = queryInput.trim().length > 0;
   const canWritePage =
@@ -183,14 +198,32 @@ export function useWikiPanel() {
     if (!canRunIngest) {
       return;
     }
+    const title = ingestTitle.trim();
+    setCreatedLinkedTask(null);
     await ingestWiki({
-      title: ingestTitle.trim(),
+      title,
       content: ingestContent.trim(),
       sourceType: ingestSourceType,
     });
+    setLastIngestTitle(title);
     setSelectedSummaryPath(null);
     setIngestTitle("");
     setIngestContent("");
+  }
+
+  async function createLinkedTask(): Promise<void> {
+    if (!canCreateLinkedTask || !ingestResult) {
+      return;
+    }
+
+    const task = await createLinkedTaskMutation.mutateAsync({
+      title: inferLinkedTaskTitle(proposedTasks, lastIngestTitle),
+      description: `Grounded in ${ingestResult.summaryPagePath} (raw: ${ingestResult.rawPath}).`,
+      status: "inbox",
+      priority: "medium",
+      sourceIds: [ingestResult.rawPath, ingestResult.summaryPagePath],
+    });
+    setCreatedLinkedTask(task);
   }
 
   function selectIngestSummary(): void {
@@ -387,6 +420,9 @@ export function useWikiPanel() {
     isIngesting,
     ingestResult,
     proposedTasks,
+    createdLinkedTask,
+    canCreateLinkedTask,
+    isCreatingLinkedTask: createLinkedTaskMutation.isPending,
     selectedSummaryPath,
     selectedSummaryPage,
     isFetchingSummaryPage,
@@ -420,6 +456,7 @@ export function useWikiPanel() {
     isWritingWikiPage: writePageMutation.isPending,
     writeResult: writePageMutation.data,
     submitIngest,
+    createLinkedTask,
     selectIngestSummary,
     submitQuery,
     promoteQueryMatchToDraft,
@@ -430,6 +467,13 @@ export function useWikiPanel() {
     dreamDecisionFeedback,
     submitWritePage,
   };
+}
+
+function inferLinkedTaskTitle(proposedTasks: string[], ingestTitle: string): string {
+  const proposedTitle = proposedTasks
+    .map((task) => task.replace(/^\s*-?\s*\[[ x]\]\s*/i, "").replace(/\s*\(source:.*\)\s*$/i, "").trim())
+    .find(Boolean);
+  return (proposedTitle || `Follow up: ${ingestTitle || "ingested source"}`).slice(0, TASK_TITLE_MAX_LENGTH);
 }
 
 function extractRunResponse(run: Run | null): string {

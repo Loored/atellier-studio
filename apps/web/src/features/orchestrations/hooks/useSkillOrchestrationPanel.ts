@@ -13,6 +13,7 @@ import {
   useRetryRunApi,
   useRunEventsApi,
 } from "../../../api/hooks/runs/useRunsApi";
+import { useTasksApi } from "../../../api/hooks/tasks/useTasksApi";
 import { queryKeys } from "../../../api/query/queryKeys";
 
 type Mode = "form" | "live";
@@ -29,6 +30,7 @@ export function useSkillOrchestrationPanel() {
   const [selectedSkillId, setSelectedSkillId] = useState<OrchestrationSkillId>(ORCHESTRATION_SKILL_IDS[0]);
   const [goal, setGoal] = useState("");
   const [context, setContext] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState("");
   const [executorModeOverride, setExecutorModeOverride] = useState<ExecutorMode | "">("");
   const [mode, setMode] = useState<Mode>("form");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function useSkillOrchestrationPanel() {
   const cancelRun = useCancelRunApi();
   const retryRun = useRetryRunApi();
   const { data: activeOrchestrationRuns = [] } = useActiveOrchestrationsApi();
+  const { data: taskList = [] } = useTasksApi();
   const { data: liveStatus } = useOrchestrationStatusApi(activeRunId);
   const isTerminal = liveStatus
     ? ["completed", "failed", "blocked", "cancelled"].includes(liveStatus.status)
@@ -54,6 +57,14 @@ export function useSkillOrchestrationPanel() {
   const selectedSkill = useMemo(
     () => orchestrationSkillList.find((s) => s.id === selectedSkillId) ?? orchestrationSkillList[0],
     [orchestrationSkillList, selectedSkillId],
+  );
+  const availableTaskList = useMemo(
+    () => taskList.filter((task) => task.status !== "done"),
+    [taskList],
+  );
+  const linkedTask = useMemo(
+    () => taskList.find((task) => task.id === liveStatus?.taskId) ?? null,
+    [liveStatus?.taskId, taskList],
   );
 
   useEffect(() => {
@@ -73,6 +84,7 @@ export function useSkillOrchestrationPanel() {
         queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page("wiki/deliverables/index.md") }),
       ]);
@@ -94,6 +106,7 @@ export function useSkillOrchestrationPanel() {
         skillId: selectedSkill.id,
         goal: trimmedGoal,
         context: context.trim() || undefined,
+        ...(selectedTaskId ? { taskId: selectedTaskId } : {}),
         executorModeOverride: executorModeOverride || undefined,
       },
       {
@@ -104,6 +117,7 @@ export function useSkillOrchestrationPanel() {
           setMode("live");
           setGoal("");
           setContext("");
+          setSelectedTaskId("");
           setExecutorModeOverride("");
         },
       },
@@ -134,6 +148,9 @@ export function useSkillOrchestrationPanel() {
     selectedSkillId,
     goal,
     context,
+    selectedTaskId,
+    availableTaskList,
+    linkedTask,
     mode,
     liveStatus,
     runEvents: runEventsResponse?.events ?? [],
@@ -151,6 +168,7 @@ export function useSkillOrchestrationPanel() {
     setSelectedSkillId,
     setGoal,
     setContext,
+    setSelectedTaskId,
     setExecutorModeOverride,
     handleStartOrchestration,
     handleCancelRun,

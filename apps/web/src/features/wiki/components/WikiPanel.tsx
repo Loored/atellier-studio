@@ -25,6 +25,9 @@ export function WikiPanel() {
     isIngesting,
     ingestResult,
     proposedTasks,
+    createdLinkedTask,
+    canCreateLinkedTask,
+    isCreatingLinkedTask,
     selectedSummaryPage,
     isFetchingSummaryPage,
     isLinting,
@@ -57,6 +60,7 @@ export function WikiPanel() {
     isWritingWikiPage,
     writeResult,
     submitIngest,
+    createLinkedTask,
     selectIngestSummary,
     submitQuery,
     promoteQueryMatchToDraft,
@@ -217,13 +221,28 @@ export function WikiPanel() {
           {ingestResult ? (
             <div className="mt-2" aria-live="polite">
               <p className="text-[0.74rem] text-ink-muted">Saved: {ingestResult.summaryPagePath}</p>
-              <button
-                type="button"
-                onClick={selectIngestSummary}
-                className="mt-1 min-h-7 px-2.5 border border-[var(--border-card)] rounded-md text-[0.74rem] text-ink-muted"
-              >
-                Preview summary
-              </button>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={selectIngestSummary}
+                  className="min-h-7 px-2.5 border border-[var(--border-card)] rounded-md text-[0.74rem] text-ink-muted"
+                >
+                  Preview summary
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createLinkedTask()}
+                  disabled={!canCreateLinkedTask}
+                  className="min-h-7 px-2.5 border border-teal/35 rounded-md text-[0.74rem] text-teal bg-teal/10 hover:bg-teal/20"
+                >
+                  {isCreatingLinkedTask ? "Creating task..." : "Create linked task"}
+                </button>
+              </div>
+              {createdLinkedTask ? (
+                <p className="mt-1.5 text-[0.74rem] text-teal">
+                  Linked task created: {createdLinkedTask.title} · {createdLinkedTask.status}
+                </p>
+              ) : null}
             </div>
           ) : null}
           {proposedTasks.length > 0 ? (

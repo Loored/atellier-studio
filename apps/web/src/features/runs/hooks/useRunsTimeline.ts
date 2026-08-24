@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import type { RunReviewStatus } from "@atellier/shared";
 import { useAgentsApi } from "../../../api/hooks/agents/useAgentsApi";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
+import { useTasksApi } from "../../../api/hooks/tasks/useTasksApi";
 import {
   useAppendRunLogApi,
   useCaptureRunMemoryApi,
@@ -21,6 +22,7 @@ export function useRunsTimeline() {
     isLoadingWithoutCache: isLoadingRunsWithoutCache,
   } = useRunsApi();
   const { data: agentList = [] } = useAgentsApi();
+  const { data: taskList = [] } = useTasksApi();
   const { data: healthStatus } = useHealthApi();
   const createRun = useCreateRunApi();
   const appendRunLog = useAppendRunLogApi();
@@ -56,6 +58,7 @@ export function useRunsTimeline() {
             run.deliverablePath ?? "",
             relatedAgent?.name ?? "",
             relatedAgent?.role ?? "",
+            run.taskId ? taskList.find((task) => task.id === run.taskId)?.title ?? "" : "",
           ]
             .join(" ")
             .toLowerCase()
@@ -125,6 +128,7 @@ export function useRunsTimeline() {
     runList,
     filteredRunList,
     deliverableRuns,
+    taskList,
     runLogMessages,
     agentFilter,
     reviewFilter,

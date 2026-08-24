@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   TimerReset,
 } from "lucide-react";
-import { RUN_REVIEW_STATUSES } from "@atellier/shared";
+import { RUN_REVIEW_STATUSES, type Run, type Task } from "@atellier/shared";
 import { ValidationSummary } from "../../components/ValidationSummary";
 import { useRunsTimeline } from "../runs/hooks/useRunsTimeline";
 import { WikiPanel } from "../wiki/components/WikiPanel";
@@ -29,6 +29,7 @@ const TABS: { id: TabFilter; label: string }[] = [
 export function ReviewView() {
   const {
     runList,
+    taskList,
     filteredRunList,
     runLogMessages,
     agentFilter,
@@ -246,6 +247,7 @@ export function ReviewView() {
             const isRunning  = run.status === "running";
             const validation = readRunValidation(run);
             const validationHasIssues = Boolean(validation && !validation.passed);
+            const linkedTask = run.taskId ? taskList.find((task) => task.id === run.taskId) : undefined;
 
             return (
               <div
@@ -288,6 +290,8 @@ export function ReviewView() {
                     {latestLog.level}: {latestLog.message}
                   </p>
                 )}
+
+                {linkedTask ? <DailyLoopChain run={run} task={linkedTask} /> : null}
 
                 {validation ? (
                   <div className="mt-2 ml-6">
@@ -360,7 +364,7 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-green-400/35 text-green-400 bg-green-400/10 hover:bg-green-400/20"
                       onClick={() => setRunReview(run.id, "approved")}
-                      disabled={isUpdatingRunReview || validationHasIssues}
+                      disabled={isUpdatingRunReview || validationHasIssues || run.reviewStatus === "approved"}
                       title={validationHasIssues ? "Validation failed. Resolve issues before approving." : "Approve run"}
                     >
                       <ShieldCheck size={13} />
@@ -371,7 +375,7 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-orange/35 text-orange bg-orange/10 hover:bg-orange/20"
                       onClick={() => setRunReview(run.id, "changes-requested")}
-                      disabled={isUpdatingRunReview}
+                      disabled={isUpdatingRunReview || run.reviewStatus === "changes-requested"}
                     >
                       <CircleSlash size={13} />
                       Request changes
@@ -381,18 +385,18 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-teal/35 text-teal bg-teal/10 hover:bg-teal/20"
                       onClick={() => captureRunMemory(run.id)}
-                      disabled={isCapturingRunMemory}
-                      title="Capture review memory to wiki"
+                      disabled={isCapturingRunMemory || run.reviewStatus !== "approved" || Boolean(run.memory)}
+                      title={run.memory ? `Memory captured at ${run.memory.wikiPath}` : "Approve the run before capturing review memory"}
                     >
                       <Archive size={13} />
-                      Capture memory
+                      {run.memory ? "Memory captured" : "Capture memory"}
                     </button>
 
                     <button
                       type="button"
                       className="icon-only-button w-7 min-w-[28px] h-7"
                       onClick={() => setRunReview(run.id, "pending")}
-                      disabled={isUpdatingRunReview}
+                      disabled={isUpdatingRunReview || run.reviewStatus === "pending"}
                       title="Reset to pending"
                       aria-label="Reset to pending review"
                     >
@@ -415,6 +419,64 @@ export function ReviewView() {
       </aside>
     </div>
   );
+}
+
+function DailyLoopChain({ run, task }: { run: Run; task: Task }) {
+  const stages = [
+    { label: "Source", value: `${task.sourceIds?.length ?? 0} linked`, complete: Boolean(task.sourceIds?.length) },
+    { label: "Task", value: task.status, complete: true },
+    { label: "Run", value: run.status, complete: run.status === "completed" },
+    { label: "Deliverable", value: run.deliverablePath ? "ready" : "missing", complete: Boolean(run.deliverablePath) },
+    { label: "QA", value: hasQaEvidence(run) ? "passed" : "pending", complete: hasQaEvidence(run) },
+    { label: "Review", value: run.reviewStatus ?? "unlinked", complete: run.reviewStatus === "approved" },
+    { label: "Memory", value: run.memory ? "captured" : "pending", complete: Boolean(run.memory) },
+  ];
+
+  return (
+    <div className="mt-2 ml-6 border border-[var(--border-card)] rounded-lg p-2 bg-black/15" aria-label={`Daily loop for ${task.title}`}>
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="m-0 text-[0.68rem] font-bold tracking-[0.08em] uppercase text-ink-faint">Daily loop</p>
+        <p className="m-0 text-[0.7rem] text-teal overflow-hidden text-ellipsis whitespace-nowrap" title={task.title}>
+          {task.title}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {stages.map((stage) => (
+          <span
+            key={stage.label}
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[0.66rem] ${
+              stage.complete
+                ? "border-teal/25 bg-teal/[0.06] text-teal"
+                : "border-[var(--border-card)] bg-white/[0.02] text-ink-faint"
+            }`}
+          >
+            <strong>{stage.label}</strong>
+            <span>{stage.value}</span>
+          </span>
+        ))}
+      </div>
+      {task.sourceIds?.length ? (
+        <p className="mt-1.5 mb-0 text-[0.66rem] text-ink-faint overflow-wrap-anywhere">
+          Sources: {task.sourceIds.join(" · ")}
+        </p>
+      ) : null}
+      {run.memory ? (
+        <p className="mt-1 mb-0 text-[0.66rem] text-teal overflow-wrap-anywhere">
+          Memory: {run.memory.wikiPath}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function hasQaEvidence(run: Run): boolean {
+  const validation = readRunValidation(run);
+  if (validation) {
+    return Boolean(validation.passed);
+  }
+
+  const steps = (run.output as { steps?: Array<{ stepId?: string; status?: string }> } | undefined)?.steps;
+  return Boolean(steps?.some((step) => ["qa", "approve"].includes(step.stepId ?? "") && step.status === "completed"));
 }
 
 function readRunValidation(run: {

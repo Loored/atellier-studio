@@ -50,6 +50,7 @@ export function useStartSkillOrchestrationApi(options: UseStartSkillOrchestratio
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
           queryClient.invalidateQueries({ queryKey: queryKeys.orchestrations.status(result.runId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
         ]);
       },
       onError: (error) => notifyError(error),
