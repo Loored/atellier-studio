@@ -24,6 +24,7 @@ type SkillTemplate = OrchestrationExecutionDefinition;
 
 export type SkillExecutionHooks = {
   isCancellationRequested: () => Promise<boolean>;
+  signal?: AbortSignal;
   onStepStarted?: (step: SkillStepTemplate) => Promise<void>;
   onStepCompleted?: (step: SkillStepTemplate, result: SkillOrchestrationStepResult) => Promise<void>;
   onStepReused?: (step: SkillStepTemplate, result: SkillOrchestrationStepResult) => Promise<void>;
@@ -395,19 +396,23 @@ export class SkillOrchestrationService {
         });
 
         const nextStep = template.steps[template.steps.indexOf(step) + 1];
-        const result = await this.agentRuns.run(agent.id, {
-          instruction: this.buildStepInstruction(template, step, input.goal),
-          context: await this.buildStepContext(template, step, orchestrationRun.id, input.context, previousOutputs),
-          executorModeOverride: input.executorModeOverride,
-          recordDeliverable: false,
-          orchestrationStep: {
-            orchestrationRunId: orchestrationRun.id,
-            stepId: step.id,
-            label: step.label,
-            phase: step.phase,
-            nextAgentName: nextStep?.agentName,
+        const result = await this.agentRuns.run(
+          agent.id,
+          {
+            instruction: this.buildStepInstruction(template, step, input.goal),
+            context: await this.buildStepContext(template, step, orchestrationRun.id, input.context, previousOutputs),
+            executorModeOverride: input.executorModeOverride,
+            recordDeliverable: false,
+            orchestrationStep: {
+              orchestrationRunId: orchestrationRun.id,
+              stepId: step.id,
+              label: step.label,
+              phase: step.phase,
+              nextAgentName: nextStep?.agentName,
+            },
           },
-        });
+          { signal: hooks.signal },
+        );
 
         if (!result) {
           throw new Error(`Agent not found for orchestration step ${step.id}.`);
@@ -467,12 +472,16 @@ export class SkillOrchestrationService {
         steps: stepResults,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown orchestration failure.";
+      const cancelled = error instanceof OrchestrationCancelledError || Boolean(hooks.signal?.aborted);
+      const settledError = cancelled && !(error instanceof OrchestrationCancelledError)
+        ? new OrchestrationCancelledError()
+        : error;
+      const message = settledError instanceof Error ? settledError.message : "Unknown orchestration failure.";
       await this.runs.appendLog(orchestrationRun.id, {
-        level: error instanceof OrchestrationCancelledError ? "warn" : "error",
+        level: cancelled ? "warn" : "error",
         message,
       });
-      throw error;
+      throw settledError;
     }
   }
 

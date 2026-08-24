@@ -46,6 +46,7 @@ export class DurableRuntimeService {
   private readonly pollMs: number;
   private readonly workerId: string;
   private activeRunPromise: Promise<boolean> | null = null;
+  private activeRunController: AbortController | null = null;
   private drainPromise: Promise<void> | null = null;
   private pollPromise: Promise<void> | null = null;
   private stopPromise: Promise<void> | null = null;
@@ -94,7 +95,11 @@ export class DurableRuntimeService {
   }
 
   async requestCancel(runId: string): Promise<Run> {
-    return this.queue.requestCancel(runId);
+    const run = await this.queue.requestCancel(runId);
+    if (this.currentRunId === runId && !this.activeRunController?.signal.aborted) {
+      this.activeRunController?.abort(new OrchestrationCancelledError());
+    }
+    return run;
   }
 
   async retry(runId: string): Promise<Run> {
@@ -171,6 +176,8 @@ export class DurableRuntimeService {
     }
 
     this.currentRunId = run.id;
+    const runController = new AbortController();
+    this.activeRunController = runController;
     this.lastError = null;
     this.state = "running";
     this.emitDiagnostic("run_claimed");
@@ -180,10 +187,30 @@ export class DurableRuntimeService {
         // A lost lease is surfaced by the next state transition.
       });
     }, Math.max(Math.floor(this.queue.leaseMs / 3), 500));
+    let checkingCancellation = false;
+    const cancellationPoll = setInterval(() => {
+      if (checkingCancellation || runController.signal.aborted) {
+        return;
+      }
+      checkingCancellation = true;
+      void this.queue.isCancellationRequested(run.id)
+        .then((cancelled) => {
+          if (cancelled && !runController.signal.aborted) {
+            runController.abort(new OrchestrationCancelledError());
+          }
+        })
+        .catch(() => {
+          // A transient cancellation read failure falls back to step-boundary checks.
+        })
+        .finally(() => {
+          checkingCancellation = false;
+        });
+    }, Math.min(Math.max(Math.floor(this.queue.leaseMs / 6), 250), 1_000));
 
     try {
       await this.skillOrchestrations.executeClaimed(run, {
         isCancellationRequested: () => this.queue.isCancellationRequested(run.id),
+        signal: runController.signal,
         onStepStarted: async (step) => {
           await this.queue.setPhase(run.id, this.workerId, "running", step.id);
           await this.queue.recordStepStarted(
@@ -204,9 +231,16 @@ export class DurableRuntimeService {
           await this.queue.setPhase(run.id, this.workerId, "finalizing", null);
         },
       });
+      if (runController.signal.aborted || await this.queue.isCancellationRequested(run.id)) {
+        throw new OrchestrationCancelledError();
+      }
       await this.queue.markCompleted(run.id, this.workerId);
     } catch (error) {
-      if (error instanceof OrchestrationCancelledError || await this.queue.isCancellationRequested(run.id)) {
+      if (
+        error instanceof OrchestrationCancelledError
+        || runController.signal.aborted
+        || await this.queue.isCancellationRequested(run.id)
+      ) {
         await this.queue.markCancelled(run.id, this.workerId);
       } else {
         this.lastError = error instanceof Error ? error.message : "Unknown orchestration execution error.";
@@ -215,6 +249,10 @@ export class DurableRuntimeService {
       }
     } finally {
       clearInterval(heartbeat);
+      clearInterval(cancellationPoll);
+      if (this.activeRunController === runController) {
+        this.activeRunController = null;
+      }
       this.processedRuns += 1;
       this.currentRunId = null;
       this.state = this.stopped

@@ -112,7 +112,7 @@ Result: offline queueing, restart/reclaim, completed-step reuse, ordered replay,
 - ✅ Add Mongo integration coverage for multi-worker claim contention and expired-lease reclaim.
 - ✅ Verify event sequence ordering and duplicate protection under concurrent claims.
 - ✅ Add explicit worker lifecycle diagnostics and graceful shutdown behavior.
-- Add provider abort support where available; keep cooperative step-boundary cancellation as the fallback.
+- ✅ Add provider abort support where available; keep cooperative step-boundary cancellation as the fallback.
 - Require provider/tool idempotency keys before irreversible side effects are allowed.
 
 ### P2 — Controlled real Codex Worker adapter

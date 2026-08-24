@@ -29,7 +29,9 @@ There is no exactly-once promise. A process crash during an external provider ca
 
 ## Cancellation
 
-`POST /runs/:id/cancel` immediately cancels queued work. Running work records `cancelRequestedAt` and stops at the next orchestration step boundary. v1 does not forcibly abort an in-flight LLM request.
+`POST /runs/:id/cancel` immediately cancels queued work. For running work it records `cancelRequestedAt`, aborts the matching in-process provider request immediately, and lets a separate worker detect the persisted request within one second. Fetch-based OpenAI, Anthropic, Groq, and Ollama executors receive the composed `AbortSignal`. Providers that cannot abort still stop cooperatively at the next orchestration step boundary.
+
+Execution timeouts use the same signal path but remain timeout failures rather than operator cancellations. Late results from providers that ignore aborts cannot complete the cancelled child or parent run.
 
 Terminal statuses are `completed`, `failed`, `blocked`, and `cancelled`. `POST /runs/:id/retry` accepts failed or blocked durable orchestration runs.
 
@@ -92,7 +94,7 @@ On `SIGINT` or `SIGTERM`, the worker:
 3. waits for that run and any inline drain to settle
 4. emits `stopped` and then disconnects Mongo
 
-Shutdown remains cooperative: it does not abort an in-flight provider request. Provider abort support is the next hardening layer.
+Shutdown remains graceful rather than cancelling active work: a process signal waits for an already claimed run, while an explicit operator cancellation aborts its provider request.
 
 ## Mongo concurrency verification
 

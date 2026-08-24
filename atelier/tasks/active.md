@@ -89,7 +89,8 @@ Tasks currently in progress.
   - [x] Add multi-worker Mongo contention/reclaim integration coverage.
   - [x] Reject stale-worker step events after lease ownership changes.
   - [x] Add worker lifecycle diagnostics and graceful shutdown behavior.
-  - Define provider idempotency and abort requirements before irreversible side effects.
+  - [x] Propagate cancellation to supported provider requests with a cooperative fallback.
+  - Define idempotency requirements before irreversible side effects.
 
 - [ ] Controlled real Codex Worker adapter
   - Keep the adapter behind a feature flag and human approval flow.

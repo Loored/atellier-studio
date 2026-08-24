@@ -4,6 +4,7 @@ export type ExecuteAgentInstructionInput = {
   agent: Agent;
   instruction: string;
   context?: string;
+  signal?: AbortSignal;
 };
 
 export type ExecuteAgentInstructionResult = {
@@ -54,6 +55,17 @@ export type AnthropicAgentExecutorConfig = {
 
 export interface AgentExecutorService {
   execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult>;
+}
+
+export class AgentExecutionCancelledError extends Error {
+  constructor(message = "Agent execution cancelled.", options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AgentExecutionCancelledError";
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 const MOCK_STEP_DELAY_MS = Number(process.env.MOCK_STEP_DELAY_MS ?? 0);
@@ -249,8 +261,25 @@ export class RoleAwareAgentExecutorService implements AgentExecutorService {
 
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    if (input.signal?.aborted) {
+      throw new AgentExecutionCancelledError("Mock execution cancelled.");
+    }
     if (MOCK_STEP_DELAY_MS > 0) {
-      await new Promise((r) => setTimeout(r, MOCK_STEP_DELAY_MS));
+      await new Promise<void>((resolve, reject) => {
+        const signal = input.signal;
+        const onAbort = (): void => {
+          clearTimeout(timeout);
+          reject(new AgentExecutionCancelledError("Mock execution cancelled."));
+        };
+        const timeout = setTimeout(() => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve();
+        }, MOCK_STEP_DELAY_MS);
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+        }
+      });
     }
     return {
       response: buildMockResponse(input.agent, input.instruction, input.context),
@@ -328,19 +357,28 @@ export class OpenAiCompatibleAgentExecutorService implements AgentExecutorServic
       headers.Authorization = `Bearer ${this.config.apiKey}`;
     }
 
-    const response = await fetch(this.config.baseUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: this.config.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 1024,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.config.baseUrl, {
+        method: "POST",
+        headers,
+        signal: input.signal,
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.4,
+          max_tokens: 1024,
+        }),
+      });
+    } catch (error) {
+      if (input.signal?.aborted || isAbortError(error)) {
+        throw new AgentExecutionCancelledError(`${label} execution cancelled.`, { cause: error });
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -414,30 +452,39 @@ export class AnthropicAgentExecutorService implements AgentExecutorService {
     const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
     const userPrompt = buildExecutorUserPrompt(input);
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": this.config.apiKey,
-        "anthropic-version": ANTHROPIC_API_VERSION,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: this.config.model,
-        max_tokens: ANTHROPIC_MAX_TOKENS,
-        temperature: ANTHROPIC_TEMPERATURE,
-        // Naive prompt caching: the system prompt (role expertise + repo hints)
-        // is stable across runs of the same agent, so cache it ephemerally.
-        // Per-run instruction/context stays uncached in the user message.
-        system: [
-          {
-            type: "text",
-            text: systemPrompt,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": this.config.apiKey,
+          "anthropic-version": ANTHROPIC_API_VERSION,
+          "Content-Type": "application/json",
+        },
+        signal: input.signal,
+        body: JSON.stringify({
+          model: this.config.model,
+          max_tokens: ANTHROPIC_MAX_TOKENS,
+          temperature: ANTHROPIC_TEMPERATURE,
+          // Naive prompt caching: the system prompt (role expertise + repo hints)
+          // is stable across runs of the same agent, so cache it ephemerally.
+          // Per-run instruction/context stays uncached in the user message.
+          system: [
+            {
+              type: "text",
+              text: systemPrompt,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages: [{ role: "user", content: userPrompt }],
+        }),
+      });
+    } catch (error) {
+      if (input.signal?.aborted || isAbortError(error)) {
+        throw new AgentExecutionCancelledError("Anthropic execution cancelled.", { cause: error });
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
