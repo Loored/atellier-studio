@@ -11898,3 +11898,9 @@
 - run: `atelier/runs/2026-08-24-durable-runtime-multi-worker-hardening.md`
 - validation: dedicated Mongo suite 3/3; normal API suite 87/87; API typecheck/build passed.
 - next: worker lifecycle diagnostics and graceful shutdown, then provider abort/idempotency requirements.
+
+## [2026-08-24T09:10:42.000Z] run_log | Worker lifecycle hardening
+- Summary: Added structured worker diagnostics and cooperative signal shutdown that interrupts idle polling, waits for active work, and disconnects Mongo only after settlement.
+- run: `atelier/runs/2026-08-24-worker-lifecycle-hardening.md`
+- validation: lifecycle 3/3; normal API 90/90; API typecheck/build passed; live isolated worker signal check passed.
+- next: provider abort support and idempotency rules for irreversible tools.

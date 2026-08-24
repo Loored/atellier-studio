@@ -109,9 +109,9 @@ Result: offline queueing, restart/reclaim, completed-step reuse, ordered replay,
 
 ### P1 — Durable Runtime hardening v1.1
 
-- Add Mongo integration coverage for multi-worker claim contention and expired-lease reclaim.
-- Verify event sequence ordering and duplicate protection under concurrent claims.
-- Add explicit worker lifecycle diagnostics and graceful shutdown behavior.
+- ✅ Add Mongo integration coverage for multi-worker claim contention and expired-lease reclaim.
+- ✅ Verify event sequence ordering and duplicate protection under concurrent claims.
+- ✅ Add explicit worker lifecycle diagnostics and graceful shutdown behavior.
 - Add provider abort support where available; keep cooperative step-boundary cancellation as the fallback.
 - Require provider/tool idempotency keys before irreversible side effects are allowed.
 

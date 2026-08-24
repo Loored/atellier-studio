@@ -12,17 +12,53 @@ import {
 
 export type DurableRuntimeOptions = {
   inline?: boolean;
+  onDiagnostic?: DurableWorkerDiagnosticSink;
   pollMs?: number;
   workerId?: string;
 };
 
+export type DurableWorkerState = "idle" | "polling" | "running" | "stopping" | "stopped";
+
+export type DurableWorkerDiagnostics = {
+  workerId: string;
+  state: DurableWorkerState;
+  startedAt: string | null;
+  stoppingAt: string | null;
+  stoppedAt: string | null;
+  currentRunId: string | null;
+  processedRuns: number;
+  lastError: string | null;
+  leaseMs: number;
+  pollMs: number;
+};
+
+export type DurableWorkerDiagnosticEvent = {
+  event: "started" | "run_claimed" | "run_settled" | "error" | "stopping" | "stopped";
+  timestamp: string;
+  diagnostics: DurableWorkerDiagnostics;
+};
+
+export type DurableWorkerDiagnosticSink = (event: DurableWorkerDiagnosticEvent) => void;
+
 export class DurableRuntimeService {
   private readonly inline: boolean;
+  private readonly onDiagnostic?: DurableWorkerDiagnosticSink;
   private readonly pollMs: number;
   private readonly workerId: string;
+  private activeRunPromise: Promise<boolean> | null = null;
   private drainPromise: Promise<void> | null = null;
+  private pollPromise: Promise<void> | null = null;
+  private stopPromise: Promise<void> | null = null;
+  private readonly stopController = new AbortController();
   private wakePending = false;
   private stopped = false;
+  private state: DurableWorkerState = "idle";
+  private startedAt: string | null = null;
+  private stoppingAt: string | null = null;
+  private stoppedAt: string | null = null;
+  private currentRunId: string | null = null;
+  private processedRuns = 0;
+  private lastError: string | null = null;
 
   constructor(
     private readonly queue: ExecutionQueueService,
@@ -30,8 +66,24 @@ export class DurableRuntimeService {
     options: DurableRuntimeOptions = {},
   ) {
     this.inline = options.inline ?? false;
+    this.onDiagnostic = options.onDiagnostic;
     this.pollMs = Math.max(options.pollMs ?? 1_000, 100);
     this.workerId = options.workerId ?? `worker-${process.pid}-${randomUUID().slice(0, 8)}`;
+  }
+
+  getDiagnostics(): DurableWorkerDiagnostics {
+    return {
+      workerId: this.workerId,
+      state: this.state,
+      startedAt: this.startedAt,
+      stoppingAt: this.stoppingAt,
+      stoppedAt: this.stoppedAt,
+      currentRunId: this.currentRunId,
+      processedRuns: this.processedRuns,
+      lastError: this.lastError,
+      leaseMs: this.queue.leaseMs,
+      pollMs: this.pollMs,
+    };
   }
 
   async enqueueSkill(input: StartSkillOrchestrationInput): Promise<StartSkillOrchestrationResponse> {
@@ -70,11 +122,58 @@ export class DurableRuntimeService {
       });
   }
 
-  async runOnce(): Promise<boolean> {
+  runOnce(): Promise<boolean> {
+    if (this.activeRunPromise) {
+      return this.activeRunPromise;
+    }
+    const execution = this.executeOnce();
+    const tracked = execution.finally(() => {
+      if (this.activeRunPromise === tracked) {
+        this.activeRunPromise = null;
+      }
+    });
+    this.activeRunPromise = tracked;
+    return tracked;
+  }
+
+  startPolling(): Promise<void> {
+    if (this.pollPromise) {
+      return this.pollPromise;
+    }
+    if (this.stopped) {
+      return Promise.reject(new Error(`Durable worker ${this.workerId} cannot restart after shutdown.`));
+    }
+
+    this.startedAt = this.startedAt ?? new Date().toISOString();
+    this.state = "polling";
+    this.emitDiagnostic("started");
+    const polling = this.poll();
+    const tracked = polling.finally(() => {
+      if (this.pollPromise === tracked) {
+        this.pollPromise = null;
+      }
+    });
+    this.pollPromise = tracked;
+    return tracked;
+  }
+
+  stop(): Promise<void> {
+    if (!this.stopPromise) {
+      this.stopPromise = this.stopInternal();
+    }
+    return this.stopPromise;
+  }
+
+  private async executeOnce(): Promise<boolean> {
     const run = await this.queue.claim(this.workerId);
     if (!run) {
       return false;
     }
+
+    this.currentRunId = run.id;
+    this.lastError = null;
+    this.state = "running";
+    this.emitDiagnostic("run_claimed");
 
     const heartbeat = setInterval(() => {
       void this.queue.heartbeat(run.id, this.workerId).catch(() => {
@@ -110,23 +209,32 @@ export class DurableRuntimeService {
       if (error instanceof OrchestrationCancelledError || await this.queue.isCancellationRequested(run.id)) {
         await this.queue.markCancelled(run.id, this.workerId);
       } else {
+        this.lastError = error instanceof Error ? error.message : "Unknown orchestration execution error.";
+        this.emitDiagnostic("error");
         await this.queue.handleFailure(run.id, this.workerId, error);
       }
     } finally {
       clearInterval(heartbeat);
+      this.processedRuns += 1;
+      this.currentRunId = null;
+      this.state = this.stopped
+        ? "stopping"
+        : (this.pollPromise || this.drainPromise ? "polling" : "idle");
+      this.emitDiagnostic("run_settled");
     }
 
     return true;
   }
 
-  async startPolling(): Promise<void> {
-    this.stopped = false;
+  private async poll(): Promise<void> {
     while (!this.stopped) {
       let worked = false;
       try {
         worked = await this.runOnce();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown durable worker error.";
+        this.lastError = message;
+        this.emitDiagnostic("error");
         console.error(`[atellier-worker] ${message}`);
       }
       if (!worked && !this.stopped) {
@@ -135,9 +243,32 @@ export class DurableRuntimeService {
     }
   }
 
-  async stop(): Promise<void> {
+  private async stopInternal(): Promise<void> {
+    if (this.state === "stopped") {
+      return;
+    }
     this.stopped = true;
-    await this.drainPromise;
+    this.stoppingAt = this.stoppingAt ?? new Date().toISOString();
+    this.state = "stopping";
+    this.emitDiagnostic("stopping");
+    this.stopController.abort();
+
+    const pending = [...new Set(
+      [this.activeRunPromise, this.drainPromise, this.pollPromise]
+        .filter((promise): promise is Promise<boolean> | Promise<void> => promise !== null),
+    )];
+    const results = await Promise.allSettled(pending);
+    const rejection = results.find((result) => result.status === "rejected");
+    if (rejection?.status === "rejected") {
+      this.lastError = rejection.reason instanceof Error
+        ? rejection.reason.message
+        : "Unknown worker shutdown error.";
+      this.emitDiagnostic("error");
+    }
+
+    this.stoppedAt = new Date().toISOString();
+    this.state = "stopped";
+    this.emitDiagnostic("stopped");
   }
 
   private async drain(): Promise<void> {
@@ -147,6 +278,34 @@ export class DurableRuntimeService {
   }
 
   private async delay(ms: number): Promise<void> {
-    await new Promise<void>((resolve) => setTimeout(resolve, ms));
+    if (this.stopController.signal.aborted) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      const signal = this.stopController.signal;
+      const done = (): void => {
+        clearTimeout(timeout);
+        signal.removeEventListener("abort", done);
+        resolve();
+      };
+      const timeout = setTimeout(done, ms);
+      signal.addEventListener("abort", done, { once: true });
+    });
+  }
+
+  private emitDiagnostic(event: DurableWorkerDiagnosticEvent["event"]): void {
+    if (!this.onDiagnostic) {
+      return;
+    }
+    try {
+      this.onDiagnostic({
+        event,
+        timestamp: new Date().toISOString(),
+        diagnostics: this.getDiagnostics(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown diagnostic sink error.";
+      console.error(`[atellier-worker] Diagnostic sink failed: ${message}`);
+    }
   }
 }
