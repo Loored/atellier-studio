@@ -80,6 +80,48 @@ export class RunService {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
+  async failInterruptedOrchestrationStepRuns(orchestrationRunId: string): Promise<number> {
+    const now = new Date();
+    const logEntry: RunLogEntry = {
+      timestamp: now.toISOString(),
+      level: "warn",
+      message: "Superseded after the parent orchestration was reclaimed or retried.",
+    };
+
+    if (this.storageMode === "mongo") {
+      const result = await RunModel.updateMany(
+        {
+          "input.orchestrationRunId": orchestrationRunId,
+          status: { $in: ["queued", "running"] },
+        },
+        {
+          $set: { status: "failed", updatedAt: now },
+          $push: { logs: logEntry },
+        },
+      );
+      return result.modifiedCount;
+    }
+
+    let settled = 0;
+    for (const [id, run] of this.records) {
+      const runInput = run.input as Record<string, unknown> | undefined;
+      if (
+        runInput?.orchestrationRunId !== orchestrationRunId
+        || (run.status !== "queued" && run.status !== "running")
+      ) {
+        continue;
+      }
+      this.records.set(id, {
+        ...run,
+        status: "failed",
+        logs: [...run.logs, logEntry],
+        updatedAt: now.toISOString(),
+      });
+      settled += 1;
+    }
+    return settled;
+  }
+
   async create(input: CreateRunInput): Promise<Run> {
     if (this.storageMode === "mongo") {
       const run = await RunModel.create({

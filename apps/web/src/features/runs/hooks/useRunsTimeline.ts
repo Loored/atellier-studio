@@ -8,6 +8,7 @@ import {
   useCompleteRunApi,
   useCreateRunApi,
   usePromoteRunDeliverableApi,
+  useRetryRunApi,
   useRunsApi,
   useUnlinkRunDeliverableApi,
   useUpdateRunReviewApi,
@@ -28,6 +29,7 @@ export function useRunsTimeline() {
   const promoteRunDeliverable = usePromoteRunDeliverableApi();
   const unlinkRunDeliverable = useUnlinkRunDeliverableApi();
   const captureRunMemory = useCaptureRunMemoryApi();
+  const retryRun = useRetryRunApi();
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
@@ -140,6 +142,7 @@ export function useRunsTimeline() {
     isPromotingRunDeliverable: promoteRunDeliverable.isPending,
     isUnlinkingRunDeliverable: unlinkRunDeliverable.isPending,
     isCapturingRunMemory: captureRunMemory.isPending,
+    isRetryingRun: retryRun.isPending,
     capturedMemoryPath: captureRunMemory.data?.wikiPath ?? null,
     setRunLogMessage,
     setAgentFilter,
@@ -184,6 +187,7 @@ export function useRunsTimeline() {
         runId,
       }),
     unlinkRunDeliverable: handleUnlinkRunDeliverable,
+    retryRun: (runId: string) => retryRun.mutate({ runId }),
     captureRunMemory: (runId: string) =>
       captureRunMemory.mutate({
         runId,

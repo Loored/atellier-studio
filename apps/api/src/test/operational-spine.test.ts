@@ -1158,6 +1158,59 @@ describe("operational spine routes", () => {
     expect(eventTypes.at(-1)).toBe("completed");
   });
 
+  it("settles interrupted child runs before a reclaimed orchestration resumes", async () => {
+    await server.close();
+    const services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/wiki-dream-loop/run",
+      payload: { goal: "Recover an interrupted child run." },
+    });
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    await services.runs.updateExecution(started.runId, {
+      status: "queued",
+      phase: "queued",
+      attempt: 1,
+      availableAt: new Date().toISOString(),
+    });
+    const interrupted = await services.runs.create({
+      type: "manual",
+      status: "running",
+      input: {
+        orchestrationRunId: started.runId,
+        orchestrationStepId: "audit",
+        orchestrationStepLabel: "Audit the wiki",
+      },
+    });
+
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+
+    expect(await services.runs.getById(interrupted.id)).toMatchObject({
+      status: "failed",
+      logs: [
+        expect.objectContaining({
+          level: "warn",
+          message: "Superseded after the parent orchestration was reclaimed or retried.",
+        }),
+      ],
+    });
+    const childRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    expect(childRuns.filter((run) => run.status === "running")).toHaveLength(0);
+    expect((await services.runs.getById(started.runId))?.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "Recovered 1 interrupted child run(s) from an earlier worker attempt.",
+        }),
+      ]),
+    );
+  });
+
   it("accepts orchestration executor override when available", async () => {
     const startResponse = await server.inject({
       method: "POST",
