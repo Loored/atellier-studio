@@ -113,7 +113,7 @@ Result: offline queueing, restart/reclaim, completed-step reuse, ordered replay,
 - ✅ Verify event sequence ordering and duplicate protection under concurrent claims.
 - ✅ Add explicit worker lifecycle diagnostics and graceful shutdown behavior.
 - ✅ Add provider abort support where available; keep cooperative step-boundary cancellation as the fallback.
-- Require provider/tool idempotency keys before irreversible side effects are allowed.
+- ✅ Require provider/tool idempotency keys before irreversible side effects are allowed.
 
 ### P2 — Controlled real Codex Worker adapter
 

@@ -25,7 +25,7 @@ Memory storage uses the same runtime services with an inline worker. It is inten
 - The persisted definition snapshot prevents a code deployment from silently changing an already queued orchestration.
 - Manual retry resets the attempt budget but retains completed child runs.
 
-There is no exactly-once promise. A process crash during an external provider call may leave a non-terminal child run and cause that in-flight step to execute again. Provider-side idempotency will be a separate concern if Atellier later adds tools with irreversible side effects.
+There is no general exactly-once promise. A process crash during an external provider call may leave a non-terminal child run and cause that in-flight step to execute again. Any tool that can create an irreversible effect must therefore use the durable effect ledger described in [`tool-effect-idempotency.md`](tool-effect-idempotency.md): the adapter supplies a stable key and deterministic fingerprint, and the ledger prevents duplicate execution for the same approved attempt.
 
 ## Cancellation
 

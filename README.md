@@ -80,6 +80,8 @@ The API accepts and persists work even while the worker is offline. When the wor
 
 Cancelling a running durable orchestration now propagates an `AbortSignal` to fetch-based OpenAI, Anthropic, Groq, and Ollama calls. A separate worker detects a persisted cancellation within one second; providers that cannot abort still stop at the next safe step boundary.
 
+Irreversible tool effects must pass through the durable idempotency ledger with a stable key and deterministic fingerprint. Completed outcomes are reused, concurrent duplicates are reported as in progress, and conflicting key reuse fails closed. See [`docs/tool-effect-idempotency.md`](docs/tool-effect-idempotency.md).
+
 Optional worker controls:
 
 ```bash

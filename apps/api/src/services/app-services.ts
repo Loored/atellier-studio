@@ -26,6 +26,8 @@ import {
   DurableRuntimeService,
   type DurableWorkerDiagnosticSink,
 } from "./durable-runtime.service";
+import { createEffectIdempotencyRepository } from "./effect-idempotency.repository";
+import { EffectIdempotencyService } from "./effect-idempotency.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -36,6 +38,7 @@ export type AppServices = {
   runEvents: RunEventService;
   executionQueue: ExecutionQueueService;
   durableRuntime: DurableRuntimeService;
+  effectIdempotency: EffectIdempotencyService;
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
@@ -243,6 +246,9 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     leaseMs: options.runtimeLeaseMs,
     retryBaseDelayMs: storageMode === "memory" ? 0 : undefined,
   });
+  const effectIdempotency = new EffectIdempotencyService(
+    createEffectIdempotencyRepository(storageMode),
+  );
   const durableRuntime = new DurableRuntimeService(executionQueue, skillOrchestrations, {
     inline: options.inlineDurableRuntime ?? storageMode === "memory",
     onDiagnostic: options.runtimeDiagnosticSink,
@@ -259,6 +265,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     runEvents,
     executionQueue,
     durableRuntime,
+    effectIdempotency,
     skillOrchestrations,
     wiki,
     codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),

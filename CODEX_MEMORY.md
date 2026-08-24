@@ -99,10 +99,9 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Durable Runtime hardening v1.1**: idempotency requirements for irreversible tools. Multi-worker Mongo contention, worker diagnostics/graceful shutdown, and provider abort propagation are complete.
-2. **Controlled real Codex Worker adapter**: replace the fake adapter only behind a feature flag, existing approvals, constrained working directories/commands, and durable evidence capture.
-3. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
-4. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
+1. **Controlled real Codex Worker adapter**: replace the fake adapter only behind a feature flag, existing approvals, constrained working directories/commands, durable idempotency, and evidence capture.
+2. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
+3. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
@@ -114,7 +113,8 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 - `SIGINT`/`SIGTERM` stop new claims, interrupt idle polling, wait for active execution while its heartbeat continues, emit `stopped`, and only then disconnect Mongo.
 - Explicit run cancellation reaches fetch-based OpenAI, Anthropic, Groq, and Ollama calls through `AbortSignal`; a separate worker detects persisted cancellation within one second, with step-boundary fallback.
 - Process shutdown remains graceful and waits for active work; it does not reinterpret shutdown as operator cancellation.
-- Irreversible-tool idempotency remains the next hardening boundary.
+- Irreversible effects now fail closed without a key and fingerprint. The memory/Mongo ledger atomically claims each key and deterministically reuses completed outcomes or reports in-progress/failed attempts.
+- The integration contract lives in `docs/tool-effect-idempotency.md`; adapters must use it before executing an irreversible effect.
 
 ### 2026-08-24 - Multi-worker Mongo hardening
 
