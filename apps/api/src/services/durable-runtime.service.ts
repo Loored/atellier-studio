@@ -87,14 +87,19 @@ export class DurableRuntimeService {
         isCancellationRequested: () => this.queue.isCancellationRequested(run.id),
         onStepStarted: async (step) => {
           await this.queue.setPhase(run.id, this.workerId, "running", step.id);
-          await this.queue.recordStepStarted(run.id, step.id, `Starting ${step.label} with ${step.agentName}.`);
+          await this.queue.recordStepStarted(
+            run.id,
+            this.workerId,
+            step.id,
+            `Starting ${step.label} with ${step.agentName}.`,
+          );
         },
         onStepCompleted: async (step, result) => {
-          await this.queue.recordStepCompleted(run.id, step.id, { runId: result.runId });
+          await this.queue.recordStepCompleted(run.id, this.workerId, step.id, { runId: result.runId });
         },
         onStepReused: async (step, result) => {
           await this.queue.setPhase(run.id, this.workerId, "recovering", step.id);
-          await this.queue.recordStepReused(run.id, step.id, { runId: result.runId });
+          await this.queue.recordStepReused(run.id, this.workerId, step.id, { runId: result.runId });
         },
         onFinalizing: async () => {
           await this.queue.setPhase(run.id, this.workerId, "finalizing", null);

@@ -347,6 +347,10 @@ export class SkillOrchestrationService {
     orchestrationRun: Run,
     hooks: SkillExecutionHooks,
   ): Promise<SkillOrchestrationResult> {
+    const leaseOwner = orchestrationRun.execution?.leaseOwner;
+    if (!leaseOwner) {
+      throw new Error(`Run ${orchestrationRun.id} has no active execution lease owner.`);
+    }
     const template = this.readDefinitionSnapshot(orchestrationRun);
     if (!template) {
       throw new Error(`Run ${orchestrationRun.id} has no valid orchestration definition snapshot.`);
@@ -427,11 +431,14 @@ export class SkillOrchestrationService {
           level: "info",
           message: `Completed ${step.label}; step run ${result.run.id}.`,
         });
-        await this.runs.updateStatus(orchestrationRun.id, "running", {
+        const updatedParent = await this.runs.updateStatus(orchestrationRun.id, "running", {
           skillId: input.skillId,
           goal: input.goal,
           steps: stepResults,
-        });
+        }, leaseOwner);
+        if (!updatedParent) {
+          throw new Error(`Execution lease lost while recording progress for run ${orchestrationRun.id}.`);
+        }
         await hooks.onStepCompleted?.(step, stepResult);
       }
 
@@ -447,7 +454,7 @@ export class SkillOrchestrationService {
           goal: input.goal,
           steps: stepResults,
         },
-      });
+      }, leaseOwner);
 
       if (!completedRun) {
         throw new Error("Orchestration run disappeared before completion.");
