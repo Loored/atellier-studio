@@ -40,6 +40,10 @@ export type BuildServerOptions = {
   | "inlineDurableRuntime"
   | "runtimeLeaseMs"
   | "runtimePollMs"
+  | "codexWorkerRealEnabled"
+  | "codexWorkerTimeoutMs"
+  | "codexWorkerMaxOutputBytes"
+  | "codexWorkerAllowedWorkingDirectories"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {

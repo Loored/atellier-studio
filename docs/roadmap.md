@@ -115,15 +115,15 @@ Result: offline queueing, restart/reclaim, completed-step reuse, ordered replay,
 - ✅ Add provider abort support where available; keep cooperative step-boundary cancellation as the fallback.
 - ✅ Require provider/tool idempotency keys before irreversible side effects are allowed.
 
-### P2 — Controlled real Codex Worker adapter
+### P2 — Controlled real Codex Worker adapter ✅ completed 2026-08-24
 
 Replace the fake Codex Worker executor only behind an explicit feature flag and the existing approval flow:
 
-- keep planning and protected-step approval visible to the operator
-- constrain working directories and allowed commands
-- capture diffs, stdout/stderr, tests, artifacts, and durations as review evidence
-- keep real Codex/external calls out of automated tests
-- never enable dangerous bypass flags
+- ✅ keep planning and protected-step approval visible to the operator
+- ✅ constrain working directories and allowed commands
+- ✅ capture diffs, stdout/stderr, tests, artifacts, and durations as review evidence
+- ✅ keep real Codex/external calls out of automated tests
+- ✅ never enable dangerous bypass flags
 
 ### P3 — Complete daily-use operational loop
 

@@ -92,7 +92,7 @@ Tasks currently in progress.
   - [x] Propagate cancellation to supported provider requests with a cooperative fallback.
   - [x] Require a durable idempotency key and fingerprint before irreversible effects.
 
-- [ ] Controlled real Codex Worker adapter
-  - Keep the adapter behind a feature flag and human approval flow.
-  - Constrain working directories and command execution.
-  - Persist diffs, logs, tests, artifacts, and durations as review evidence.
+- [x] Controlled real Codex Worker adapter
+  - [x] Keep the adapter behind a feature flag and human approval flow.
+  - [x] Constrain working directories and command execution.
+  - [x] Persist diffs, logs, tests, artifacts, and durations as review evidence.

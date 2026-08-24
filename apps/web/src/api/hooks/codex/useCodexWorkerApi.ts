@@ -32,6 +32,10 @@ export function useCodexWorkerApi(runId: string | null) {
     mutationFn: (id: string) => codexWorkerService.executeNext(id),
   });
 
+  const retryCodexWorkerStepMutation = useMutation({
+    mutationFn: ({ id, stepId }: { id: string; stepId: string }) => codexWorkerService.retryStep(id, stepId),
+  });
+
   const cancelCodexWorkerMutation = useMutation({
     mutationFn: (id: string) => codexWorkerService.cancel(id),
   });
@@ -55,6 +59,7 @@ export function useCodexWorkerApi(runId: string | null) {
     planCodexWorkerMutation,
     approveCodexWorkerStepMutation,
     executeNextCodexWorkerMutation,
+    retryCodexWorkerStepMutation,
     cancelCodexWorkerMutation,
     finalizeCodexWorkerMutation,
   };

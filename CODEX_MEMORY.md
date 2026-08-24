@@ -99,13 +99,20 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Controlled real Codex Worker adapter**: replace the fake adapter only behind a feature flag, existing approvals, constrained working directories/commands, durable idempotency, and evidence capture.
-2. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
-3. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
+1. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
+2. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-24 - Controlled real Codex Worker adapter
+
+- Fake-safe execution remains the default; `CODEX_WORKER_REAL_ENABLED=true` is required for local real execution.
+- The ordered allowlist is repository inspection, approved `codex exec`, diff capture, and typecheck. Commands use fixed argv with `shell: false` and realpath confinement.
+- Codex runs with workspace-write sandboxing, automatic policy review, and ephemeral session state; dangerous bypass/configuration flags are rejected.
+- The implementation step is wrapped by the irreversible-effect ledger, explicit retry gets a new key and requires fresh approval, and cancellation terminates the active child process.
+- `/health`, run detail, evidence, and the dashboard expose fake versus real adapter state.
 
 ### 2026-08-24 - Worker lifecycle diagnostics and graceful shutdown
 

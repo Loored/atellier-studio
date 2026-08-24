@@ -32,6 +32,7 @@ const getCodexRunMock = vi.hoisted(() => vi.fn());
 const planCodexRunMock = vi.hoisted(() => vi.fn());
 const approveCodexStepMock = vi.hoisted(() => vi.fn());
 const executeNextCodexMock = vi.hoisted(() => vi.fn());
+const retryCodexStepMock = vi.hoisted(() => vi.fn());
 const cancelCodexMock = vi.hoisted(() => vi.fn());
 const finalizeCodexMock = vi.hoisted(() => vi.fn());
 const readKnowledgeGraphMock = vi.hoisted(() => vi.fn());
@@ -187,6 +188,11 @@ vi.mock("./api/services/system.service", () => ({
       executorMode: "openai",
       executorModel: "gpt-4.1-mini",
       modelProfile: "standard",
+      codexWorker: {
+        executionAdapter: "fake",
+        label: "fake-safe",
+        realExecutionEnabled: false,
+      },
       mongo: { connected: false, state: "disconnected" },
       metrics: { agentsTotal: 1, waitingAgents: 0, activeRuns: 1 },
       memory: { rssBytes: 1000, heapUsedBytes: 500 },
@@ -201,6 +207,7 @@ vi.mock("./api/services/codex-worker.service", () => ({
     plan: planCodexRunMock,
     approveStep: approveCodexStepMock,
     executeNext: executeNextCodexMock,
+    retryStep: retryCodexStepMock,
     cancel: cancelCodexMock,
     finalize: finalizeCodexMock,
   },
@@ -413,6 +420,7 @@ describe("App", () => {
       mode: "approved_step",
       profile: "standard",
       goal: "Implement a safe API change",
+      executionAdapter: { mode: "fake", label: "fake-safe" },
       steps: [
         {
           id: "step-1",
@@ -915,6 +923,8 @@ describe("App", () => {
   it("runs codex worker panel actions", async () => {
     const user = userEvent.setup();
     render(<App />);
+
+    expect(await screen.findByText(/Codex adapter: fake · fake-safe/i)).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: /create run/i }));
     expect(window.confirm).toHaveBeenCalledWith(

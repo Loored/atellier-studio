@@ -61,6 +61,11 @@ describe("operational spine routes", () => {
       executorModel: "mock",
       modelProfile: "standard",
       availableExecutorModes: expect.arrayContaining(["mock"]),
+      codexWorker: {
+        executionAdapter: "fake",
+        label: "fake-safe",
+        realExecutionEnabled: false,
+      },
       mongo: {
         connected: false,
       },
@@ -1852,6 +1857,7 @@ describe("operational spine routes", () => {
       });
       await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
     }
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
 
     const finalizeResponse = await server.inject({
       method: "POST",
@@ -1881,7 +1887,7 @@ describe("operational spine routes", () => {
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("apps/api/src/services/codex-worker.service.ts");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("pnpm test:api passed");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("evidence: Fake executor completed step.");
-    expect(runLogResponse.json<WikiPageResponse>().content).toContain("Completed steps: 3/3");
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("Completed steps: 4/4");
   });
 
   it("rejects finalize when codex worker still has unresolved steps", async () => {
