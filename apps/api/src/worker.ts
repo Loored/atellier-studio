@@ -14,19 +14,28 @@ async function main(): Promise<void> {
   const services = await createAppServices({
     ...config.serviceOptions,
     inlineDurableRuntime: false,
+    runtimeDiagnosticSink: (event) => {
+      console.info(`[atellier-worker] ${JSON.stringify(event)}`);
+    },
   });
 
-  let stopping = false;
-  const stop = async (): Promise<void> => {
-    if (stopping) return;
-    stopping = true;
-    await services.durableRuntime.stop();
-    await disconnectMongo();
+  let stopPromise: Promise<void> | null = null;
+  const stop = (signal: NodeJS.Signals): Promise<void> => {
+    if (!stopPromise) {
+      console.info(`[atellier-worker] Received ${signal}; waiting for active work before disconnecting Mongo.`);
+      stopPromise = services.durableRuntime.stop().finally(() => disconnectMongo());
+    }
+    return stopPromise;
   };
-  process.once("SIGINT", () => void stop());
-  process.once("SIGTERM", () => void stop());
+  const handleSignal = (signal: NodeJS.Signals): void => {
+    void stop(signal).catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  };
+  process.once("SIGINT", () => handleSignal("SIGINT"));
+  process.once("SIGTERM", () => handleSignal("SIGTERM"));
 
-  console.info("[atellier-worker] Durable orchestration worker started.");
   await services.durableRuntime.startPolling();
 }
 

@@ -76,6 +76,8 @@ pnpm dev:worker
 
 The API accepts and persists work even while the worker is offline. When the worker starts, it claims queued or lease-expired runs. `API_STORAGE=memory` keeps an inline worker for tests and lightweight UI review, so `dev:memory` does not need a second process.
 
+`SIGINT` and `SIGTERM` stop new polling immediately, keep the heartbeat alive for any already claimed run, wait for that run to settle, and only then disconnect Mongo. The standalone worker prints structured lifecycle diagnostics with its worker ID, state, active run, processed count, lease/poll settings, and latest error.
+
 Optional worker controls:
 
 ```bash

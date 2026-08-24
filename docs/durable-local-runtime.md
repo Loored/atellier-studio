@@ -75,6 +75,25 @@ RUN_WORKER_POLL_MS=1000
 
 Do not run the standalone worker with `API_STORAGE=memory`; memory state is process-local and cannot be shared with the API.
 
+## Worker lifecycle and graceful shutdown
+
+The standalone worker emits one-line JSON diagnostics prefixed with `[atellier-worker]`. Lifecycle events are `started`, `run_claimed`, `run_settled`, `error`, `stopping`, and `stopped`. Each event includes:
+
+- stable worker ID and current lifecycle state
+- active parent run ID, when present
+- processed-run count and most recent error
+- start/stop timestamps
+- configured lease and polling durations
+
+On `SIGINT` or `SIGTERM`, the worker:
+
+1. stops issuing new claims and interrupts an idle poll delay immediately
+2. enters `stopping` while an already claimed run continues with its heartbeat
+3. waits for that run and any inline drain to settle
+4. emits `stopped` and then disconnects Mongo
+
+Shutdown remains cooperative: it does not abort an in-flight provider request. Provider abort support is the next hardening layer.
+
 ## Mongo concurrency verification
 
 With the local Mongo container running, execute:

@@ -88,7 +88,7 @@ Tasks currently in progress.
   - [x] Settle interrupted child runs when a parent is reclaimed or retried.
   - [x] Add multi-worker Mongo contention/reclaim integration coverage.
   - [x] Reject stale-worker step events after lease ownership changes.
-  - Add worker lifecycle diagnostics and graceful shutdown behavior.
+  - [x] Add worker lifecycle diagnostics and graceful shutdown behavior.
   - Define provider idempotency and abort requirements before irreversible side effects.
 
 - [ ] Controlled real Codex Worker adapter

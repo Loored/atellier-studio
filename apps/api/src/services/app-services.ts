@@ -22,7 +22,10 @@ import { seedDemoData } from "./seed.service";
 import { KnowledgeLiveService } from "./knowledge-live.service";
 import { RunEventService } from "./run-event.service";
 import { ExecutionQueueService } from "./execution-queue.service";
-import { DurableRuntimeService } from "./durable-runtime.service";
+import {
+  DurableRuntimeService,
+  type DurableWorkerDiagnosticSink,
+} from "./durable-runtime.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -83,6 +86,8 @@ export type CreateAppServicesOptions = {
   inlineDurableRuntime?: boolean;
   runtimeLeaseMs?: number;
   runtimePollMs?: number;
+  runtimeWorkerId?: string;
+  runtimeDiagnosticSink?: DurableWorkerDiagnosticSink;
 };
 
 export function resolveAtellierRoot(input?: string): string {
@@ -240,7 +245,9 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
   });
   const durableRuntime = new DurableRuntimeService(executionQueue, skillOrchestrations, {
     inline: options.inlineDurableRuntime ?? storageMode === "memory",
+    onDiagnostic: options.runtimeDiagnosticSink,
     pollMs: options.runtimePollMs,
+    workerId: options.runtimeWorkerId,
   });
 
   const services: AppServices = {
