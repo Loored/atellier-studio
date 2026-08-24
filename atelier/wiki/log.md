@@ -11911,3 +11911,14 @@
 - docs: `docs/tool-effect-idempotency.md`, `docs/codex-worker.md`
 - validation: 115 API and 22 web tests passed; shared/API/web/MCP typechecks and builds passed; no real Codex or external LLM was invoked by tests.
 - next: daily-use operational loop, then review-to-memory completion.
+
+## [2026-08-24T17:05:00.000Z] ingest | Daily-use operational loop implementation knowledge
+- Summary: Connected immutable source ingest, Wiki summary, linked task state, durable task-grounded orchestration, deliverable/QA evidence, operator review, and idempotent approved memory capture.
+- Source: implementation and validation on `codex/daily-use-operational-loop`; no new immutable external raw source.
+- run: `atelier/runs/2026-08-24-daily-use-operational-loop.md`
+- pages created: `docs/daily-use-operational-loop.md`, `atelier/wiki/workflows/daily-use-operational-loop.md`, `atelier/runs/2026-08-24-daily-use-operational-loop.md`.
+- pages updated: `atelier/wiki/index.md`, `atelier/tasks/active.md`, `README.md`, `CODEX_MEMORY.md`, `docs/roadmap.md`.
+- contradictions: none found; P3 now matches the shipped runtime, approval, and Wiki behavior.
+- tasks proposed: P4 review-to-memory learning loop remains the next active milestone.
+- validation: monorepo typecheck/build passed; API 117/117 and web 22/22 passed with mock/local executors only (3 opt-in Mongo tests skipped); read-only Wiki lint reported zero issues.
+- next: review-to-memory learning loop for curated role memory and contradiction/staleness signals.

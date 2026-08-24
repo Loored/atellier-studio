@@ -96,3 +96,10 @@ Tasks currently in progress.
   - [x] Keep the adapter behind a feature flag and human approval flow.
   - [x] Constrain working directories and command execution.
   - [x] Persist diffs, logs, tests, artifacts, and durations as review evidence.
+
+- [x] Complete daily-use operational loop
+  - [x] Link Wiki ingest raw and summary paths to a task.
+  - [x] Ground durable orchestration steps with linked task context.
+  - [x] Advance task state through execution, review, changes, and approved memory.
+  - [x] Make repeated review and memory actions idempotent.
+  - [x] Expose the complete evidence chain in Review and document recovery.
