@@ -136,7 +136,10 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
   const wiki = new WikiService(atelierRootResolved);
   const agents = new AgentService(storageMode);
   const tasks = new TaskService(storageMode);
-  const runs = new RunService(storageMode, wiki);
+  const effectIdempotency = new EffectIdempotencyService(
+    createEffectIdempotencyRepository(storageMode),
+  );
+  const runs = new RunService(storageMode, wiki, tasks, effectIdempotency);
   const messages = new MessageService(storageMode);
   const repoFileHints = [
     ...(await listVerifiedRepoFiles(repoRootResolved, "apps/web/src/features/wiki")),
@@ -249,15 +252,12 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     verifiedRepoFiles: repoFileHints,
   });
 
-  const skillOrchestrations = new SkillOrchestrationService(agents, agentRuns, runs, wiki);
+  const skillOrchestrations = new SkillOrchestrationService(agents, agentRuns, runs, wiki, tasks);
   const runEvents = new RunEventService(storageMode, runs);
   const executionQueue = new ExecutionQueueService(runs, runEvents, {
     leaseMs: options.runtimeLeaseMs,
     retryBaseDelayMs: storageMode === "memory" ? 0 : undefined,
   });
-  const effectIdempotency = new EffectIdempotencyService(
-    createEffectIdempotencyRepository(storageMode),
-  );
   const codexWorkerExecutor = options.codexWorkerRealEnabled
     ? new RealCodexWorkerExecutor({
         repositoryRoot: repoRootResolved,

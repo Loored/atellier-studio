@@ -17,6 +17,7 @@ import type {
 import { AgentRunService } from "./agent-run.service";
 import { AgentService } from "./agent.service";
 import { RunService } from "./run.service";
+import type { TaskService } from "./task.service";
 import type { WikiService } from "./wiki.service";
 
 type SkillStepTemplate = OrchestrationExecutionStep;
@@ -229,6 +230,7 @@ export class SkillOrchestrationService {
     private readonly agentRuns: AgentRunService,
     private readonly runs: RunService,
     private readonly wiki: WikiService,
+    private readonly tasks: TaskService,
   ) {}
 
   listSkills(): OrchestrationSkillSummary[] {
@@ -246,6 +248,13 @@ export class SkillOrchestrationService {
 
   async enqueue(input: StartSkillOrchestrationInput, maxAttempts = 3): Promise<Run> {
     const template = this.requireTemplate(input.skillId);
+    const linkedTask = input.taskId ? await this.tasks.getById(input.taskId) : null;
+    if (input.taskId && !linkedTask) {
+      throw new Error(`Linked task ${input.taskId} was not found.`);
+    }
+    if (linkedTask?.status === "done") {
+      throw new Error("A completed task cannot start a new orchestration.");
+    }
     const definitionSnapshot = structuredClone(template);
     const definitionHash = createHash("sha256")
       .update(JSON.stringify(definitionSnapshot))
@@ -259,6 +268,7 @@ export class SkillOrchestrationService {
         skillId: input.skillId,
         goal: input.goal,
         context: input.context,
+        taskId: input.taskId,
         executorModeOverride: input.executorModeOverride,
       },
       execution: {
@@ -278,6 +288,9 @@ export class SkillOrchestrationService {
       level: "info",
       message: `Skill queued: ${template.name}.`,
     });
+    if (linkedTask && linkedTask.status !== "active") {
+      await this.tasks.update(linkedTask.id, { status: "active" });
+    }
     return (await this.runs.getById(orchestrationRun.id)) ?? orchestrationRun;
   }
 
@@ -326,6 +339,7 @@ export class SkillOrchestrationService {
 
     return {
       orchestrationRunId,
+      taskId: orchRun.taskId,
       skillId,
       goal: orchInput?.goal ?? "",
       status: orchRun.status,
@@ -400,7 +414,7 @@ export class SkillOrchestrationService {
           agent.id,
           {
             instruction: this.buildStepInstruction(template, step, input.goal),
-            context: await this.buildStepContext(template, step, orchestrationRun.id, input.context, previousOutputs),
+            context: await this.buildStepContext(template, step, orchestrationRun.id, input, previousOutputs),
             executorModeOverride: input.executorModeOverride,
             recordDeliverable: false,
             orchestrationStep: {
@@ -569,18 +583,44 @@ export class SkillOrchestrationService {
     template: SkillTemplate,
     step: SkillStepTemplate,
     orchestrationRunId: string,
-    baseContext?: string,
+    input: StartSkillOrchestrationInput,
     previousOutputs: string[] = [],
   ): Promise<string> {
-    const dreamGrounding = await this.buildWikiDreamGrounding(template, step);
+    const [taskGrounding, dreamGrounding] = await Promise.all([
+      this.buildTaskGrounding(input.taskId),
+      this.buildWikiDreamGrounding(template, step),
+    ]);
     return [
       `Parent orchestration run: ${orchestrationRunId}`,
-      baseContext?.trim() ? `Operator context:\n${baseContext.trim()}` : "",
+      input.context?.trim() ? `Operator context:\n${input.context.trim()}` : "",
+      taskGrounding,
       dreamGrounding,
       previousOutputs.length > 0 ? `Previous step outputs:\n${previousOutputs.join("\n\n")}` : "",
     ]
       .filter(Boolean)
       .join("\n\n");
+  }
+
+  private async buildTaskGrounding(taskId?: string): Promise<string> {
+    if (!taskId) {
+      return "";
+    }
+
+    const task = await this.tasks.getById(taskId);
+    if (!task) {
+      return `Linked task: ${taskId} (no longer available)`;
+    }
+
+    return [
+      "Linked Task Grounding",
+      `Task ID: ${task.id}`,
+      `Title: ${task.title}`,
+      `Status: ${task.status}`,
+      task.description?.trim() ? `Description: ${task.description.trim()}` : "Description: none",
+      "Source paths:",
+      ...(task.sourceIds?.length ? task.sourceIds.map((sourceId) => `- ${sourceId}`) : ["- none"]),
+      "Treat these paths as the verified source chain for this execution.",
+    ].join("\n");
   }
 
   private async buildWikiDreamGrounding(template: SkillTemplate, step: SkillStepTemplate): Promise<string> {

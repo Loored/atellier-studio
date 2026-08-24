@@ -42,6 +42,16 @@ const RunExecutionSchema = new Schema(
   { _id: false },
 );
 
+const RunMemoryCaptureSchema = new Schema(
+  {
+    wikiPath: { type: String, required: true },
+    logPath: { type: String, required: true },
+    summary: { type: String, required: true },
+    capturedAt: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const RunSchema = new Schema<Run>(
   {
     taskId: String,
@@ -50,6 +60,7 @@ const RunSchema = new Schema<Run>(
     status: { type: String, enum: RUN_STATUSES, default: "queued", required: true },
     reviewStatus: { type: String, enum: RUN_REVIEW_STATUSES, required: false },
     deliverablePath: String,
+    memory: { type: RunMemoryCaptureSchema, required: false },
     input: Schema.Types.Mixed,
     output: Schema.Types.Mixed,
     execution: { type: RunExecutionSchema, required: false },

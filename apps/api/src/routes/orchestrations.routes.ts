@@ -59,6 +59,15 @@ export async function orchestrationsRoutes(fastify: FastifyInstance, services: A
     if (taskId && !isValidObjectId(taskId)) {
       return badRequest(reply, "Task id is invalid.");
     }
+    if (taskId) {
+      const task = await services.tasks.getById(taskId);
+      if (!task) {
+        return notFound(reply, "Linked task not found.");
+      }
+      if (task.status === "done") {
+        return badRequest(reply, "A completed task cannot start a new orchestration.");
+      }
+    }
     const executorModeOverrideRaw = optionalStringField(body, "executorModeOverride");
     if (executorModeOverrideRaw && !isOneOf(executorModeOverrideRaw, EXECUTOR_MODES)) {
       return badRequest(reply, "Executor mode override is invalid.");
