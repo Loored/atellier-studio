@@ -23,6 +23,8 @@ export const queryKeys = {
   runs: {
     all: [QUERY_KEYS.RUNS] as const,
     detail: (runId: string) => [QUERY_KEYS.RUNS, runId] as const,
+    activeOrchestrations: [QUERY_KEYS.RUNS, "active-orchestrations"] as const,
+    events: (runId: string) => [QUERY_KEYS.RUNS, runId, "events"] as const,
   },
   wiki: {
     index: [QUERY_KEYS.WIKI, "index"] as const,

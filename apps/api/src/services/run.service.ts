@@ -7,7 +7,9 @@ import {
   type CompleteRunInput,
   type CreateRunInput,
   type AgentValidationResult,
+  type ListRunsInput,
   type Run,
+  type RunExecutionPhase,
   type RunLogEntry,
   type RunReviewStatus,
   type RunStatus,
@@ -15,6 +17,21 @@ import {
 import { RunModel } from "../db/models/Run";
 import { cleanUndefined, toIso, toJsonRecord, type StorageMode } from "./service-utils";
 import { WikiService } from "./wiki.service";
+
+export type RunExecutionUpdate = {
+  status?: RunStatus;
+  phase?: RunExecutionPhase;
+  attempt?: number;
+  availableAt?: string;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: string | null;
+  heartbeatAt?: string | null;
+  cancelRequestedAt?: string | null;
+  startedAt?: string;
+  finishedAt?: string | null;
+  lastError?: string | null;
+  currentStepId?: string | null;
+};
 
 export class RunService {
   private readonly records = new Map<string, Run>();
@@ -24,13 +41,25 @@ export class RunService {
     private readonly wikiService: WikiService,
   ) {}
 
-  async list(): Promise<Run[]> {
+  async list(input: ListRunsInput = {}): Promise<Run[]> {
+    const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
     if (this.storageMode === "mongo") {
-      const runs = await RunModel.find().sort({ createdAt: -1 }).limit(30);
+      const query: Record<string, unknown> = {};
+      if (input.type) {
+        query.type = input.type;
+      }
+      if (input.statuses?.length) {
+        query.status = { $in: input.statuses };
+      }
+      const runs = await RunModel.find(query).sort({ createdAt: -1 }).limit(limit);
       return toJsonRecord<Run[]>(runs);
     }
 
-    return [...this.records.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return [...this.records.values()]
+      .filter((run) => !input.type || run.type === input.type)
+      .filter((run) => !input.statuses?.length || input.statuses.includes(run.status))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
   }
 
   async getById(id: string): Promise<Run | null> {
@@ -69,6 +98,7 @@ export class RunService {
       type: input.type,
       status: input.status ?? "queued",
       input: input.input,
+      execution: input.execution,
       logs: [],
       createdAt: now,
       updatedAt: now,
@@ -206,6 +236,213 @@ export class RunService {
     };
     this.records.set(id, next);
     return next;
+  }
+
+  async claimNextExecution(workerId: string, leaseMs: number): Promise<Run | null> {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const leaseExpiresAt = new Date(now.getTime() + leaseMs).toISOString();
+
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findOneAndUpdate(
+        {
+          type: "orchestration",
+          "execution.kind": "skill-orchestration",
+          "execution.cancelRequestedAt": { $exists: false },
+          $or: [
+            { status: "queued", "execution.availableAt": { $lte: nowIso } },
+            { status: "running", "execution.leaseExpiresAt": { $lte: nowIso } },
+          ],
+        },
+        {
+          $set: {
+            status: "running",
+            "execution.phase": "running",
+            "execution.leaseOwner": workerId,
+            "execution.leaseExpiresAt": leaseExpiresAt,
+            "execution.heartbeatAt": nowIso,
+            "execution.startedAt": nowIso,
+            updatedAt: now,
+          },
+          $inc: { "execution.attempt": 1 },
+        },
+        { new: true, sort: { "execution.availableAt": 1, createdAt: 1 } },
+      );
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+
+    const candidate = [...this.records.values()]
+      .filter((run) => run.type === "orchestration" && run.execution?.kind === "skill-orchestration")
+      .filter((run) => !run.execution?.cancelRequestedAt)
+      .filter((run) => {
+        if (run.status === "queued") {
+          return (run.execution?.availableAt ?? nowIso) <= nowIso;
+        }
+        return run.status === "running" && Boolean(run.execution?.leaseExpiresAt)
+          && (run.execution?.leaseExpiresAt ?? nowIso) <= nowIso;
+      })
+      .sort((a, b) => {
+        const availability = (a.execution?.availableAt ?? a.createdAt)
+          .localeCompare(b.execution?.availableAt ?? b.createdAt);
+        return availability || a.createdAt.localeCompare(b.createdAt);
+      })[0];
+
+    if (!candidate?.execution) {
+      return null;
+    }
+
+    const next: Run = {
+      ...candidate,
+      status: "running",
+      execution: {
+        ...candidate.execution,
+        phase: candidate.execution.attempt > 0 ? "recovering" : "running",
+        attempt: candidate.execution.attempt + 1,
+        leaseOwner: workerId,
+        leaseExpiresAt,
+        heartbeatAt: nowIso,
+        startedAt: nowIso,
+      },
+      updatedAt: nowIso,
+    };
+    this.records.set(next.id, next);
+    return next;
+  }
+
+  async heartbeatExecution(id: string, workerId: string, leaseMs: number): Promise<boolean> {
+    const now = new Date();
+    const heartbeatAt = now.toISOString();
+    const leaseExpiresAt = new Date(now.getTime() + leaseMs).toISOString();
+
+    if (this.storageMode === "mongo") {
+      const result = await RunModel.updateOne(
+        {
+          _id: id,
+          status: "running",
+          "execution.leaseOwner": workerId,
+          "execution.cancelRequestedAt": { $exists: false },
+        },
+        {
+          $set: {
+            "execution.heartbeatAt": heartbeatAt,
+            "execution.leaseExpiresAt": leaseExpiresAt,
+            updatedAt: now,
+          },
+        },
+      );
+      return result.modifiedCount === 1;
+    }
+
+    const current = this.records.get(id);
+    if (
+      !current?.execution ||
+      current.status !== "running" ||
+      current.execution.leaseOwner !== workerId ||
+      current.execution.cancelRequestedAt
+    ) {
+      return false;
+    }
+    this.records.set(id, {
+      ...current,
+      execution: { ...current.execution, heartbeatAt, leaseExpiresAt },
+      updatedAt: heartbeatAt,
+    });
+    return true;
+  }
+
+  async updateExecution(
+    id: string,
+    input: RunExecutionUpdate,
+    expectedLeaseOwner?: string,
+  ): Promise<Run | null> {
+    const now = new Date();
+
+    if (this.storageMode === "mongo") {
+      const set: Record<string, unknown> = { updatedAt: now };
+      const unset: Record<string, ""> = {};
+      if (input.status !== undefined) set.status = input.status;
+      if (input.phase !== undefined) set["execution.phase"] = input.phase;
+      if (input.attempt !== undefined) set["execution.attempt"] = input.attempt;
+      if (input.availableAt !== undefined) set["execution.availableAt"] = input.availableAt;
+      if (input.startedAt !== undefined) set["execution.startedAt"] = input.startedAt;
+
+      const nullableFields = [
+        "leaseOwner",
+        "leaseExpiresAt",
+        "heartbeatAt",
+        "cancelRequestedAt",
+        "finishedAt",
+        "lastError",
+        "currentStepId",
+      ] as const;
+      for (const field of nullableFields) {
+        const value = input[field];
+        if (value === undefined) continue;
+        if (value === null) {
+          unset[`execution.${field}`] = "";
+        } else {
+          set[`execution.${field}`] = value;
+        }
+      }
+
+      const query: Record<string, unknown> = { _id: id };
+      if (expectedLeaseOwner) {
+        query["execution.leaseOwner"] = expectedLeaseOwner;
+      }
+      const update: Record<string, unknown> = { $set: set };
+      if (Object.keys(unset).length > 0) {
+        update.$unset = unset;
+      }
+      const run = await RunModel.findOneAndUpdate(query, update, { new: true });
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+
+    const current = this.records.get(id);
+    if (!current?.execution || (expectedLeaseOwner && current.execution.leaseOwner !== expectedLeaseOwner)) {
+      return null;
+    }
+    const nextExecution = { ...current.execution };
+    const assign = <K extends keyof RunExecutionUpdate>(field: K): void => {
+      const value = input[field];
+      if (value === undefined) return;
+      if (value === null) {
+        delete (nextExecution as Record<string, unknown>)[field];
+      } else if (field !== "status") {
+        (nextExecution as Record<string, unknown>)[field] = value;
+      }
+    };
+    (Object.keys(input) as Array<keyof RunExecutionUpdate>).forEach(assign);
+    const next: Run = {
+      ...current,
+      status: input.status ?? current.status,
+      execution: nextExecution,
+      updatedAt: now.toISOString(),
+    };
+    this.records.set(id, next);
+    return next;
+  }
+
+  async allocateEventSequence(id: string): Promise<number | null> {
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findByIdAndUpdate(
+        id,
+        { $inc: { "execution.nextEventSequence": 1 } },
+        { new: true },
+      );
+      return run?.execution?.nextEventSequence ?? null;
+    }
+
+    const current = this.records.get(id);
+    if (!current?.execution) {
+      return null;
+    }
+    const sequence = current.execution.nextEventSequence + 1;
+    this.records.set(id, {
+      ...current,
+      execution: { ...current.execution, nextEventSequence: sequence },
+      updatedAt: new Date().toISOString(),
+    });
+    return sequence;
   }
 
   async updateReviewStatus(id: string, reviewStatus: RunReviewStatus): Promise<Run | null> {

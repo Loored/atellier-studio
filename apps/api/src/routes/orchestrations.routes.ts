@@ -79,7 +79,7 @@ export async function orchestrationsRoutes(fastify: FastifyInstance, services: A
       executorModeOverride,
     };
 
-    const result: StartSkillOrchestrationResponse = await services.skillOrchestrations.startBackground(input);
+    const result: StartSkillOrchestrationResponse = await services.durableRuntime.enqueueSkill(input);
     return reply.code(202).send(result);
   });
 }

@@ -1,30 +1,41 @@
+import { createHash, randomUUID } from "node:crypto";
 import { ROLE_SYSTEM_INSTRUCTIONS } from "./agent-executor.service";
 import type {
   Agent,
   AgentRole,
+  OrchestrationExecutionDefinition,
+  OrchestrationExecutionStep,
   OrchestrationSkillId,
   OrchestrationSkillSummary,
-  OrchestrationSkillStepSummary,
   OrchestrationStatusResult,
   OrchestrationStepStatusEntry,
   Run,
   SkillOrchestrationResult,
   SkillOrchestrationStepResult,
   StartSkillOrchestrationInput,
-  StartSkillOrchestrationResponse,
 } from "@atellier/shared";
 import { AgentRunService } from "./agent-run.service";
 import { AgentService } from "./agent.service";
 import { RunService } from "./run.service";
 import type { WikiService } from "./wiki.service";
 
-type SkillStepTemplate = OrchestrationSkillStepSummary & {
-  instruction: string;
+type SkillStepTemplate = OrchestrationExecutionStep;
+type SkillTemplate = OrchestrationExecutionDefinition;
+
+export type SkillExecutionHooks = {
+  isCancellationRequested: () => Promise<boolean>;
+  onStepStarted?: (step: SkillStepTemplate) => Promise<void>;
+  onStepCompleted?: (step: SkillStepTemplate, result: SkillOrchestrationStepResult) => Promise<void>;
+  onStepReused?: (step: SkillStepTemplate, result: SkillOrchestrationStepResult) => Promise<void>;
+  onFinalizing?: () => Promise<void>;
 };
 
-type SkillTemplate = Omit<OrchestrationSkillSummary, "steps"> & {
-  steps: SkillStepTemplate[];
-};
+export class OrchestrationCancelledError extends Error {
+  constructor() {
+    super("Orchestration cancellation requested.");
+    this.name = "OrchestrationCancelledError";
+  }
+}
 
 const SKILL_TEMPLATES: SkillTemplate[] = [
   {
@@ -232,19 +243,41 @@ export class SkillOrchestrationService {
     return this.listSkills().find((skill) => skill.id === id) ?? null;
   }
 
-  async startBackground(input: StartSkillOrchestrationInput): Promise<StartSkillOrchestrationResponse> {
+  async enqueue(input: StartSkillOrchestrationInput, maxAttempts = 3): Promise<Run> {
     const template = this.requireTemplate(input.skillId);
-    const orchestrationRun = await this.createOrchestrationRun(input, template);
-    void this.executeSteps(orchestrationRun, template, input).catch(() => {
-      // error already logged and run marked failed inside executeSteps
+    const definitionSnapshot = structuredClone(template);
+    const definitionHash = createHash("sha256")
+      .update(JSON.stringify(definitionSnapshot))
+      .digest("hex");
+    const now = new Date().toISOString();
+    const orchestrationRun = await this.runs.create({
+      type: "orchestration",
+      status: "queued",
+      taskId: input.taskId,
+      input: {
+        skillId: input.skillId,
+        goal: input.goal,
+        context: input.context,
+        executorModeOverride: input.executorModeOverride,
+      },
+      execution: {
+        schemaVersion: 1,
+        kind: "skill-orchestration",
+        phase: "queued",
+        definitionHash,
+        definitionSnapshot,
+        idempotencyKey: randomUUID(),
+        attempt: 0,
+        maxAttempts: Math.max(maxAttempts, 1),
+        nextEventSequence: 0,
+        availableAt: now,
+      },
     });
-    return { runId: orchestrationRun.id };
-  }
-
-  async start(input: StartSkillOrchestrationInput): Promise<SkillOrchestrationResult> {
-    const template = this.requireTemplate(input.skillId);
-    const orchestrationRun = await this.createOrchestrationRun(input, template);
-    return this.executeSteps(orchestrationRun, template, input);
+    await this.runs.appendLog(orchestrationRun.id, {
+      level: "info",
+      message: `Skill queued: ${template.name}.`,
+    });
+    return (await this.runs.getById(orchestrationRun.id)) ?? orchestrationRun;
   }
 
   async getStatus(orchestrationRunId: string): Promise<OrchestrationStatusResult | null> {
@@ -255,7 +288,8 @@ export class SkillOrchestrationService {
 
     const orchInput = orchRun.input as { skillId?: string; goal?: string } | undefined;
     const skillId = orchInput?.skillId as OrchestrationSkillId | undefined;
-    const template = skillId ? SKILL_TEMPLATES.find((t) => t.id === skillId) : undefined;
+    const template = this.readDefinitionSnapshot(orchRun)
+      ?? (skillId ? SKILL_TEMPLATES.find((t) => t.id === skillId) : undefined);
     if (!template || !skillId) {
       return null;
     }
@@ -264,9 +298,9 @@ export class SkillOrchestrationService {
     const agents = await this.agents.list();
 
     const steps: OrchestrationStepStatusEntry[] = template.steps.map((step) => {
-      const stepRun = stepRuns.find((r) => {
+      const stepRun = [...stepRuns].reverse().find((r) => {
         const ri = r.input as Record<string, unknown> | undefined;
-        return ri?.orchestrationStepLabel === step.label;
+        return ri?.orchestrationStepId === step.id || ri?.orchestrationStepLabel === step.label;
       });
       const agent = agents.find((a) => a.name.toLowerCase() === step.agentName.toLowerCase());
       const status: OrchestrationStepStatusEntry["status"] = stepRun
@@ -294,6 +328,7 @@ export class SkillOrchestrationService {
       skillId,
       goal: orchInput?.goal ?? "",
       status: orchRun.status,
+      execution: orchRun.execution,
       steps,
       activeStep,
       nextStep,
@@ -308,39 +343,41 @@ export class SkillOrchestrationService {
     return template;
   }
 
-  private async createOrchestrationRun(
-    input: StartSkillOrchestrationInput,
-    template: SkillTemplate,
-  ): Promise<Run> {
-    const orchestrationRun = await this.runs.create({
-      type: "orchestration",
-      status: "running",
-      taskId: input.taskId,
-      input: {
-        skillId: input.skillId,
-        goal: input.goal,
-        context: input.context,
-        executorModeOverride: input.executorModeOverride,
-      },
-    });
-    await this.runs.appendLog(orchestrationRun.id, {
-      level: "info",
-      message: `Skill triggered: ${template.name}.`,
-    });
-    return orchestrationRun;
-  }
-
-  private async executeSteps(
+  async executeClaimed(
     orchestrationRun: Run,
-    template: SkillTemplate,
-    input: StartSkillOrchestrationInput,
+    hooks: SkillExecutionHooks,
   ): Promise<SkillOrchestrationResult> {
+    const template = this.readDefinitionSnapshot(orchestrationRun);
+    if (!template) {
+      throw new Error(`Run ${orchestrationRun.id} has no valid orchestration definition snapshot.`);
+    }
+    const input = this.readStartInput(orchestrationRun);
     const stepResults: SkillOrchestrationStepResult[] = [];
     const previousOutputs: string[] = [];
+    const existingStepRuns = await this.runs.listByOrchestrationRunId(orchestrationRun.id);
 
     try {
       for (const step of template.steps) {
+        if (await hooks.isCancellationRequested()) {
+          throw new OrchestrationCancelledError();
+        }
+
+        const completedStepRun = [...existingStepRuns].reverse().find((candidate) => {
+          const candidateInput = candidate.input as Record<string, unknown> | undefined;
+          return candidate.status === "completed"
+            && (candidateInput?.orchestrationStepId === step.id
+              || candidateInput?.orchestrationStepLabel === step.label);
+        });
+        if (completedStepRun) {
+          const reused = await this.buildReusedStepResult(step, completedStepRun);
+          stepResults.push(reused);
+          previousOutputs.push(this.buildPreviousOutput(step, reused.agentName, completedStepRun));
+          await hooks.onStepReused?.(step, reused);
+          continue;
+        }
+
         const agent = await this.resolveAgent(step.agentName, step.agentRole);
+        await hooks.onStepStarted?.(step);
         await this.runs.appendLog(orchestrationRun.id, {
           level: "info",
           message: `Starting ${step.label} with ${agent.name}.`,
@@ -354,6 +391,7 @@ export class SkillOrchestrationService {
           recordDeliverable: false,
           orchestrationStep: {
             orchestrationRunId: orchestrationRun.id,
+            stepId: step.id,
             label: step.label,
             phase: step.phase,
             nextAgentName: nextStep?.agentName,
@@ -364,16 +402,9 @@ export class SkillOrchestrationService {
           throw new Error(`Agent not found for orchestration step ${step.id}.`);
         }
 
-        previousOutputs.push(
-          [
-            `## ${step.label}`,
-            `Agent: ${agent.name} (${agent.role})`,
-            `Run: ${result.run.id}`,
-            this.truncateForContext(result.assistantMessage.content),
-          ].join("\n"),
-        );
+        previousOutputs.push(this.buildPreviousOutput(step, agent.name, result.run));
 
-        stepResults.push({
+        const stepResult: SkillOrchestrationStepResult = {
           stepId: step.id,
           label: step.label,
           phase: step.phase,
@@ -382,13 +413,25 @@ export class SkillOrchestrationService {
           agentRole: agent.role,
           runId: result.run.id,
           status: result.run.status,
-        });
+        };
+        stepResults.push(stepResult);
 
         await this.runs.appendLog(orchestrationRun.id, {
           level: "info",
           message: `Completed ${step.label}; step run ${result.run.id}.`,
         });
+        await this.runs.updateStatus(orchestrationRun.id, "running", {
+          skillId: input.skillId,
+          goal: input.goal,
+          steps: stepResults,
+        });
+        await hooks.onStepCompleted?.(step, stepResult);
       }
+
+      if (await hooks.isCancellationRequested()) {
+        throw new OrchestrationCancelledError();
+      }
+      await hooks.onFinalizing?.();
 
       const completedRun = await this.runs.complete(orchestrationRun.id, {
         summary: `${template.name} completed`,
@@ -412,17 +455,61 @@ export class SkillOrchestrationService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown orchestration failure.";
       await this.runs.appendLog(orchestrationRun.id, {
-        level: "error",
+        level: error instanceof OrchestrationCancelledError ? "warn" : "error",
         message,
-      });
-      await this.runs.updateStatus(orchestrationRun.id, "failed", {
-        skillId: input.skillId,
-        goal: input.goal,
-        error: message,
-        steps: stepResults,
       });
       throw error;
     }
+  }
+
+  private readDefinitionSnapshot(run: Run): SkillTemplate | null {
+    const snapshot = run.execution?.definitionSnapshot as Partial<SkillTemplate> | undefined;
+    if (!snapshot || typeof snapshot.id !== "string" || !Array.isArray(snapshot.steps)) {
+      return null;
+    }
+    if (!snapshot.steps.every((step) =>
+      step
+      && typeof step.id === "string"
+      && typeof step.label === "string"
+      && typeof step.instruction === "string")) {
+      return null;
+    }
+    return snapshot as SkillTemplate;
+  }
+
+  private readStartInput(run: Run): StartSkillOrchestrationInput {
+    const input = run.input as Partial<StartSkillOrchestrationInput> | undefined;
+    if (!input?.skillId || typeof input.goal !== "string") {
+      throw new Error(`Run ${run.id} has invalid orchestration input.`);
+    }
+    return input as StartSkillOrchestrationInput;
+  }
+
+  private async buildReusedStepResult(
+    step: SkillStepTemplate,
+    run: Run,
+  ): Promise<SkillOrchestrationStepResult> {
+    const agent = run.agentId ? await this.agents.getById(run.agentId) : null;
+    return {
+      stepId: step.id,
+      label: step.label,
+      phase: step.phase,
+      agentId: run.agentId ?? agent?.id ?? "unknown",
+      agentName: agent?.name ?? step.agentName,
+      agentRole: agent?.role ?? step.agentRole,
+      runId: run.id,
+      status: run.status,
+    };
+  }
+
+  private buildPreviousOutput(step: SkillStepTemplate, agentName: string, run: Run): string {
+    const response = (run.output as { response?: string } | undefined)?.response ?? "Completed without text output.";
+    return [
+      `## ${step.label}`,
+      `Agent: ${agentName} (${step.agentRole})`,
+      `Run: ${run.id}`,
+      this.truncateForContext(response),
+    ].join("\n");
   }
 
   private async resolveAgent(agentName: string, agentRole: AgentRole): Promise<Agent> {
@@ -479,7 +566,7 @@ export class SkillOrchestrationService {
     }
 
     const [lint, wikiPaths] = await Promise.all([
-      this.wiki.lint(),
+      this.wiki.lint({ recordLog: false }),
       this.wiki.listWikiMarkdownPaths(),
     ]);
     const issueLines = lint.issues.length > 0

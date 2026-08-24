@@ -15,7 +15,12 @@ export const orchestrationsService = {
   async startSkillRun(input: StartSkillOrchestrationInput): Promise<StartSkillOrchestrationResponse> {
     const response = await httpClient.post<StartSkillOrchestrationResponse>(
       `/orchestrations/skills/${input.skillId}/run`,
-      { goal: input.goal, context: input.context, taskId: input.taskId },
+      {
+        goal: input.goal,
+        context: input.context,
+        taskId: input.taskId,
+        executorModeOverride: input.executorModeOverride,
+      },
     );
     return response.data;
   },

@@ -4,6 +4,7 @@ export * from "./types/message";
 export * from "./types/orchestration";
 export * from "./types/task";
 export * from "./types/run";
+export * from "./types/run-event";
 export * from "./types/wiki";
 export * from "./types/health";
 export * from "./types/codex-worker";

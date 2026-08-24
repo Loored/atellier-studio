@@ -10,12 +10,14 @@ import type {
   OrchestrationSkillSummary,
   OrchestrationStatusResult,
   Run,
+  RunEventsResponse,
   RunAgentResult,
   StartSkillOrchestrationResponse,
   Task,
   WikiPageResponse,
 } from "@atellier/shared";
 import { buildServer } from "../server";
+import { createAppServices } from "../services/app-services";
 
 describe("operational spine routes", () => {
   let server: FastifyInstance;
@@ -236,6 +238,21 @@ describe("operational spine routes", () => {
         }),
       ]),
     );
+  });
+
+  it("keeps knowledge graph reads free of wiki lint log side effects", async () => {
+    const beforeResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    const before = beforeResponse.json<WikiPageResponse>().content;
+
+    expect((await server.inject({ method: "GET", url: "/knowledge/graph" })).statusCode).toBe(200);
+    expect((await server.inject({ method: "GET", url: "/knowledge/graph" })).statusCode).toBe(200);
+
+    const afterResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    expect(afterResponse.json<WikiPageResponse>().content).toBe(before);
+
+    expect((await server.inject({ method: "POST", url: "/wiki/lint" })).statusCode).toBe(200);
+    const explicitLintLog = await server.inject({ method: "GET", url: "/wiki/log" });
+    expect(explicitLintLog.json<WikiPageResponse>().content).toContain("wiki_lint | Wiki lint run");
   });
 
   it("rejects oversized task titles and run log messages", async () => {
@@ -1053,6 +1070,92 @@ describe("operational spine routes", () => {
     expect(wikiLogResponse.json<WikiPageResponse>().content).toContain(
       "run_completed | Pepe PM completed execution and requests review.",
     );
+  });
+
+  it("persists queued orchestration state and supports cancellation before claim", async () => {
+    await server.close();
+    server = await buildServer({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+    });
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: { goal: "Keep this orchestration queued until a worker claims it." },
+    });
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+
+    const runResponse = await server.inject({ method: "GET", url: `/runs/${started.runId}` });
+    const queuedRun = runResponse.json<Run>();
+    expect(queuedRun.status).toBe("queued");
+    expect(queuedRun.execution).toMatchObject({
+      schemaVersion: 1,
+      kind: "skill-orchestration",
+      phase: "queued",
+      attempt: 0,
+      maxAttempts: 3,
+      nextEventSequence: 1,
+    });
+    expect(queuedRun.execution?.definitionHash).toMatch(/^[a-f0-9]{64}$/);
+
+    const activeResponse = await server.inject({
+      method: "GET",
+      url: "/runs?type=orchestration&status=queued,running",
+    });
+    expect(activeResponse.json<Run[]>().map((run) => run.id)).toContain(started.runId);
+
+    const cancelResponse = await server.inject({ method: "POST", url: `/runs/${started.runId}/cancel` });
+    expect(cancelResponse.statusCode).toBe(200);
+    expect(cancelResponse.json<Run>()).toMatchObject({
+      id: started.runId,
+      status: "cancelled",
+      execution: { phase: "cancelled" },
+    });
+
+    const eventsResponse = await server.inject({ method: "GET", url: `/runs/${started.runId}/events` });
+    const events = eventsResponse.json<RunEventsResponse>();
+    expect(events.events.map((event) => event.type)).toEqual(["queued", "cancelled"]);
+    expect(events.nextCursor).toBe(2);
+  });
+
+  it("retries durable orchestrations without duplicating completed step runs", async () => {
+    await server.close();
+    const services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/wiki-dream-loop/run",
+      payload: { goal: "Exercise resumable step commits." },
+    });
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+
+    const firstStepRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    expect(firstStepRuns).toHaveLength(4);
+    await services.runs.updateExecution(started.runId, {
+      status: "failed",
+      phase: "failed",
+      finishedAt: new Date().toISOString(),
+    });
+
+    const retryResponse = await server.inject({ method: "POST", url: `/runs/${started.runId}/retry` });
+    expect(retryResponse.statusCode).toBe(200);
+    expect(retryResponse.json<Run>().status).toBe("queued");
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+
+    const replayedStepRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    expect(replayedStepRuns).toHaveLength(firstStepRuns.length);
+    const eventsResponse = await server.inject({ method: "GET", url: `/runs/${started.runId}/events` });
+    const eventTypes = eventsResponse.json<RunEventsResponse>().events.map((event) => event.type);
+    expect(eventTypes.filter((type) => type === "step_reused")).toHaveLength(4);
+    expect(eventTypes.at(-1)).toBe("completed");
   });
 
   it("accepts orchestration executor override when available", async () => {

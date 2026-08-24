@@ -220,7 +220,7 @@ export class KnowledgeGraphService {
       this.wiki.listWikiMarkdownPaths(),
       this.wiki.listRawAssetPaths(),
       this.wiki.listRuntimeMarkdownPaths(),
-      this.wiki.lint(),
+      this.wiki.lint({ recordLog: false }),
     ]);
 
     const nodes = new Map<string, KnowledgeGraphNode>();

@@ -6,7 +6,7 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Review Memory Capture + Knowledge Graph v2 (live force-directed map of operational memory). Next direction: graph curation trails (dream proposal decisions feeding back to the graph), WebSocket live updates, role memory surfaces.
+Current stage: Operational Spine + Durable Local Orchestration Runtime + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Review Memory Capture + Knowledge Graph v2.
 
 Implemented:
 
@@ -14,6 +14,7 @@ Implemented:
 - Fastify API with thin routes and service-owned business logic
 - React dashboard on Tailwind CSS v4 (only `MobileView.tsx` still on legacy CSS)
 - Skill-triggered agent orchestration (`atellier-build-loop`, `llm-wiki-ingest-loop`, `wiki-dream-loop`)
+- Mongo-backed durable orchestration queue with immutable definition snapshots, leases, bounded retries, cooperative cancellation, resumable completed steps, and replayable run events
 - Agent run logs, handoffs, circular-handoff and depth guards
 - Deliverable generation, preview, promotion, unlink, and review states
 - Markdown wiki index, log, deliverables index, and synthesis pages
@@ -65,6 +66,21 @@ Run only the API:
 
 ```bash
 pnpm --filter @atellier/api dev
+```
+
+Mongo-backed orchestration execution runs in a separate local worker. Start it in a second terminal with the same executor environment as the API:
+
+```bash
+pnpm dev:worker
+```
+
+The API accepts and persists work even while the worker is offline. When the worker starts, it claims queued or lease-expired runs. `API_STORAGE=memory` keeps an inline worker for tests and lightweight UI review, so `dev:memory` does not need a second process.
+
+Optional worker controls:
+
+```bash
+RUN_WORKER_LEASE_MS=30000
+RUN_WORKER_POLL_MS=1000
 ```
 
 Run the API with OpenAI-backed agent execution:
@@ -137,8 +153,12 @@ The dashboard includes an Orchestration panel backed by:
 
 - `GET /orchestrations/skills`
 - `POST /orchestrations/skills/:skillId/run`
+- `GET /orchestrations/:runId/status`
+- `GET /runs?type=orchestration&status=queued,running`
+- `GET /runs/:runId/events` and `GET /runs/:runId/events/stream`
+- `POST /runs/:runId/cancel` and `POST /runs/:runId/retry`
 
-Current skills are `atellier-build-loop`, `llm-wiki-ingest-loop`, and `wiki-dream-loop`. They use the existing local agent/run/wiki spine and do not yet execute external Codex workers or MCP tools.
+Current skills are `atellier-build-loop`, `llm-wiki-ingest-loop`, and `wiki-dream-loop`. They use the existing local agent/run/wiki spine and do not execute external Codex workers or MCP tools. See [docs/durable-local-runtime.md](docs/durable-local-runtime.md) for runtime semantics and recovery behavior.
 
 ## Codex Workflow
 

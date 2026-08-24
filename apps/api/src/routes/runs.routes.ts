@@ -9,6 +9,7 @@ import {
   type CaptureRunMemoryInput,
   type CompleteRunInput,
   type CreateRunInput,
+  type RunStatus,
   type UpdateRunReviewInput,
 } from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
@@ -23,7 +24,145 @@ import {
 } from "./route-utils";
 
 export async function runsRoutes(fastify: FastifyInstance, services: AppServices): Promise<void> {
-  fastify.get("/runs", async () => services.runs.list());
+  fastify.get("/runs", async (request, reply) => {
+    const query = request.query as { type?: string; status?: string; limit?: string };
+    if (query.type && !isOneOf(query.type, RUN_TYPES)) {
+      return badRequest(reply, "Run type is invalid.");
+    }
+    const statuses = query.status
+      ?.split(",")
+      .map((status) => status.trim())
+      .filter(Boolean);
+    if (statuses?.some((status) => !isOneOf(status, RUN_STATUSES))) {
+      return badRequest(reply, "Run status filter is invalid.");
+    }
+    const parsedLimit = query.limit === undefined ? undefined : Number(query.limit);
+    if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit < 1)) {
+      return badRequest(reply, "Run limit must be a positive integer.");
+    }
+    return services.runs.list({
+      type: query.type as CreateRunInput["type"] | undefined,
+      statuses: statuses as RunStatus[] | undefined,
+      limit: parsedLimit,
+    });
+  });
+
+  fastify.get("/runs/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    const run = await services.runs.getById(id);
+    return run ?? notFound(reply, "Run not found.");
+  });
+
+  fastify.get("/runs/:id/events", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    const run = await services.runs.getById(id);
+    if (!run) {
+      return notFound(reply, "Run not found.");
+    }
+    const query = request.query as { after?: string; limit?: string };
+    const after = query.after === undefined ? 0 : Number(query.after);
+    const limit = query.limit === undefined ? undefined : Number(query.limit);
+    if (!Number.isInteger(after) || after < 0) {
+      return badRequest(reply, "Event cursor must be a non-negative integer.");
+    }
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
+      return badRequest(reply, "Event limit must be a positive integer.");
+    }
+    return services.runEvents.list(id, { after, limit });
+  });
+
+  fastify.get("/runs/:id/events/stream", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    const run = await services.runs.getById(id);
+    if (!run) {
+      return notFound(reply, "Run not found.");
+    }
+    const query = request.query as { after?: string };
+    let cursor = query.after === undefined ? 0 : Number(query.after);
+    if (!Number.isInteger(cursor) || cursor < 0) {
+      return badRequest(reply, "Event cursor must be a non-negative integer.");
+    }
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+
+    let closed = false;
+    request.raw.on("close", () => {
+      closed = true;
+    });
+
+    const pushEvents = async (): Promise<boolean> => {
+      const response = await services.runEvents.list(id, { after: cursor, limit: 200 });
+      for (const event of response.events) {
+        reply.raw.write(`id: ${event.sequence}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+      }
+      cursor = response.nextCursor;
+      const latest = await services.runs.getById(id);
+      const terminal = latest
+        ? ["completed", "failed", "blocked", "cancelled"].includes(latest.status)
+        : true;
+      if (terminal) {
+        reply.raw.end();
+        closed = true;
+      }
+      return terminal;
+    };
+
+    try {
+      while (!closed && !await pushEvents()) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 750));
+      }
+    } catch {
+      if (!closed) {
+        reply.raw.end();
+      }
+    }
+  });
+
+  fastify.post("/runs/:id/cancel", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    if (!await services.runs.getById(id)) {
+      return notFound(reply, "Run not found.");
+    }
+    try {
+      return await services.durableRuntime.requestCancel(id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to cancel run.";
+      return reply.code(409).send({ error: message });
+    }
+  });
+
+  fastify.post("/runs/:id/retry", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    if (!await services.runs.getById(id)) {
+      return notFound(reply, "Run not found.");
+    }
+    try {
+      return await services.durableRuntime.retry(id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to retry run.";
+      return reply.code(409).send({ error: message });
+    }
+  });
 
   fastify.post("/runs", async (request, reply) => {
     const body = bodyRecord(request.body);
