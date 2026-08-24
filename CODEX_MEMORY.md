@@ -97,17 +97,23 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 ## Current Priorities
 
-Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 (force-directed map + inspector + search + sesión viva + time-travel + run timeline + Office↔Graph + mobile tab + snapshots) shipped 2026-05-13 across PRs #29-#32 on `dev/1.0.0`.
+Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Role memory**: curated per-role learning surfaces for Builder, QA, Wiki Curator, PM, and other agents.
-2. **Graph snapshot diff view**: compare two snapshots and expose +/− node/edge deltas in UI.
-3. **Knowledge graph performance pass (>300 nodes)**: sprite caching/WebGL toggle/neighbor calc profiling.
-4. **Role memory overlays in graph/inspector**: curated role learning surfaces linked to graph entities.
-5. **Codex Worker real executor adapter (future)**: keep current fake executor until controlled real execution integration.
+1. **Durable Runtime hardening v1.1**: multi-worker Mongo contention/reclaim coverage, ordered-event concurrency, worker diagnostics, graceful shutdown, and optional provider abort support.
+2. **Controlled real Codex Worker adapter**: replace the fake adapter only behind a feature flag, existing approvals, constrained working directories/commands, and durable evidence capture.
+3. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
+4. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-24 - Post-merge durability drill and hardening fixes
+
+- Isolated Mongo + local Ollama validation passed for worker-offline queueing, lease reclaim after worker interruption, completed-step reuse, ordered event replay, cancellation at a step boundary, manual retry, and UI rehydration.
+- Runs history now exposes retry for failed/blocked orchestration runs, so recovery remains available after a refresh.
+- A reclaimed parent now marks non-terminal child runs from interrupted attempts as failed/superseded before resuming, preventing stale global `running` counts.
+- Remaining hardening work: true multi-worker Mongo contention coverage, worker diagnostics/graceful shutdown, provider abort support, and idempotency requirements for irreversible tools.
 
 ### 2026-08-24 - Durable local orchestration runtime v1
 
@@ -319,6 +325,7 @@ Run the smallest relevant subset for documentation-only changes.
 - Vite 6 and Vitest 2 produced conflicting Vite types. Web uses Vite 5.4.x for now.
 - Mongoose ESM should use `import mongoose, { Schema } from "mongoose"`; do not import `models` as a named export.
 - `tsx watch` may need escalated permissions because it creates IPC sockets under temp directories.
+- In this non-TTY Codex environment, root `test:web`/`test:api` aliases may trigger a nested pnpm dependency-purge guard; run the direct workspace scripts (`pnpm --filter @atellier/web test` and `pnpm --filter @atellier/api test`) when that happens.
 - Hidden directories like `.agents` and `.codex` may need escalated filesystem permission in this environment.
 - `canvas.getContext("2d")` throws in jsdom; always guard canvas access with try/catch.
 - This environment did not have Poppler or Python PDF packages by default; `pypdf` was installed temporarily under `/private/tmp/codex-pdfdeps` for PDF extraction.

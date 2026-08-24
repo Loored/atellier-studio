@@ -11885,3 +11885,10 @@
 - run: `atelier/runs/2026-08-24-durable-local-runtime-v1.md`
 - docs: `docs/durable-local-runtime.md`
 - validation: shared/API/web/MCP typechecks and builds passed; 86 API and 21 web tests passed with mock executors only.
+
+## [2026-08-24T08:32:00.000Z] run_log | Durable runtime post-merge drill
+- Summary: Validated offline queueing, restart/reclaim, completed-step reuse, event replay, cancellation, manual retry, and refresh-safe UI rehydration against isolated Mongo plus local Ollama.
+- run: `atelier/runs/2026-08-24-durable-runtime-post-merge-drill.md`
+- fixes: retry from Runs history; interrupted child runs settle as failed/superseded during recovery.
+- validation: 87 API and 22 web tests passed; monorepo typecheck/build passed; fresh browser console clean.
+- next: multi-worker contention coverage, worker diagnostics/graceful shutdown, provider abort support, and idempotency rules for irreversible tools.

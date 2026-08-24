@@ -22,6 +22,7 @@ export function RunsTimeline() {
     isUpdatingRunReview,
     isPromotingRunDeliverable,
     isUnlinkingRunDeliverable,
+    isRetryingRun,
     isLoadingRunsWithoutCache,
     setAgentFilter,
     setReviewFilter,
@@ -33,6 +34,7 @@ export function RunsTimeline() {
     setRunReview,
     promoteRunDeliverable,
     unlinkRunDeliverable,
+    retryRun,
   } = useRunsTimeline();
 
   return (
@@ -120,6 +122,7 @@ export function RunsTimeline() {
           const pendingLogMessage = runLogMessages[run.id]?.trim() ?? "";
           const latestLog = run.logs.at(-1);
           const isRunning = run.status === "running";
+          const canRetry = run.type === "orchestration" && ["failed", "blocked"].includes(run.status);
           const validation = readRunValidation(run);
 
           return (
@@ -183,16 +186,30 @@ export function RunsTimeline() {
                       <span>Log</span>
                     </button>
                   </form>
-                  <button
-                    className="icon-only-button"
-                    type="button"
-                    onClick={() => completeRun(run.id)}
-                    disabled={isCompletingRun}
-                    title="Complete run"
-                    aria-label={`Complete ${run.type} run`}
-                  >
-                    <Check size={16} />
-                  </button>
+                  <div className="inline-flex items-center gap-1.5">
+                    {canRetry ? (
+                      <button
+                        className="icon-only-button"
+                        type="button"
+                        onClick={() => retryRun(run.id)}
+                        disabled={isRetryingRun}
+                        title="Retry orchestration and preserve completed steps"
+                        aria-label="Retry orchestration run"
+                      >
+                        {isRetryingRun ? <Loader2 size={16} className="spin" /> : <RotateCcw size={16} />}
+                      </button>
+                    ) : null}
+                    <button
+                      className="icon-only-button"
+                      type="button"
+                      onClick={() => completeRun(run.id)}
+                      disabled={isCompletingRun}
+                      title="Complete run"
+                      aria-label={`Complete ${run.type} run`}
+                    >
+                      <Check size={16} />
+                    </button>
+                  </div>
                 </div>
               ) : null}
 

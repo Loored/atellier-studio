@@ -70,3 +70,27 @@ Tasks currently in progress.
   - Add quick focus modes for high-risk and pending-review role clusters.
   - Project focused subgraphs from role/agent memory signals.
   - Keep graph selection behavior coherent when focus mode changes.
+
+## 2026-08-24 - Durable runtime reliability spine
+
+- [x] Align roadmap and active memory after PRs #35 and #36
+  - Mark shipped Knowledge Graph follow-ups as complete.
+  - Record Durable Local Runtime v1 as the current execution foundation.
+  - Make runtime hardening and controlled real Codex execution the next sequence.
+
+- [x] Run the post-merge durability drill
+  - Use an isolated Mongo database and local Ollama executor.
+  - Verify offline queueing, restart/reclaim, completed-step reuse, event replay, cancellation, retry, and UI rehydration.
+  - Record evidence and convert any failure into a bounded hardening task.
+
+- [ ] Durable Runtime hardening v1.1
+  - [x] Expose retry for failed/blocked orchestrations from Runs history.
+  - [x] Settle interrupted child runs when a parent is reclaimed or retried.
+  - Add multi-worker Mongo contention/reclaim integration coverage.
+  - Add worker lifecycle diagnostics and graceful shutdown behavior.
+  - Define provider idempotency and abort requirements before irreversible side effects.
+
+- [ ] Controlled real Codex Worker adapter
+  - Keep the adapter behind a feature flag and human approval flow.
+  - Constrain working directories and command execution.
+  - Persist diffs, logs, tests, artifacts, and durations as review evidence.

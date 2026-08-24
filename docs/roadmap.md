@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-05-13 — Knowledge Graph v2 plus persisted snapshots and Dream decision graph curation trail.
-**Active plan:** [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md) (P1–P4 complete; Knowledge Graph v2 complete; current candidates under "Now planning" below).
+**Last updated:** 2026-08-24 — Durable local orchestration runtime v1 shipped in PR #36.
+**Active plan:** Stabilize the durable runtime in real local operation, then connect the approval-gated Codex Worker to a controlled real executor and validate the complete daily-use loop.
 
 ## Strategic stance
 
@@ -22,6 +22,7 @@ Atellier is **the model of *your* work** — wiki, runs, tasks, deliverables, re
 - OpenAI cost-warning patterns across orchestration, runs, office live mode, codex worker
 - Codex Worker control-plane v1 (create/plan/approve/execute/cancel/finalize, guardrails, durable finalize logs, web + API tests)
 - Codex Worker evidence pass groundwork (commits 9adfcd8, 8d68eed)
+- Durable Mongo-backed orchestration runtime (queued execution envelopes, leases, retries, cancellation, replayable events, separate worker, UI rehydration)
 
 ## Shipped 2026-05-10/11 — P1–P4 from the 2026-05-06 plan
 
@@ -34,11 +35,11 @@ All four post-keynote priorities landed on `feat/multi-provider-executors`. Test
 - **P2.b — Wiki Dream grounding.** The `audit` step now receives backend-grounded context: `wiki.lint()` output and the current real markdown path list under `atelier/wiki`. Curator reports should use listed paths only and mark anything else as unverified.
 - **P2.c — Wiki Dream UI surface.** Wiki panel now exposes `Dream now`, tracks the orchestration, previews the `draft-report` output, and saves approved reports under `wiki/dreams` via the safe write route.
 
-## Now planning — next iteration sequence
+## Completed 2026-05 — product-memory expansion
 
 Ordered by leverage after the Wiki Dream validation runs and the 2026-05-12 Knowledge Graph product direction.
 
-### P0 — Memory artifact hygiene
+### P0 — Memory artifact hygiene ✅ shipped 2026-05-15
 
 The working tree contains many generated run/deliverable artifacts from earlier validation. Curate which files are durable memory, which should be ignored/generated, and which belong in a later commit. Do this before another feature branch gets larger.
 
@@ -52,22 +53,23 @@ Local read model derives nodes/edges from wiki, raw assets, runtime logs, agents
 
 Force-directed live map with layer clustering, inspector with markdown render, ⌘K search, URL-synced filters, sesión viva polling, time-travel slider with snapshot ticks, run timeline, mobile tab, Office↔Graph navigation. Four PRs (#29 #30 #31 #32) landed on `dev/1.0.0`. 90 tests (72 api + 18 web). See `docs/knowledge-graph.md` for the full feature inventory.
 
-### Next Knowledge Graph candidates
+### Knowledge Graph follow-ups ✅ shipped 2026-05-15
 
-After P2 v2 the obvious gaps before declaring the surface "done":
+The post-v2 gaps were delivered together in PR #35:
 
-- **WebSocket live updates** instead of 15s polling — closes the "sesión viva" loop properly.
-- **Graph annotations** — operator notes/tags on nodes that persist to disk; would feed back into curation.
-- **Filter presets** saved to URL or settings (e.g. "needs curation", "this week", "wiki orphans").
-- **Diff snapshot view** — pick two persisted snapshots, render +/- nodes/edges.
-- **Sub-tabs inside Office** (mock alignment) — promote Office to host the graph as one of its panes.
-- **Performance hardening** for >300 nodes (sprite caching, WebGL toggle, virtualised neighbour calc).
+- WebSocket live updates with polling fallback.
+- Persisted graph annotations and filter presets.
+- Snapshot diff view with node/edge deltas.
+- Office sub-tabs for Office/Knowledge Graph context.
+- Performance hardening for graphs above 300 nodes.
+- Role-memory overlays, inspector context, and high-risk/pending-review focus filters.
+- Annotation and deferred/rejected Dream decision signals in deterministic Wiki lint.
 
 ### P3 — Dream report review trail and graph curation ✅ shipped 2026-05-13
 
 When the operator applies a proposed dream action, record whether the proposal was accepted, rejected, or deferred. This now ships end-to-end: decisions persist under `wiki/decisions`, update `wiki/log`, and appear in the graph as `dream-decision` nodes with `dream_decision_for_report` edges plus UI filters.
 
-### P4 — Role memory
+### P4 — Role memory ✅ shipped 2026-05-15
 
 Give each agent role a curated memory surface derived from the graph: builder implementation patterns, QA blockers, wiki-curator maintenance themes, PM decisions, and recurring handoff/cohesion issues.
 
@@ -90,6 +92,52 @@ Status: ✅ shipped 2026-05-13. Step-level evidence now includes durations and a
 ### Later candidate — auto-persist toggle for the dream report
 
 Optional env flag `WIKI_DREAM_AUTO_PERSIST=true` that saves the draft report to `wiki/dreams/<YYYY-MM-DD>-dream-report.md` automatically. Opt-in only — default stays manual to preserve the approval pattern.
+
+## Now planning — after Durable Local Runtime v1
+
+### P0 — Post-merge durability drill ✅ completed 2026-08-24
+
+Validate the merged runtime against an isolated local Mongo database and a real local Ollama executor:
+
+- queue work while the worker is offline
+- start, stop, and restart the worker around active work
+- verify lease reclaim and completed-step reuse
+- verify ordered event replay, cancellation, manual retry, and UI rehydration after refresh
+- record observed limitations before expanding execution authority
+
+Result: offline queueing, restart/reclaim, completed-step reuse, ordered replay, cancellation, manual retry, and refresh-safe UI rehydration passed against isolated Mongo plus local Ollama. The drill also shipped two bounded fixes: retry access from Runs history and cleanup of interrupted child runs when a parent orchestration is reclaimed.
+
+### P1 — Durable Runtime hardening v1.1
+
+- Add Mongo integration coverage for multi-worker claim contention and expired-lease reclaim.
+- Verify event sequence ordering and duplicate protection under concurrent claims.
+- Add explicit worker lifecycle diagnostics and graceful shutdown behavior.
+- Add provider abort support where available; keep cooperative step-boundary cancellation as the fallback.
+- Require provider/tool idempotency keys before irreversible side effects are allowed.
+
+### P2 — Controlled real Codex Worker adapter
+
+Replace the fake Codex Worker executor only behind an explicit feature flag and the existing approval flow:
+
+- keep planning and protected-step approval visible to the operator
+- constrain working directories and allowed commands
+- capture diffs, stdout/stderr, tests, artifacts, and durations as review evidence
+- keep real Codex/external calls out of automated tests
+- never enable dangerous bypass flags
+
+### P3 — Complete daily-use operational loop
+
+Exercise one repeatable reference workflow end to end:
+
+```txt
+source/input -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory
+```
+
+The milestone is complete when an interrupted run can recover, the operator can review the evidence, and approved reusable knowledge reaches the Wiki/role-memory surfaces without relying on chat history.
+
+### P4 — Review-to-memory learning loop
+
+Make approved review outcomes feed curated role memory and contradiction/staleness signals. Keep writes inspectable and approval-driven; do not introduce silent autonomous edits.
 
 ## Later — Tailwind / Pixel polish
 

@@ -18,6 +18,7 @@ const updateRunReviewMock = vi.hoisted(() => vi.fn());
 const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
 const captureRunMemoryMock = vi.hoisted(() => vi.fn());
+const retryRunMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const getOrchestrationStatusMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
@@ -95,6 +96,7 @@ vi.mock("./api/services/runs.service", () => ({
     promoteDeliverable: promoteDeliverableMock,
     unlinkDeliverable: unlinkDeliverableMock,
     captureMemory: captureRunMemoryMock,
+    retry: retryRunMock,
   },
 }));
 
@@ -317,6 +319,14 @@ describe("App", () => {
       },
       wikiPath: "wiki/synthesis/run-run-2-review-memory-captured-from-dashboard.md",
       logPath: "wiki/log.md",
+    });
+    retryRunMock.mockResolvedValue({
+      id: "run-retry",
+      type: "orchestration",
+      status: "queued",
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
     });
     startSkillOrchestrationMock.mockResolvedValue({ runId: "run-4" });
     getOrchestrationStatusMock.mockResolvedValue({
@@ -571,6 +581,34 @@ describe("App", () => {
         level: "info",
         message: "Reviewed V3",
       });
+    });
+  });
+
+  it("retries a failed orchestration from the runs timeline", async () => {
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-retry",
+        type: "orchestration",
+        status: "failed",
+        logs: [
+          {
+            timestamp: "2026-05-04T00:00:00.000Z",
+            level: "error",
+            message: "fetch failed",
+          },
+        ],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
+    await user.click(await screen.findByRole("button", { name: "Retry orchestration run" }));
+
+    await waitFor(() => {
+      expect(retryRunMock).toHaveBeenCalledWith("run-retry");
     });
   });
 

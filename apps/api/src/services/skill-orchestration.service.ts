@@ -354,6 +354,13 @@ export class SkillOrchestrationService {
     const input = this.readStartInput(orchestrationRun);
     const stepResults: SkillOrchestrationStepResult[] = [];
     const previousOutputs: string[] = [];
+    const interruptedStepRuns = await this.runs.failInterruptedOrchestrationStepRuns(orchestrationRun.id);
+    if (interruptedStepRuns > 0) {
+      await this.runs.appendLog(orchestrationRun.id, {
+        level: "warn",
+        message: `Recovered ${interruptedStepRuns} interrupted child run(s) from an earlier worker attempt.`,
+      });
+    }
     const existingStepRuns = await this.runs.listByOrchestrationRunId(orchestrationRun.id);
 
     try {

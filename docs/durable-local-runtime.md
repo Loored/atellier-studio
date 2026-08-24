@@ -20,6 +20,7 @@ Memory storage uses the same runtime services with an inline worker. It is inten
 - A lease-expired run can be reclaimed by another worker.
 - The maximum automatic attempt count defaults to three, with bounded exponential backoff.
 - Completed child steps are idempotent commits. A recovered or manually retried orchestration reuses them instead of running them again.
+- When a parent is reclaimed or retried, non-terminal child runs left by an interrupted worker are marked `failed` with a superseded warning before execution resumes. This keeps the global run timeline from reporting stale work as active.
 - The persisted definition snapshot prevents a code deployment from silently changing an already queued orchestration.
 - Manual retry resets the attempt budget but retains completed child runs.
 
@@ -37,6 +38,23 @@ Terminal statuses are `completed`, `failed`, `blocked`, and `cancelled`. `POST /
 - `GET /runs/:id/events?after=<sequence>` returns replayable ordered events.
 - `GET /runs/:id/events/stream?after=<sequence>` provides an SSE tail and closes at a terminal state.
 - `GET /runs?type=orchestration&status=queued,running` discovers active work for UI rehydration.
+
+Failed and blocked orchestration runs expose a retry action in the Runs timeline. Retrying queues the same parent run, preserves completed child-step commits, resets the attempt budget, and lets the dashboard rehydrate it as active work.
+
+## Post-merge durability drill
+
+The 2026-08-24 drill used an isolated Mongo database and local Ollama models. It verified:
+
+- work accepted and visible in the UI while the worker was offline
+- lease reclaim after interrupting a worker during an LLM step
+- completed-step reuse without duplicate completed commits
+- ordered event replay across the worker restart
+- cancellation at the next safe step boundary
+- three bounded automatic failures followed by a successful manual retry
+- dashboard rehydration after full-page refresh
+- interrupted child-run cleanup during a reclaimed attempt
+
+The drill exposed and fixed two gaps: retry was not reachable from history after refreshing a failed run, and an in-flight child from a crashed worker remained globally `running` after the parent recovered.
 
 ## Local operation
 
