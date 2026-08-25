@@ -3,6 +3,8 @@ import path from "node:path";
 import {
   AGENT_ROLES,
   REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_OUTCOMES,
   REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH,
   REVIEW_LEARNING_SIGNALS,
   type AppendRunLogInput,
@@ -20,7 +22,10 @@ import {
   type RunMemoryCapture,
   type RunReviewStatus,
   type RunStatus,
+  type ResolveRunLearningSignalInput,
+  type ResolveRunLearningSignalResponse,
   type ReviewLearningRecord,
+  type ReviewLearningSignalResolution,
   type TaskStatus,
 } from "@atellier/shared";
 import { RunModel } from "../db/models/Run";
@@ -851,6 +856,117 @@ export class RunService {
       throw new Error(`Role learning curation failed: ${outcome.error}`);
     }
     return outcome.result;
+  }
+
+  async resolveLearningSignal(
+    id: string,
+    input: ResolveRunLearningSignalInput,
+  ): Promise<ResolveRunLearningSignalResponse | null> {
+    const run = await this.getById(id);
+    if (!run) {
+      return null;
+    }
+    const learning = run.memory?.learning;
+    if (!learning?.signal || !learning.signalPath) {
+      throw new Error("Run does not have an open role learning signal.");
+    }
+
+    const outcome = input.outcome;
+    if (!REVIEW_LEARNING_RESOLUTION_OUTCOMES.includes(outcome)) {
+      throw new Error("Role learning signal resolution outcome is invalid.");
+    }
+    const note = input.note.trim();
+    if (!note) {
+      throw new Error("Role learning signal resolution note is required.");
+    }
+    if (note.length > REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH) {
+      throw new Error(
+        `Role learning signal resolution note must be ${REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH} characters or fewer.`,
+      );
+    }
+
+    if (learning.resolution) {
+      const matchesExisting =
+        learning.resolution.outcome === outcome &&
+        learning.resolution.note === note;
+      if (!matchesExisting) {
+        throw new Error("Run learning signal already has a different resolution.");
+      }
+      return {
+        run,
+        roleMemoryPath: learning.roleMemoryPath,
+        logPath: learning.resolution.logPath,
+      };
+    }
+
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify({ runId: run.id, outcome, note }))
+      .digest("hex");
+    const effect = await this.effectIdempotency.execute(
+      {
+        toolName: "run-role-learning-signal-resolution",
+        classification: "irreversible",
+        idempotencyKey: `run-learning-resolution:${run.id}`,
+        fingerprint,
+      },
+      async () => {
+        const resolvedAt = new Date().toISOString();
+        const resolution: ReviewLearningSignalResolution = {
+          runId: run.id,
+          outcome,
+          note,
+          signal: learning.signal!,
+          signalPath: learning.signalPath!,
+          logPath: "wiki/log.md",
+          resolvedAt,
+        };
+        const roleMemoryPage = await this.wikiService.appendRoleLearningResolution(
+          learning.role,
+          resolution,
+        );
+        const log = await this.wikiService.appendLog({
+          eventType: "decision",
+          title: "Review learning signal resolved",
+          summary: note,
+          runId: run.id,
+          taskId: run.taskId,
+          agentId: run.agentId,
+          details: {
+            role: learning.role,
+            roleMemoryPath: roleMemoryPage.path,
+            signal: learning.signal,
+            signalPath: learning.signalPath,
+            outcome,
+          },
+        });
+        const resolvedRun = await this.recordMemoryCapture(run.id, {
+          ...run.memory!,
+          learning: {
+            ...learning,
+            resolution: {
+              ...resolution,
+              logPath: log.path,
+            },
+          },
+        });
+        if (!resolvedRun) {
+          throw new Error(`Run ${run.id} disappeared while recording the signal resolution.`);
+        }
+        return {
+          run: resolvedRun,
+          roleMemoryPath: roleMemoryPage.path,
+          logPath: log.path,
+        } satisfies ResolveRunLearningSignalResponse;
+      },
+    );
+
+    if (effect.disposition === "in-progress") {
+      throw new Error("Role learning signal resolution is already in progress.");
+    }
+    if (effect.disposition === "failed") {
+      throw new Error(`Role learning signal resolution failed: ${effect.error}`);
+    }
+    return effect.result;
   }
 
   private async recordMemoryCapture(id: string, memory: RunMemoryCapture): Promise<Run | null> {

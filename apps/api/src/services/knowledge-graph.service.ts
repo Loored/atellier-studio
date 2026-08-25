@@ -453,6 +453,10 @@ export class KnowledgeGraphService {
       const blockers = this.extractBlockerSignals(roleRuns);
       const roleLearnings = learnings.filter((learning) => learning.role === role);
       const curationSignals = roleLearnings.filter((learning) => Boolean(learning.signal)).length;
+      const openCurationSignals = roleLearnings.filter(
+        (learning) => Boolean(learning.signal) && !learning.resolution,
+      ).length;
+      const resolvedCurationSignals = curationSignals - openCurationSignals;
 
       const focus: string[] = [];
       if (blocked + failed > 0) {
@@ -461,8 +465,8 @@ export class KnowledgeGraphService {
       if (pendingReview > 0) {
         focus.push(`Close ${pendingReview} pending review item(s) to keep delivery flow moving.`);
       }
-      if (curationSignals > 0) {
-        focus.push(`Resolve ${curationSignals} approved curation signal(s) captured from review.`);
+      if (openCurationSignals > 0) {
+        focus.push(`Resolve ${openCurationSignals} approved curation signal(s) captured from review.`);
       }
       if (focus.length === 0) {
         focus.push("No active friction detected. Keep cadence with small, verifiable run slices.");
@@ -482,6 +486,8 @@ export class KnowledgeGraphService {
           pendingReview,
           curatedLearnings: roleLearnings.length,
           curationSignals,
+          openCurationSignals,
+          resolvedCurationSignals,
         },
         recentRuns: roleRuns.slice(0, 5).map((run) => ({
           runId: run.id,
@@ -790,6 +796,7 @@ export class KnowledgeGraphService {
         roleMemoryPath: run.memory?.learning?.roleMemoryPath ?? null,
         learningRole: run.memory?.learning?.role ?? null,
         learningSignal: run.memory?.learning?.signal ?? null,
+        learningSignalResolution: run.memory?.learning?.resolution?.outcome ?? null,
       },
     });
   }

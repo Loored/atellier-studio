@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import {
   AGENT_ROLES,
+  REVIEW_LEARNING_RESOLUTION_OUTCOMES,
   REVIEW_LEARNING_SIGNALS,
   RUN_EXECUTION_KINDS,
   RUN_EXECUTION_PHASES,
@@ -56,6 +57,21 @@ const ReviewLearningSchema = new Schema(
     signal: { type: String, enum: REVIEW_LEARNING_SIGNALS, required: false },
     signalPath: String,
     capturedAt: { type: String, required: true },
+    resolution: {
+      type: new Schema(
+        {
+          runId: { type: String, required: true },
+          outcome: { type: String, enum: REVIEW_LEARNING_RESOLUTION_OUTCOMES, required: true },
+          note: { type: String, required: true },
+          signal: { type: String, enum: REVIEW_LEARNING_SIGNALS, required: true },
+          signalPath: { type: String, required: true },
+          logPath: { type: String, required: true },
+          resolvedAt: { type: String, required: true },
+        },
+        { _id: false },
+      ),
+      required: false,
+    },
   },
   { _id: false },
 );
