@@ -2,6 +2,8 @@ import { type FormEvent, useState } from "react";
 import type {
   AgentRole,
   CurateRunLearningInput,
+  ResolveRunLearningSignalInput,
+  ReviewLearningResolutionOutcome,
   ReviewLearningSignal,
   Run,
   RunReviewStatus,
@@ -17,6 +19,7 @@ import {
   useCurateRunLearningApi,
   usePromoteRunDeliverableApi,
   useRetryRunApi,
+  useResolveRunLearningSignalApi,
   useRunsApi,
   useUnlinkRunDeliverableApi,
   useUpdateRunReviewApi,
@@ -27,6 +30,11 @@ type RunLearningDraft = {
   lesson: string;
   signal: ReviewLearningSignal | "";
   signalPath: string;
+};
+
+type RunLearningResolutionDraft = {
+  outcome: ReviewLearningResolutionOutcome;
+  note: string;
 };
 
 export function useRunsTimeline() {
@@ -46,12 +54,16 @@ export function useRunsTimeline() {
   const unlinkRunDeliverable = useUnlinkRunDeliverableApi();
   const captureRunMemory = useCaptureRunMemoryApi();
   const curateRunLearning = useCurateRunLearningApi();
+  const resolveRunLearningSignal = useResolveRunLearningSignalApi();
   const retryRun = useRetryRunApi();
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [runLearningDrafts, setRunLearningDrafts] = useState<Record<string, Partial<RunLearningDraft>>>({});
+  const [runLearningResolutionDrafts, setRunLearningResolutionDrafts] = useState<
+    Record<string, Partial<RunLearningResolutionDraft>>
+  >({});
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
@@ -188,6 +200,34 @@ export function useRunsTimeline() {
     curateRunLearning.mutate({ runId: run.id, input });
   }
 
+  function getRunLearningResolutionDraft(runId: string): RunLearningResolutionDraft {
+    return {
+      outcome: "resolved",
+      note: "",
+      ...(runLearningResolutionDrafts[runId] ?? {}),
+    };
+  }
+
+  function setRunLearningResolutionDraft(runId: string, patch: Partial<RunLearningResolutionDraft>) {
+    setRunLearningResolutionDrafts((current) => ({
+      ...current,
+      [runId]: { ...(current[runId] ?? {}), ...patch },
+    }));
+  }
+
+  function handleResolveRunLearningSignal(runId: string) {
+    const draft = getRunLearningResolutionDraft(runId);
+    const note = draft.note.trim();
+    if (!note) {
+      return;
+    }
+    const input: ResolveRunLearningSignalInput = {
+      outcome: draft.outcome,
+      note,
+    };
+    resolveRunLearningSignal.mutate({ runId, input });
+  }
+
   return {
     runList,
     filteredRunList,
@@ -211,11 +251,15 @@ export function useRunsTimeline() {
     isUnlinkingRunDeliverable: unlinkRunDeliverable.isPending,
     isCapturingRunMemory: captureRunMemory.isPending,
     isCuratingRunLearning: curateRunLearning.isPending,
+    isResolvingRunLearningSignal: resolveRunLearningSignal.isPending,
     isRetryingRun: retryRun.isPending,
     capturedMemoryPath: captureRunMemory.data?.wikiPath ?? null,
     capturedRoleMemoryPath: curateRunLearning.data?.roleMemoryPath ?? null,
+    resolvedRoleMemoryPath: resolveRunLearningSignal.data?.roleMemoryPath ?? null,
     getRunLearningDraft,
     setRunLearningDraft,
+    getRunLearningResolutionDraft,
+    setRunLearningResolutionDraft,
     setRunLogMessage,
     setAgentFilter,
     setReviewFilter,
@@ -268,5 +312,6 @@ export function useRunsTimeline() {
         },
       }),
     curateRunLearning: handleCurateRunLearning,
+    resolveRunLearningSignal: handleResolveRunLearningSignal,
   };
 }

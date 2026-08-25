@@ -7,6 +7,8 @@ import type {
   CurateRunLearningResponse,
   CreateRunInput,
   ListRunsInput,
+  ResolveRunLearningSignalInput,
+  ResolveRunLearningSignalResponse,
   Run,
   RunEventsResponse,
   UpdateRunReviewInput,
@@ -84,6 +86,17 @@ export const runsService = {
 
   async curateLearning(runId: string, input: CurateRunLearningInput): Promise<CurateRunLearningResponse> {
     const response = await httpClient.post<CurateRunLearningResponse>(`/runs/${runId}/curate-learning`, input);
+    return response.data;
+  },
+
+  async resolveLearningSignal(
+    runId: string,
+    input: ResolveRunLearningSignalInput,
+  ): Promise<ResolveRunLearningSignalResponse> {
+    const response = await httpClient.post<ResolveRunLearningSignalResponse>(
+      `/runs/${runId}/resolve-learning-signal`,
+      input,
+    );
     return response.data;
   },
 };

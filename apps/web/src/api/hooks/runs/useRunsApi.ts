@@ -7,6 +7,8 @@ import type {
   CurateRunLearningInput,
   CurateRunLearningResponse,
   CreateRunInput,
+  ResolveRunLearningSignalInput,
+  ResolveRunLearningSignalResponse,
   Run,
   UpdateRunReviewInput,
 } from "@atellier/shared";
@@ -322,6 +324,44 @@ export function useCurateRunLearningApi(options: UseCurateRunLearningApiOptions 
     {
       onSuccess: async (result) => {
         notifySuccess("Approved learning curated");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.roleMemory }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.graph }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page(result.roleMemoryPath) }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type ResolveRunLearningSignalVariables = {
+  runId: string;
+  input: ResolveRunLearningSignalInput;
+};
+
+export type UseResolveRunLearningSignalApiOptions = UseMutationOptions<
+  ResolveRunLearningSignalResponse,
+  Error,
+  ResolveRunLearningSignalVariables
+>;
+
+export function useResolveRunLearningSignalApi(options: UseResolveRunLearningSignalApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<ResolveRunLearningSignalResponse, Error, ResolveRunLearningSignalVariables>(
+    {
+      mutationFn: ({ runId, input }) => runsService.resolveLearningSignal(runId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (result) => {
+        notifySuccess("Learning signal resolved");
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.run.id) }),

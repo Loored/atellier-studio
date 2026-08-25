@@ -19,6 +19,7 @@ const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
 const captureRunMemoryMock = vi.hoisted(() => vi.fn());
 const curateRunLearningMock = vi.hoisted(() => vi.fn());
+const resolveRunLearningSignalMock = vi.hoisted(() => vi.fn());
 const retryRunMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const getOrchestrationStatusMock = vi.hoisted(() => vi.fn());
@@ -99,6 +100,7 @@ vi.mock("./api/services/runs.service", () => ({
     unlinkDeliverable: unlinkDeliverableMock,
     captureMemory: captureRunMemoryMock,
     curateLearning: curateRunLearningMock,
+    resolveLearningSignal: resolveRunLearningSignalMock,
     retry: retryRunMock,
   },
 }));
@@ -363,6 +365,45 @@ describe("App", () => {
         logs: [],
         createdAt: "2026-05-04T00:00:00.000Z",
         updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      roleMemoryPath: "wiki/role-memory/qa.md",
+      logPath: "wiki/log.md",
+    });
+    resolveRunLearningSignalMock.mockResolvedValue({
+      run: {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+          learning: {
+            runId: "run-3",
+            role: "qa",
+            lesson: "Preserve validation evidence for approved deliverables.",
+            memoryPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+            roleMemoryPath: "wiki/role-memory/qa.md",
+            logPath: "wiki/log.md",
+            signal: "stale",
+            signalPath: "wiki/deliverables/run-3.md",
+            capturedAt: "2026-05-04T00:00:00.000Z",
+            resolution: {
+              runId: "run-3",
+              outcome: "dismissed",
+              note: "The page is intentionally historical and needs no update.",
+              signal: "stale",
+              signalPath: "wiki/deliverables/run-3.md",
+              logPath: "wiki/log.md",
+              resolvedAt: "2026-05-04T00:01:00.000Z",
+            },
+          },
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:01:00.000Z",
       },
       roleMemoryPath: "wiki/role-memory/qa.md",
       logPath: "wiki/log.md",
@@ -776,6 +817,55 @@ describe("App", () => {
       });
     });
     expect(await screen.findByText(/Curated role memory: wiki\/role-memory\/qa\.md/i)).toBeInTheDocument();
+  });
+
+  it("resolves an open role learning signal from review", async () => {
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+          learning: {
+            runId: "run-3",
+            role: "qa",
+            lesson: "Preserve validation evidence for approved deliverables.",
+            memoryPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+            roleMemoryPath: "wiki/role-memory/qa.md",
+            logPath: "wiki/log.md",
+            signal: "stale",
+            signalPath: "wiki/deliverables/run-3.md",
+            capturedAt: "2026-05-04T00:00:00.000Z",
+          },
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    await user.selectOptions(screen.getByLabelText("Signal resolution outcome for run-3"), "dismissed");
+    await user.type(
+      screen.getByLabelText("Signal resolution note for run-3"),
+      "The page is intentionally historical and needs no update.",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve signal" }));
+
+    await waitFor(() => {
+      expect(resolveRunLearningSignalMock).toHaveBeenCalledWith("run-3", {
+        outcome: "dismissed",
+        note: "The page is intentionally historical and needs no update.",
+      });
+    });
+    expect(await screen.findByText(/Resolved role signal: wiki\/role-memory\/qa\.md/i)).toBeInTheDocument();
   });
 
   it("filters deliverables by type and review", async () => {
