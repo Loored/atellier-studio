@@ -373,7 +373,13 @@ export class KnowledgeGraphService {
     }
 
     for (const issue of lint.issues) {
-      const quality: KnowledgeGraphQualityState = issue.code === "stale_index_entry" ? "stale" : "orphaned";
+      const quality: KnowledgeGraphQualityState = issue.code === "stale_index_entry" || /\bstale\b/i.test(issue.message)
+        ? "stale"
+        : /contradict/i.test(issue.message)
+          ? "contradicted"
+          : /needs-review/i.test(issue.message)
+            ? "proposed"
+            : "orphaned";
       const issueNodeId = `lint:${issue.code}:${issue.path}`;
       this.addNode(nodes, {
         id: issueNodeId,
@@ -426,7 +432,12 @@ export class KnowledgeGraphService {
   }
 
   async buildRoleMemory(): Promise<RoleMemoryResponse> {
-    const [agents, tasks, runs] = await Promise.all([this.agents.list(), this.tasks.list(), this.runs.list()]);
+    const [agents, tasks, runs, learnings] = await Promise.all([
+      this.agents.list(),
+      this.tasks.list(),
+      this.runs.list(),
+      this.wiki.listReviewLearnings(),
+    ]);
     const generatedAt = new Date().toISOString();
     const roles: RoleMemoryEntry[] = AGENT_ROLES.map((role) => {
       const roleAgents = agents.filter((agent) => agent.role === role);
@@ -440,6 +451,8 @@ export class KnowledgeGraphService {
       const failed = roleRuns.filter((run) => run.status === "failed").length;
       const completed = roleRuns.filter((run) => run.status === "completed").length;
       const blockers = this.extractBlockerSignals(roleRuns);
+      const roleLearnings = learnings.filter((learning) => learning.role === role);
+      const curationSignals = roleLearnings.filter((learning) => Boolean(learning.signal)).length;
 
       const focus: string[] = [];
       if (blocked + failed > 0) {
@@ -447,6 +460,9 @@ export class KnowledgeGraphService {
       }
       if (pendingReview > 0) {
         focus.push(`Close ${pendingReview} pending review item(s) to keep delivery flow moving.`);
+      }
+      if (curationSignals > 0) {
+        focus.push(`Resolve ${curationSignals} approved curation signal(s) captured from review.`);
       }
       if (focus.length === 0) {
         focus.push("No active friction detected. Keep cadence with small, verifiable run slices.");
@@ -464,6 +480,8 @@ export class KnowledgeGraphService {
           blocked,
           failed,
           pendingReview,
+          curatedLearnings: roleLearnings.length,
+          curationSignals,
         },
         recentRuns: roleRuns.slice(0, 5).map((run) => ({
           runId: run.id,
@@ -475,6 +493,7 @@ export class KnowledgeGraphService {
         })),
         blockers,
         focus,
+        learnings: roleLearnings.slice(0, 10),
       };
     });
 
@@ -767,6 +786,10 @@ export class KnowledgeGraphService {
       metadata: {
         type: run.type,
         logCount: run.logs.length,
+        memoryPath: run.memory?.wikiPath ?? null,
+        roleMemoryPath: run.memory?.learning?.roleMemoryPath ?? null,
+        learningRole: run.memory?.learning?.role ?? null,
+        learningSignal: run.memory?.learning?.signal ?? null,
       },
     });
   }

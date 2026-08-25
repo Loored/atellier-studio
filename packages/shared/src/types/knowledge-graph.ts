@@ -1,3 +1,5 @@
+import type { ReviewLearningRecord } from "./review-learning";
+
 export const KNOWLEDGE_GRAPH_NODE_TYPES = [
   "agent",
   "role",
@@ -176,10 +178,13 @@ export type RoleMemoryEntry = {
     blocked: number;
     failed: number;
     pendingReview: number;
+    curatedLearnings: number;
+    curationSignals: number;
   };
   recentRuns: RoleMemoryRunSummary[];
   blockers: string[];
   focus: string[];
+  learnings: ReviewLearningRecord[];
 };
 
 export type RoleMemoryResponse = {

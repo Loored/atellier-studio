@@ -1,5 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import {
+  AGENT_ROLES,
+  REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH,
+  REVIEW_LEARNING_SIGNALS,
   RUN_LOG_LEVELS,
   RUN_LOG_MESSAGE_MAX_LENGTH,
   RUN_REVIEW_STATUSES,
@@ -8,6 +12,7 @@ import {
   type AppendRunLogInput,
   type CaptureRunMemoryInput,
   type CompleteRunInput,
+  type CurateRunLearningInput,
   type CreateRunInput,
   type RunStatus,
   type UpdateRunReviewInput,
@@ -303,6 +308,57 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
       return result ? reply.code(201).send(result) : notFound(reply, "Run not found.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to capture run memory.";
+      return reply.code(409).send({ error: message });
+    }
+  });
+
+  fastify.post("/runs/:id/curate-learning", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+    const role = stringField(body, "role");
+    if (!role || !isOneOf(role, AGENT_ROLES)) {
+      return badRequest(reply, "Role learning target is invalid.");
+    }
+    const lesson = stringField(body, "lesson");
+    if (!lesson) {
+      return badRequest(reply, "Role learning lesson is required.");
+    }
+    if (lesson.length > REVIEW_LEARNING_MAX_LENGTH) {
+      return badRequest(
+        reply,
+        `Role learning lesson must be ${REVIEW_LEARNING_MAX_LENGTH} characters or fewer.`,
+      );
+    }
+    const signal = optionalStringField(body, "signal");
+    if (signal && !isOneOf(signal, REVIEW_LEARNING_SIGNALS)) {
+      return badRequest(reply, "Role learning signal is invalid.");
+    }
+    const signalPath = optionalStringField(body, "signalPath");
+    if (signalPath && signalPath.length > REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH) {
+      return badRequest(
+        reply,
+        `Role learning signal path must be ${REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH} characters or fewer.`,
+      );
+    }
+
+    const input: CurateRunLearningInput = {
+      role,
+      lesson,
+      signal: signal as CurateRunLearningInput["signal"],
+      signalPath,
+    };
+    try {
+      const result = await services.runs.curateLearning(id, input);
+      return result ? reply.code(201).send(result) : notFound(reply, "Run not found.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to curate role learning.";
       return reply.code(409).send({ error: message });
     }
   });
