@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
   type AppendRunLogInput,
@@ -11,12 +11,17 @@ import {
   type Run,
   type RunExecutionPhase,
   type RunLogEntry,
+  type RunMemoryCapture,
   type RunReviewStatus,
   type RunStatus,
+  type TaskStatus,
 } from "@atellier/shared";
 import { RunModel } from "../db/models/Run";
 import { cleanUndefined, toIso, toJsonRecord, type StorageMode } from "./service-utils";
 import { WikiService } from "./wiki.service";
+import { EffectIdempotencyService } from "./effect-idempotency.service";
+import { MemoryEffectIdempotencyRepository } from "./effect-idempotency.repository";
+import type { TaskService } from "./task.service";
 
 export type RunExecutionUpdate = {
   status?: RunStatus;
@@ -39,6 +44,10 @@ export class RunService {
   constructor(
     private readonly storageMode: StorageMode,
     private readonly wikiService: WikiService,
+    private readonly tasks?: TaskService,
+    private readonly effectIdempotency = new EffectIdempotencyService(
+      new MemoryEffectIdempotencyRepository(),
+    ),
   ) {}
 
   async list(input: ListRunsInput = {}): Promise<Run[]> {
@@ -235,6 +244,7 @@ export class RunService {
       if (serialized.reviewStatus === "approved") {
         await this.appendDeliverableAcceptedLog(serialized);
       }
+      await this.syncLinkedTask(serialized, "review");
       return serialized;
     }
 
@@ -268,6 +278,7 @@ export class RunService {
     if (next.reviewStatus === "approved") {
       await this.appendDeliverableAcceptedLog(next);
     }
+    await this.syncLinkedTask(next, "review");
     return next;
   }
 
@@ -561,9 +572,12 @@ export class RunService {
       if (reviewStatus === "approved" && this.hasBlockingValidationIssues(validation)) {
         throw new Error(this.buildReviewBlockedMessage(validation));
       }
+      if (existingRun.reviewStatus === reviewStatus) {
+        return existingRun;
+      }
 
-      const run = await RunModel.findByIdAndUpdate(
-        id,
+      const run = await RunModel.findOneAndUpdate(
+        { _id: id, reviewStatus: { $ne: reviewStatus } },
         cleanUndefined({
           reviewStatus,
           updatedAt: new Date(),
@@ -571,12 +585,16 @@ export class RunService {
         { new: true },
       );
       if (!run) {
-        return null;
+        return this.getById(id);
       }
       const serialized = toJsonRecord<Run>(run);
       if (reviewStatus === "approved") {
         await this.appendDeliverableAcceptedLog(serialized);
       }
+      await this.syncLinkedTask(
+        serialized,
+        reviewStatus === "changes-requested" ? "active" : "review",
+      );
       return serialized;
     }
 
@@ -589,6 +607,9 @@ export class RunService {
     if (reviewStatus === "approved" && this.hasBlockingValidationIssues(validation)) {
       throw new Error(this.buildReviewBlockedMessage(validation));
     }
+    if (current.reviewStatus === reviewStatus) {
+      return current;
+    }
 
     const next: Run = {
       ...current,
@@ -599,6 +620,10 @@ export class RunService {
     if (reviewStatus === "approved") {
       await this.appendDeliverableAcceptedLog(next);
     }
+    await this.syncLinkedTask(
+      next,
+      reviewStatus === "changes-requested" ? "active" : "review",
+    );
     return next;
   }
 
@@ -610,31 +635,117 @@ export class RunService {
     if (run.status !== "completed") {
       throw new Error("Only completed runs can be captured as wiki memory.");
     }
+    if (run.reviewStatus !== "approved") {
+      throw new Error("Only approved runs can be captured as wiki memory.");
+    }
+    if (run.memory) {
+      await this.syncLinkedTask(run, "done");
+      return {
+        run,
+        wikiPath: run.memory.wikiPath,
+        logPath: run.memory.logPath,
+      };
+    }
 
     const summary = input.summary?.trim() || this.inferRunMemorySummary(run);
     const wikiPath = this.buildRunMemoryPath(run, summary);
-    const content = this.buildRunMemoryMarkdown(run, summary);
-    const page = await this.wikiService.writePage(wikiPath, content);
-    const log = await this.wikiService.appendLog({
-      eventType: "decision",
-      title: "Run memory captured",
-      summary: `Captured review memory for run ${run.id}.`,
-      runId: run.id,
-      taskId: run.taskId,
-      agentId: run.agentId,
-      details: {
-        memoryPath: page.path,
-        type: run.type,
-        reviewStatus: run.reviewStatus ?? "none",
-        deliverablePath: run.deliverablePath ?? "none",
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify({ runId: run.id, summary, wikiPath }))
+      .digest("hex");
+    const outcome = await this.effectIdempotency.execute(
+      {
+        toolName: "run-memory-capture",
+        classification: "irreversible",
+        idempotencyKey: `run-memory:${run.id}`,
+        fingerprint,
       },
-    });
+      async () => {
+        const content = this.buildRunMemoryMarkdown(run, summary);
+        const page = await this.wikiService.writePage(wikiPath, content);
+        const log = await this.wikiService.appendLog({
+          eventType: "decision",
+          title: "Run memory captured",
+          summary: `Captured review memory for run ${run.id}.`,
+          runId: run.id,
+          taskId: run.taskId,
+          agentId: run.agentId,
+          details: {
+            memoryPath: page.path,
+            type: run.type,
+            reviewStatus: run.reviewStatus,
+            deliverablePath: run.deliverablePath ?? "none",
+          },
+        });
+        const memory: RunMemoryCapture = {
+          wikiPath: page.path,
+          logPath: log.path,
+          summary,
+          capturedAt: new Date().toISOString(),
+        };
+        const capturedRun = await this.recordMemoryCapture(run.id, memory);
+        if (!capturedRun) {
+          throw new Error(`Run ${run.id} disappeared while recording memory.`);
+        }
+        await this.syncLinkedTask(capturedRun, "done");
+        return {
+          run: capturedRun,
+          wikiPath: page.path,
+          logPath: log.path,
+        } satisfies CaptureRunMemoryResponse;
+      },
+    );
 
-    return {
-      run,
-      wikiPath: page.path,
-      logPath: log.path,
+    if (outcome.disposition === "in-progress") {
+      throw new Error("Run memory capture is already in progress.");
+    }
+    if (outcome.disposition === "failed") {
+      throw new Error(`Run memory capture failed: ${outcome.error}`);
+    }
+    return outcome.result;
+  }
+
+  private async recordMemoryCapture(id: string, memory: RunMemoryCapture): Promise<Run | null> {
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            memory,
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+
+    const current = this.records.get(id);
+    if (!current) {
+      return null;
+    }
+    const next: Run = {
+      ...current,
+      memory,
+      updatedAt: new Date().toISOString(),
     };
+    this.records.set(id, next);
+    return next;
+  }
+
+  private async syncLinkedTask(run: Run, status: TaskStatus): Promise<void> {
+    if (!this.tasks || !run.taskId) {
+      return;
+    }
+
+    const task = await this.tasks.getById(run.taskId);
+    if (!task || task.status === status) {
+      return;
+    }
+    if (task.status === "done" && status !== "done") {
+      return;
+    }
+
+    await this.tasks.update(task.id, { status });
   }
 
   private readValidation(output: unknown): AgentValidationResult | null {

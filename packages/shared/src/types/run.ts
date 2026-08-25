@@ -60,6 +60,13 @@ export type RunLogEntry = {
   message: string;
 };
 
+export type RunMemoryCapture = {
+  wikiPath: string;
+  logPath: string;
+  summary: string;
+  capturedAt: string;
+};
+
 export type Run = {
   id: string;
   taskId?: string;
@@ -68,6 +75,7 @@ export type Run = {
   status: RunStatus;
   reviewStatus?: RunReviewStatus;
   deliverablePath?: string;
+  memory?: RunMemoryCapture;
   input?: unknown;
   output?: unknown;
   execution?: RunExecution;

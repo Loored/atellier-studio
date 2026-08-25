@@ -49,6 +49,9 @@ export function SkillOrchestrationPanel() {
     selectedSkillId,
     goal,
     context,
+    selectedTaskId,
+    availableTaskList,
+    linkedTask,
     mode,
     liveStatus,
     runEvents,
@@ -65,6 +68,7 @@ export function SkillOrchestrationPanel() {
     setSelectedSkillId,
     setGoal,
     setContext,
+    setSelectedTaskId,
     setExecutorModeOverride,
     handleStartOrchestration,
     handleCancelRun,
@@ -143,9 +147,16 @@ export function SkillOrchestrationPanel() {
         <div>
           {/* Live meta bar */}
           <div className="flex items-baseline justify-between gap-2 mb-3 px-2.5 py-2 border border-[var(--border-card)] rounded-lg bg-purple/[0.04]">
-            <span className="text-[0.78rem] text-ink-muted overflow-hidden text-ellipsis whitespace-nowrap flex-1 italic">
-              {liveStatus?.goal ?? "…"}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-[0.78rem] text-ink-muted overflow-hidden text-ellipsis whitespace-nowrap italic">
+                {liveStatus?.goal ?? "…"}
+              </span>
+              {linkedTask ? (
+                <span className="block mt-0.5 text-[0.68rem] text-teal overflow-hidden text-ellipsis whitespace-nowrap">
+                  Task: {linkedTask.title} · {linkedTask.status}
+                </span>
+              ) : null}
+            </div>
             {!isTerminal && liveStatus && (
               <span className="text-[0.72rem] font-extrabold text-teal whitespace-nowrap tabular-nums">
                 {doneCount}/{totalCount}
@@ -258,6 +269,17 @@ export function SkillOrchestrationPanel() {
               disabled={isStartingOrchestration}
               className="w-full border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-ink bg-[var(--bg-input)] font-[inherit] text-[0.82rem] leading-[1.45] resize-y outline-none focus:border-purple placeholder:text-ink-faint"
             />
+            <select
+              aria-label="Linked task"
+              value={selectedTaskId}
+              onChange={(e) => setSelectedTaskId(e.target.value)}
+              disabled={isStartingOrchestration}
+            >
+              <option value="">No linked task</option>
+              {availableTaskList.map((task) => (
+                <option key={task.id} value={task.id}>{task.title} · {task.status}</option>
+              ))}
+            </select>
             <select
               aria-label="Orchestration executor override"
               value={executorModeOverride}

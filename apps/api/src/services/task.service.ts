@@ -17,6 +17,15 @@ export class TaskService {
     return [...this.records.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async getById(id: string): Promise<Task | null> {
+    if (this.storageMode === "mongo") {
+      const task = await TaskModel.findById(id);
+      return task ? toJsonRecord<Task>(task) : null;
+    }
+
+    return this.records.get(id) ?? null;
+  }
+
   async create(input: CreateTaskInput): Promise<Task> {
     if (this.storageMode === "mongo") {
       const task = await TaskModel.create({

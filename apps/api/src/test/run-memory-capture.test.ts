@@ -68,6 +68,21 @@ describe("run memory capture", () => {
     const captured = captureResponse.json<CaptureRunMemoryResponse>();
     expect(captured.wikiPath).toMatch(/^wiki\/synthesis\/run-.+review-memory-captured-from-test\.md$/);
     expect(captured.logPath).toContain("log.md");
+    expect(captured.run.memory).toMatchObject({
+      wikiPath: captured.wikiPath,
+      logPath: captured.logPath,
+      summary: "Review memory captured from test",
+    });
+
+    const repeatedCaptureResponse = await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/capture-memory`,
+      payload: {
+        summary: "Review memory captured from test",
+      },
+    });
+    expect(repeatedCaptureResponse.statusCode).toBe(201);
+    expect(repeatedCaptureResponse.json<CaptureRunMemoryResponse>().wikiPath).toBe(captured.wikiPath);
 
     const pageResponse = await server.inject({
       method: "GET",
@@ -90,7 +105,8 @@ describe("run memory capture", () => {
       method: "GET",
       url: "/wiki/log",
     });
-    expect(logResponse.json<WikiPageResponse>().content).toContain("Run memory captured");
+    const logContent = logResponse.json<WikiPageResponse>().content;
+    expect(logContent.match(/Run memory captured/g)).toHaveLength(1);
   });
 
   it("rejects memory capture for unfinished runs", async () => {
@@ -114,5 +130,34 @@ describe("run memory capture", () => {
 
     expect(captureResponse.statusCode).toBe(409);
     expect(captureResponse.json()).toEqual({ error: "Only completed runs can be captured as wiki memory." });
+  });
+
+  it("rejects memory capture until a completed run is approved", async () => {
+    const createResponse = await server.inject({
+      method: "POST",
+      url: "/runs",
+      payload: {
+        type: "manual",
+        status: "running",
+      },
+    });
+    const run = createResponse.json<Run>();
+    await server.inject({
+      method: "PATCH",
+      url: `/runs/${run.id}/complete`,
+      payload: {
+        summary: "Awaiting operator approval",
+        reviewStatus: "pending",
+      },
+    });
+
+    const captureResponse = await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/capture-memory`,
+      payload: { summary: "Too early" },
+    });
+
+    expect(captureResponse.statusCode).toBe(409);
+    expect(captureResponse.json()).toEqual({ error: "Only approved runs can be captured as wiki memory." });
   });
 });

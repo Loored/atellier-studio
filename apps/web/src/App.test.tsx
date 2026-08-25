@@ -316,15 +316,22 @@ describe("App", () => {
     });
     captureRunMemoryMock.mockResolvedValue({
       run: {
-        id: "run-2",
-        type: "review",
+        id: "run-3",
+        type: "build",
         status: "completed",
-        reviewStatus: "pending",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+        },
         logs: [],
         createdAt: "2026-05-04T00:00:00.000Z",
         updatedAt: "2026-05-04T00:00:00.000Z",
       },
-      wikiPath: "wiki/synthesis/run-run-2-review-memory-captured-from-dashboard.md",
+      wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
       logPath: "wiki/log.md",
     });
     retryRunMock.mockResolvedValue({
@@ -685,14 +692,16 @@ describe("App", () => {
 
     await user.click(await screen.findByRole("button", { name: "Review" }));
     const captureButtons = await screen.findAllByRole("button", { name: /capture memory/i });
-    await user.click(captureButtons[0]);
+    const enabledCaptureButton = captureButtons.find((button) => !(button as HTMLButtonElement).disabled);
+    expect(enabledCaptureButton).toBeDefined();
+    await user.click(enabledCaptureButton!);
 
     await waitFor(() => {
-      expect(captureRunMemoryMock).toHaveBeenCalledWith("run-2", {
+      expect(captureRunMemoryMock).toHaveBeenCalledWith("run-3", {
         summary: "Review memory captured from dashboard.",
       });
     });
-    expect(await screen.findByText(/Captured memory: wiki\/synthesis\/run-run-2-review-memory-captured-from-dashboard\.md/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Captured memory: wiki\/synthesis\/run-run-3-review-memory-captured-from-dashboard\.md/i)).toBeInTheDocument();
   });
 
   it("filters deliverables by type and review", async () => {
@@ -725,6 +734,7 @@ describe("App", () => {
 
     await user.type(scoped.getByLabelText("Orchestration goal"), "Build orchestration");
     await user.type(scoped.getByLabelText("Orchestration context"), "Use the existing run spine.");
+    await user.selectOptions(scoped.getByLabelText("Linked task"), "task-1");
     await user.click(scoped.getByRole("button", { name: /start/i }));
 
     await waitFor(() => {
@@ -732,6 +742,7 @@ describe("App", () => {
         skillId: "atellier-build-loop",
         goal: "Build orchestration",
         context: "Use the existing run spine.",
+        taskId: "task-1",
       });
     });
   });
@@ -751,6 +762,20 @@ describe("App", () => {
         title: "Client meeting notes",
         content: "Need to preserve raw sources first.",
         sourceType: "research",
+      });
+    });
+
+    await user.click(await screen.findByRole("button", { name: /create linked task/i }));
+    await waitFor(() => {
+      expect(createTaskMock).toHaveBeenCalledWith({
+        title: "Client meeting notes",
+        description: "Grounded in wiki/sources/2026-05-05-client-meeting-notes.md (raw: raw/ingest/2026-05-05-client-meeting-notes.md).",
+        status: "inbox",
+        priority: "medium",
+        sourceIds: [
+          "raw/ingest/2026-05-05-client-meeting-notes.md",
+          "wiki/sources/2026-05-05-client-meeting-notes.md",
+        ],
       });
     });
 

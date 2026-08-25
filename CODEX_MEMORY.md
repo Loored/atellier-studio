@@ -99,12 +99,20 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Daily-use operational loop**: validate source -> wiki -> task -> durable run -> deliverable/change -> QA -> review -> memory as one recoverable reference workflow.
-2. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
+1. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-24 - Daily-use operational loop
+
+- Wiki ingest can create a task whose `sourceIds` preserve both the immutable raw input and its Wiki summary.
+- Parent orchestrations persist `taskId`; every child step receives the task title, description, status, and verified source paths.
+- Task state advances `inbox -> active -> review -> done`; requested changes return it to `active` and completed tasks are not silently reopened.
+- Review shows Source, Task, Run, Deliverable, QA, Review, and Memory evidence together.
+- Run review updates and approved memory capture are idempotent. `Run.memory` persists the synthesis path, log path, summary, and timestamp.
+- Operator and recovery contract: `docs/daily-use-operational-loop.md`.
 
 ### 2026-08-24 - Controlled real Codex Worker adapter
 

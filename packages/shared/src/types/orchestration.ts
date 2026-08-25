@@ -77,6 +77,7 @@ export type OrchestrationStepStatusEntry = {
 
 export type OrchestrationStatusResult = {
   orchestrationRunId: string;
+  taskId?: string;
   skillId: OrchestrationSkillId;
   goal: string;
   status: RunStatus;

@@ -168,6 +168,7 @@ export function useCompleteRunApi(options: UseCompleteRunApiOptions = {}) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
         ]);
       },
@@ -198,6 +199,7 @@ export function useUpdateRunReviewApi(options: UseUpdateRunReviewApiOptions = {}
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
         ]);
       },
@@ -284,6 +286,7 @@ export function useCaptureRunMemoryApi(options: UseCaptureRunMemoryApiOptions = 
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page(result.wikiPath) }),

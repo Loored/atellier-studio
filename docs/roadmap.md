@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-08-24 — Durable local orchestration runtime v1 shipped in PR #36.
-**Active plan:** Stabilize the durable runtime in real local operation, then connect the approval-gated Codex Worker to a controlled real executor and validate the complete daily-use loop.
+**Last updated:** 2026-08-24 — Daily-use operational loop completed on `codex/daily-use-operational-loop`.
+**Active plan:** Extend approved review outcomes into curated role-memory and curation signals without silent writes.
 
 ## Strategic stance
 
@@ -125,7 +125,7 @@ Replace the fake Codex Worker executor only behind an explicit feature flag and 
 - ✅ keep real Codex/external calls out of automated tests
 - ✅ never enable dangerous bypass flags
 
-### P3 — Complete daily-use operational loop
+### P3 — Complete daily-use operational loop ✅ completed 2026-08-24
 
 Exercise one repeatable reference workflow end to end:
 
@@ -134,6 +134,8 @@ source/input -> wiki -> task -> durable run -> deliverable/change -> QA -> revie
 ```
 
 The milestone is complete when an interrupted run can recover, the operator can review the evidence, and approved reusable knowledge reaches the Wiki/role-memory surfaces without relying on chat history.
+
+Result: Wiki ingest now creates source-linked tasks; durable orchestrations retain and ground every step with that task; task status follows execution and review; Review shows the full chain; and approved memory capture is persisted and idempotent. See [`docs/daily-use-operational-loop.md`](daily-use-operational-loop.md).
 
 ### P4 — Review-to-memory learning loop
 
