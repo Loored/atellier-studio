@@ -11933,3 +11933,23 @@
 - tasks proposed: daily-use soak against the local Mongo worker and resolution of real curation signals before choosing another feature slice.
 - validation: monorepo typecheck/build passed; API 119/119 and web 24/24 passed with mock/local services only (3 opt-in Mongo tests skipped); read-only Wiki lint reported zero issues.
 - next: use the complete P3/P4 loop in real work, resolve signals, and record repeated friction.
+
+## [2026-08-24T21:15:00.000-06:00] ingest | Curation signal resolution implementation knowledge
+- Summary: Added explicit resolved/dismissed decisions for approved role-learning signals with required notes, durable role-memory history, exact lint closure, and open/resolved graph statistics.
+- Source: implementation, deterministic tests, and read-only visual validation on `codex/curation-signal-resolution`; no new immutable external raw source.
+- run: `atelier/runs/2026-08-24-curation-signal-resolution.md`
+- pages updated: `docs/review-memory-learning-loop.md`, `atelier/wiki/workflows/review-memory-learning-loop.md`, `atelier/wiki/index.md`, `atelier/tasks/active.md`, `README.md`, `CODEX_MEMORY.md`, `docs/roadmap.md`.
+- contradictions: none found; resolution remains a separate operator decision and never edits the signaled target page.
+- live evidence: the real `stale` signal remained open during read-only QA; the operator then dismissed it with the note `missing expected pages`, and Review confirmed `wiki/role-memory/wiki-curator.md`.
+- validation: monorepo typecheck/build passed; API 120/120 and web 25/25 passed (3 opt-in Mongo tests skipped); browser console clean.
+- next: continue the daily-use soak and record repeated operator friction before expanding scope; subsequent Wiki lint runs reported no issues.
+
+## [2026-08-25T21:59:05.000Z] ingest | Local Dev Launcher v1 operational knowledge
+- Summary: Converted repeated local startup friction into one safe launcher for Mongo, API, the durable worker, and fixed-port web development.
+- Source: implementation and isolated localhost validation on `codex/local-dev-launcher`; no new immutable external raw source.
+- run: `atelier/runs/2026-08-25-local-dev-launcher.md`
+- pages updated: `README.md`, `docs/operations/local-setup.md`, `docs/roadmap.md`, `atelier/tasks/active.md`, `atelier/wiki/index.md`, `CODEX_MEMORY.md`.
+- contradictions: replaced ambiguous `pnpm dev` guidance with an explicit distinction between the recommended full launcher and manual all-workspace development.
+- validation: 6/6 launcher tests, frozen install, and direct Shared/API/Web/MCP builds passed; isolated Mongo/API/worker/web readiness passed; Dashboard rendered with a clean console; launcher-owned ports closed after graceful shutdown; the pre-existing API remained healthy after occupied-port detection.
+- tasks proposed: continue the daily-use P3/P4 soak using the launcher and record only repeated friction before selecting another bounded slice.
+- next: run the first meaningful source-to-memory workflow against the standard local Mongo session.

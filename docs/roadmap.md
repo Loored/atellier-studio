@@ -149,6 +149,10 @@ Close the feedback loop without deleting history or silently editing the signale
 
 Result: Review now resolves or dismisses an open learning signal with a required operator note. The decision is appended to role-memory Markdown, persisted on the run, logged in the Wiki, removed from active lint, and reflected in total/open/resolved role statistics. Exact retries are idempotent and conflicting replacements fail closed.
 
+### P4.c — Local Dev Launcher v1 ✅ completed 2026-08-25
+
+Resolve the repeated startup friction without introducing broader infrastructure. `./scripts/dev-local` now validates Node, pinned pnpm access, dependencies, ports, Docker/Compose, and Mongo; starts API, durable worker, and web on deterministic loopback URLs; waits for health; and shuts down only its own processes. It does not install packages, kill port owners, stop Mongo, or enable cloud/runtime authority.
+
 ### Next — Daily-use soak and learning feedback
 
 - Run the P3/P4 flow against the local Mongo worker during real personal/project work.
