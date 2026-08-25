@@ -14,9 +14,12 @@ import {
 import {
   AGENT_ROLES,
   REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_OUTCOMES,
   REVIEW_LEARNING_SIGNALS,
   RUN_REVIEW_STATUSES,
   type AgentRole,
+  type ReviewLearningResolutionOutcome,
   type ReviewLearningSignal,
   type Run,
   type Task,
@@ -53,8 +56,10 @@ export function ReviewView() {
     isUnlinkingRunDeliverable,
     isCapturingRunMemory,
     isCuratingRunLearning,
+    isResolvingRunLearningSignal,
     capturedMemoryPath,
     capturedRoleMemoryPath,
+    resolvedRoleMemoryPath,
     isAppendingRunLog,
     isCompletingRun,
     setAgentFilter,
@@ -70,6 +75,9 @@ export function ReviewView() {
     curateRunLearning,
     getRunLearningDraft,
     setRunLearningDraft,
+    getRunLearningResolutionDraft,
+    setRunLearningResolutionDraft,
+    resolveRunLearningSignal,
   } = useRunsTimeline();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -226,6 +234,12 @@ export function ReviewView() {
           </p>
         ) : null}
 
+        {resolvedRoleMemoryPath ? (
+          <p className="mb-4 m-0 border border-teal/25 rounded-lg px-2.5 py-2 text-[0.74rem] text-teal bg-teal/10 overflow-wrap-anywhere">
+            Resolved role signal: {resolvedRoleMemoryPath}
+          </p>
+        ) : null}
+
         {/* Tabs */}
         <div className="review-tabs">
           {TABS.map(({ id, label }) => (
@@ -269,6 +283,7 @@ export function ReviewView() {
             const validationHasIssues = Boolean(validation && !validation.passed);
             const linkedTask = run.taskId ? taskList.find((task) => task.id === run.taskId) : undefined;
             const learningDraft = getRunLearningDraft(run);
+            const resolutionDraft = getRunLearningResolutionDraft(run.id);
 
             return (
               <div
@@ -496,11 +511,49 @@ export function ReviewView() {
                 ) : null}
 
                 {run.memory?.learning ? (
-                  <div className="mt-2 ml-6 text-[0.68rem] text-purple overflow-wrap-anywhere">
-                    Role learning: {run.memory.learning.role} · {run.memory.learning.roleMemoryPath}
-                    {run.memory.learning.signal
-                      ? ` · ${run.memory.learning.signal}: ${run.memory.learning.signalPath}`
-                      : ""}
+                  <div className="mt-2 ml-6 border border-purple/15 rounded-lg p-2.5 bg-purple/[0.03] text-[0.68rem] text-purple overflow-wrap-anywhere">
+                    <p className="m-0">
+                      Role learning: {run.memory.learning.role} · {run.memory.learning.roleMemoryPath}
+                      {run.memory.learning.signal
+                        ? ` · ${run.memory.learning.signal}: ${run.memory.learning.signalPath}`
+                        : ""}
+                    </p>
+                    {run.memory.learning.resolution ? (
+                      <p className="mt-1 mb-0 text-teal">
+                        Signal {run.memory.learning.resolution.outcome}: {run.memory.learning.resolution.note}
+                      </p>
+                    ) : run.memory.learning.signal ? (
+                      <div className="mt-2 grid grid-cols-[minmax(120px,0.3fr)_1fr_auto] gap-2">
+                        <select
+                          aria-label={`Signal resolution outcome for ${run.id}`}
+                          value={resolutionDraft.outcome}
+                          onChange={(event) => setRunLearningResolutionDraft(run.id, {
+                            outcome: event.target.value as ReviewLearningResolutionOutcome,
+                          })}
+                          disabled={isResolvingRunLearningSignal}
+                        >
+                          {REVIEW_LEARNING_RESOLUTION_OUTCOMES.map((outcome) => (
+                            <option key={outcome} value={outcome}>{outcome}</option>
+                          ))}
+                        </select>
+                        <input
+                          aria-label={`Signal resolution note for ${run.id}`}
+                          value={resolutionDraft.note}
+                          maxLength={REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH}
+                          placeholder="Record why this signal can be closed…"
+                          onChange={(event) => setRunLearningResolutionDraft(run.id, { note: event.target.value })}
+                          disabled={isResolvingRunLearningSignal}
+                        />
+                        <button
+                          type="button"
+                          className="h-8 px-2.5 text-[0.72rem] border-teal/35 text-teal bg-teal/10 hover:bg-teal/20"
+                          onClick={() => resolveRunLearningSignal(run.id)}
+                          disabled={isResolvingRunLearningSignal || !resolutionDraft.note.trim()}
+                        >
+                          {isResolvingRunLearningSignal ? "Resolving..." : "Resolve signal"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -533,6 +586,13 @@ function DailyLoopChain({ run, task }: { run: Run; task: Task }) {
       label: "Learning",
       value: run.memory?.learning ? run.memory.learning.role : "pending",
       complete: Boolean(run.memory?.learning),
+    },
+    {
+      label: "Signal",
+      value: run.memory?.learning?.signal
+        ? run.memory.learning.resolution?.outcome ?? "open"
+        : "none",
+      complete: !run.memory?.learning?.signal || Boolean(run.memory.learning.resolution),
     },
   ];
 

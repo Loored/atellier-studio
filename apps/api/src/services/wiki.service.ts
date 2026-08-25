@@ -2,7 +2,9 @@ import { mkdir, readFile, writeFile, appendFile, readdir, stat, rm } from "node:
 import path from "node:path";
 import {
   AGENT_ROLES,
+  REVIEW_LEARNING_RESOLUTION_OUTCOMES,
   REVIEW_LEARNING_SIGNALS,
+  type AgentRole,
   type AppendWikiLogInput,
   type AppendWikiLogResponse,
   type WikiIngestInput,
@@ -16,11 +18,12 @@ import {
   type WikiQueryResponse,
   type WikiRelatedPage,
   type ReviewLearningRecord,
+  type ReviewLearningSignalResolution,
   type WikiDreamDecisionRecord,
   type WikiDreamDecisionRecordInput,
 } from "@atellier/shared";
 
-type AppendRoleLearningInput = Omit<ReviewLearningRecord, "roleMemoryPath" | "logPath">;
+type AppendRoleLearningInput = Omit<ReviewLearningRecord, "roleMemoryPath" | "logPath" | "resolution">;
 
 const DEFAULT_INDEX = `# Atellier Studio Wiki Index
 
@@ -200,6 +203,42 @@ export class WikiService {
     };
   }
 
+  async appendRoleLearningResolution(
+    role: AgentRole,
+    input: ReviewLearningSignalResolution,
+  ): Promise<WikiPageResponse> {
+    await this.ensureWiki();
+    const roleMemoryPath = `wiki/role-memory/${role}.md`;
+    const { resolved } = this.resolveAtelierPath(roleMemoryPath);
+    await readFile(resolved, "utf8");
+
+    const machineRecord = Buffer.from(JSON.stringify(input), "utf8").toString("base64url");
+    const entry = [
+      `## [${input.resolvedAt}] Signal resolution for run ${input.runId}`,
+      "",
+      `- Run ID: ${input.runId}`,
+      `- Signal: ${input.signal}`,
+      `- Signal path: ${input.signalPath}`,
+      `- Outcome: ${input.outcome}`,
+      "",
+      "### Resolution note",
+      "",
+      input.note,
+      "",
+      `<!-- atellier-review-learning-resolution ${machineRecord} -->`,
+      "",
+    ].join("\n");
+    await appendFile(resolved, entry, "utf8");
+    const content = await readFile(resolved, "utf8");
+    await this.upsertWikiIndexEntry(roleMemoryPath, content);
+
+    return {
+      path: roleMemoryPath,
+      content,
+      ready: true,
+    };
+  }
+
   async listReviewLearnings(): Promise<ReviewLearningRecord[]> {
     await this.ensureWiki();
     const roleMemoryRoot = path.join(this.wikiRoot, "role-memory");
@@ -217,6 +256,8 @@ export class WikiService {
     for (const filePath of files) {
       const content = await readFile(filePath, "utf8");
       const roleMemoryPath = this.toRelativeAtelierPath(filePath);
+      const fileLearnings: ReviewLearningRecord[] = [];
+      const resolutions = new Map<string, ReviewLearningSignalResolution>();
       for (const match of content.matchAll(/<!-- atellier-review-learning ([a-zA-Z0-9_-]+) -->/g)) {
         try {
           const parsed = JSON.parse(
@@ -237,7 +278,7 @@ export class WikiService {
           )
             ? parsed.signal as (typeof REVIEW_LEARNING_SIGNALS)[number]
             : undefined;
-          learnings.push({
+          fileLearnings.push({
             runId: parsed.runId,
             taskId: typeof parsed.taskId === "string" ? parsed.taskId : undefined,
             role: parsed.role as (typeof AGENT_ROLES)[number],
@@ -253,6 +294,54 @@ export class WikiService {
           // Keep malformed manual edits inspectable without breaking the read model.
         }
       }
+      for (const match of content.matchAll(/<!-- atellier-review-learning-resolution ([a-zA-Z0-9_-]+) -->/g)) {
+        try {
+          const parsed = JSON.parse(
+            Buffer.from(match[1] ?? "", "base64url").toString("utf8"),
+          ) as Partial<ReviewLearningSignalResolution>;
+          if (
+            typeof parsed.runId !== "string" ||
+            typeof parsed.outcome !== "string" ||
+            !REVIEW_LEARNING_RESOLUTION_OUTCOMES.includes(
+              parsed.outcome as (typeof REVIEW_LEARNING_RESOLUTION_OUTCOMES)[number],
+            ) ||
+            typeof parsed.note !== "string" ||
+            typeof parsed.signal !== "string" ||
+            !REVIEW_LEARNING_SIGNALS.includes(parsed.signal as (typeof REVIEW_LEARNING_SIGNALS)[number]) ||
+            typeof parsed.signalPath !== "string" ||
+            typeof parsed.logPath !== "string" ||
+            typeof parsed.resolvedAt !== "string"
+          ) {
+            continue;
+          }
+          resolutions.set(parsed.runId, {
+            runId: parsed.runId,
+            outcome: parsed.outcome as (typeof REVIEW_LEARNING_RESOLUTION_OUTCOMES)[number],
+            note: parsed.note,
+            signal: parsed.signal as (typeof REVIEW_LEARNING_SIGNALS)[number],
+            signalPath: parsed.signalPath,
+            logPath: parsed.logPath,
+            resolvedAt: parsed.resolvedAt,
+          });
+        } catch {
+          // Keep malformed manual edits inspectable without breaking the read model.
+        }
+      }
+      learnings.push(
+        ...fileLearnings.map((learning) => {
+          const resolution = resolutions.get(learning.runId);
+          const matchingResolution =
+            resolution &&
+            resolution.signal === learning.signal &&
+            resolution.signalPath === learning.signalPath
+              ? resolution
+              : undefined;
+          return {
+            ...learning,
+            resolution: matchingResolution,
+          };
+        }),
+      );
     }
 
     return learnings.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
@@ -576,7 +665,7 @@ export class WikiService {
     }
 
     const reviewLearningSignals = (await this.listReviewLearnings()).filter(
-      (learning) => learning.signal && learning.signalPath,
+      (learning) => learning.signal && learning.signalPath && !learning.resolution,
     );
     for (const learning of reviewLearningSignals) {
       addIssue({

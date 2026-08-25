@@ -277,7 +277,8 @@ export function KnowledgeInspector({
                   Failed: {selectedRoleMemory.stats.failed} · Pending review: {selectedRoleMemory.stats.pendingReview}
                 </p>
                 <p className="mt-1 text-ink-muted">
-                  Curated learnings: {selectedRoleMemory.stats.curatedLearnings} · Curation signals: {selectedRoleMemory.stats.curationSignals}
+                  Curated learnings: {selectedRoleMemory.stats.curatedLearnings} · Signals: {selectedRoleMemory.stats.curationSignals}
+                  {" "}· Open: {selectedRoleMemory.stats.openCurationSignals} · Resolved: {selectedRoleMemory.stats.resolvedCurationSignals}
                 </p>
                 {selectedRoleMemory.focus.length > 0 && (
                   <div className="mt-2">
@@ -321,6 +322,9 @@ export function KnowledgeInspector({
                         <li key={`${learning.runId}-${learning.capturedAt}`}>
                           {learning.lesson}
                           {learning.signal ? ` · ${learning.signal}: ${learning.signalPath}` : ""}
+                          {learning.resolution
+                            ? ` · ${learning.resolution.outcome}: ${learning.resolution.note}`
+                            : ""}
                         </li>
                       ))}
                     </ul>

@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import {
   AGENT_ROLES,
   REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_OUTCOMES,
   REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH,
   REVIEW_LEARNING_SIGNALS,
   RUN_LOG_LEVELS,
@@ -14,6 +16,7 @@ import {
   type CompleteRunInput,
   type CurateRunLearningInput,
   type CreateRunInput,
+  type ResolveRunLearningSignalInput,
   type RunStatus,
   type UpdateRunReviewInput,
 } from "@atellier/shared";
@@ -359,6 +362,41 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
       return result ? reply.code(201).send(result) : notFound(reply, "Run not found.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to curate role learning.";
+      return reply.code(409).send({ error: message });
+    }
+  });
+
+  fastify.post("/runs/:id/resolve-learning-signal", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+    const outcome = stringField(body, "outcome");
+    if (!outcome || !isOneOf(outcome, REVIEW_LEARNING_RESOLUTION_OUTCOMES)) {
+      return badRequest(reply, "Role learning signal resolution outcome is invalid.");
+    }
+    const note = stringField(body, "note");
+    if (!note) {
+      return badRequest(reply, "Role learning signal resolution note is required.");
+    }
+    if (note.length > REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH) {
+      return badRequest(
+        reply,
+        `Role learning signal resolution note must be ${REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH} characters or fewer.`,
+      );
+    }
+
+    const input: ResolveRunLearningSignalInput = { outcome, note };
+    try {
+      const result = await services.runs.resolveLearningSignal(id, input);
+      return result ? reply.code(201).send(result) : notFound(reply, "Run not found.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to resolve role learning signal.";
       return reply.code(409).send({ error: message });
     }
   });

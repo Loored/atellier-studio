@@ -75,6 +75,8 @@ describe("KnowledgeInspector", () => {
               pendingReview: 0,
               curatedLearnings: 1,
               curationSignals: 1,
+              openCurationSignals: 0,
+              resolvedCurationSignals: 1,
             },
             focus: [],
             blockers: [],
@@ -90,6 +92,15 @@ describe("KnowledgeInspector", () => {
                 signal: "stale",
                 signalPath: "wiki/deliverables/run-3.md",
                 capturedAt: "2026-05-16T00:00:00.000Z",
+                resolution: {
+                  runId: "run-3",
+                  outcome: "resolved",
+                  note: "The page now reflects the approved validation rule.",
+                  signal: "stale",
+                  signalPath: "wiki/deliverables/run-3.md",
+                  logPath: "wiki/log.md",
+                  resolvedAt: "2026-05-16T00:05:00.000Z",
+                },
               },
             ],
           },
@@ -117,9 +128,9 @@ describe("KnowledgeInspector", () => {
       />,
     );
 
-    expect(screen.getByText(/Curated learnings: 1 · Curation signals: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Curated learnings: 1 · Signals: 1 · Open: 0 · Resolved: 1/)).toBeInTheDocument();
     expect(screen.getByText(/Preserve validation evidence for approved deliverables/)).toHaveTextContent(
-      "stale: wiki/deliverables/run-3.md",
+      "resolved: The page now reflects the approved validation rule.",
     );
   });
 });

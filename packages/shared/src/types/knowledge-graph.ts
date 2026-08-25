@@ -180,6 +180,8 @@ export type RoleMemoryEntry = {
     pendingReview: number;
     curatedLearnings: number;
     curationSignals: number;
+    openCurationSignals: number;
+    resolvedCurationSignals: number;
   };
   recentRuns: RoleMemoryRunSummary[];
   blockers: string[];

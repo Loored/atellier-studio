@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
   CurateRunLearningResponse,
   KnowledgeGraphResponse,
+  ResolveRunLearningSignalResponse,
   RoleMemoryResponse,
   Run,
   WikiLintResponse,
@@ -148,6 +149,14 @@ describe("review-to-memory learning", () => {
       url: `/runs/${run.id}/capture-memory`,
       payload: { summary: "Approved QA memory" },
     });
+    const beforeSignal = await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/resolve-learning-signal`,
+      payload: { outcome: "resolved", note: "Nothing to resolve yet." },
+    });
+    expect(beforeSignal.statusCode).toBe(409);
+    expect(beforeSignal.json()).toEqual({ error: "Run does not have an open role learning signal." });
+
     const missingTarget = await server.inject({
       method: "POST",
       url: `/runs/${run.id}/curate-learning`,
@@ -162,6 +171,109 @@ describe("review-to-memory learning", () => {
     expect(missingTarget.json()).toEqual({
       error: "Role learning signal path must reference an existing Wiki page.",
     });
+  });
+
+  it("resolves a learning signal durably and removes it from active lint", async () => {
+    const targetPath = "wiki/notes/resolved-target.md";
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: targetPath, content: "# Resolved Target\n\nReviewed by the operator." },
+    });
+    const run = await createApprovedRun(server);
+    await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/capture-memory`,
+      payload: { summary: "Approved resolution memory" },
+    });
+    await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/curate-learning`,
+      payload: {
+        role: "qa",
+        lesson: "Close quality signals only after recording an operator decision.",
+        signal: "needs-review",
+        signalPath: targetPath,
+      },
+    });
+
+    const openRoleMemory = await server.inject({ method: "GET", url: "/knowledge/role-memory" });
+    expect(
+      openRoleMemory.json<RoleMemoryResponse>().roles.find((entry) => entry.role === "qa")?.stats,
+    ).toMatchObject({ curationSignals: 1, openCurationSignals: 1, resolvedCurationSignals: 0 });
+
+    const resolutionPayload = {
+      outcome: "resolved",
+      note: "The target was reviewed and already reflects the approved operating rule.",
+    };
+    const resolveResponse = await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/resolve-learning-signal`,
+      payload: resolutionPayload,
+    });
+    expect(resolveResponse.statusCode).toBe(201);
+    const resolved = resolveResponse.json<ResolveRunLearningSignalResponse>();
+    expect(resolved.run.memory?.learning?.resolution).toMatchObject({
+      runId: run.id,
+      signal: "needs-review",
+      signalPath: targetPath,
+      ...resolutionPayload,
+    });
+
+    const repeatedResponse = await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/resolve-learning-signal`,
+      payload: resolutionPayload,
+    });
+    expect(repeatedResponse.statusCode).toBe(201);
+
+    const conflictingResponse = await server.inject({
+      method: "POST",
+      url: `/runs/${run.id}/resolve-learning-signal`,
+      payload: { outcome: "dismissed", note: "A conflicting resolution." },
+    });
+    expect(conflictingResponse.statusCode).toBe(409);
+    expect(conflictingResponse.json()).toEqual({
+      error: "Run learning signal already has a different resolution.",
+    });
+
+    const rolePageResponse = await server.inject({
+      method: "GET",
+      url: `/wiki/page?path=${encodeURIComponent(resolved.roleMemoryPath)}`,
+    });
+    const rolePage = rolePageResponse.json<WikiPageResponse>().content;
+    expect(rolePage).toContain("Signal resolution for run");
+    expect(rolePage).toContain(resolutionPayload.note);
+    expect(rolePage.match(/atellier-review-learning-resolution/g)).toHaveLength(1);
+
+    const roleMemoryResponse = await server.inject({ method: "GET", url: "/knowledge/role-memory" });
+    const qaMemory = roleMemoryResponse
+      .json<RoleMemoryResponse>()
+      .roles.find((entry) => entry.role === "qa");
+    expect(qaMemory?.stats).toMatchObject({
+      curationSignals: 1,
+      openCurationSignals: 0,
+      resolvedCurationSignals: 1,
+    });
+    expect(qaMemory?.learnings[0]?.resolution).toMatchObject(resolutionPayload);
+    expect(qaMemory?.focus.join(" ")).not.toContain("approved curation signal");
+
+    const lintResponse = await server.inject({ method: "POST", url: "/wiki/lint", payload: {} });
+    expect(
+      lintResponse
+        .json<WikiLintResponse>()
+        .issues.some((issue) => issue.code === "curation_signal" && issue.path === targetPath),
+    ).toBe(false);
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(
+      graphResponse
+        .json<KnowledgeGraphResponse>()
+        .nodes.some((node) => node.id === `lint:curation_signal:${targetPath}`),
+    ).toBe(false);
+
+    const logResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    expect(logResponse.json<WikiPageResponse>().content.match(/Review learning signal resolved/g)).toHaveLength(1);
   });
 });
 

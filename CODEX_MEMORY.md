@@ -113,6 +113,14 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 - Exact retries reuse the irreversible effect `run-learning:<runId>`; different second content is rejected.
 - Operator and recovery contract: `docs/review-memory-learning-loop.md`.
 
+### 2026-08-24 - Curation signal resolution
+
+- Review can resolve or dismiss an open role-learning signal only with a human decision note.
+- Resolution appends to the existing role-memory Markdown, persists under `Run.memory.learning.resolution`, and records a Wiki decision log.
+- Wiki lint suppresses only an exact signal/path match with durable resolution; Knowledge Graph keeps total, open, and resolved signal counts.
+- Exact retries reuse `run-learning-resolution:<runId>`; conflicting second resolutions fail closed.
+- Live Mongo validation passed: the operator dismissed a real `stale` signal, Review confirmed the role-memory path, and subsequent Wiki lint runs reported no issues.
+
 ### 2026-08-24 - Daily-use operational loop
 
 - Wiki ingest can create a task whose `sourceIds` preserve both the immutable raw input and its Wiki summary.
