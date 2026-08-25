@@ -4,6 +4,8 @@ import type {
   CaptureRunMemoryInput,
   CaptureRunMemoryResponse,
   CompleteRunInput,
+  CurateRunLearningInput,
+  CurateRunLearningResponse,
   CreateRunInput,
   Run,
   UpdateRunReviewInput,
@@ -290,6 +292,44 @@ export function useCaptureRunMemoryApi(options: UseCaptureRunMemoryApiOptions = 
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page(result.wikiPath) }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type CurateRunLearningVariables = {
+  runId: string;
+  input: CurateRunLearningInput;
+};
+
+export type UseCurateRunLearningApiOptions = UseMutationOptions<
+  CurateRunLearningResponse,
+  Error,
+  CurateRunLearningVariables
+>;
+
+export function useCurateRunLearningApi(options: UseCurateRunLearningApiOptions = {}) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+
+  return useMutationInstance<CurateRunLearningResponse, Error, CurateRunLearningVariables>(
+    {
+      mutationFn: ({ runId, input }) => runsService.curateLearning(runId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (result) => {
+        notifySuccess("Approved learning curated");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(result.run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.roleMemory }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.graph }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.page(result.roleMemoryPath) }),
         ]);
       },
       onError: (error) => notifyError(error),

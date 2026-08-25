@@ -3,6 +3,8 @@ import type {
   CaptureRunMemoryInput,
   CaptureRunMemoryResponse,
   CompleteRunInput,
+  CurateRunLearningInput,
+  CurateRunLearningResponse,
   CreateRunInput,
   ListRunsInput,
   Run,
@@ -77,6 +79,11 @@ export const runsService = {
 
   async captureMemory(runId: string, input: CaptureRunMemoryInput = {}): Promise<CaptureRunMemoryResponse> {
     const response = await httpClient.post<CaptureRunMemoryResponse>(`/runs/${runId}/capture-memory`, input);
+    return response.data;
+  },
+
+  async curateLearning(runId: string, input: CurateRunLearningInput): Promise<CurateRunLearningResponse> {
+    const response = await httpClient.post<CurateRunLearningResponse>(`/runs/${runId}/curate-learning`, input);
     return response.data;
   },
 };

@@ -1,5 +1,11 @@
 import { type FormEvent, useState } from "react";
-import type { RunReviewStatus } from "@atellier/shared";
+import type {
+  AgentRole,
+  CurateRunLearningInput,
+  ReviewLearningSignal,
+  Run,
+  RunReviewStatus,
+} from "@atellier/shared";
 import { useAgentsApi } from "../../../api/hooks/agents/useAgentsApi";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import { useTasksApi } from "../../../api/hooks/tasks/useTasksApi";
@@ -8,12 +14,20 @@ import {
   useCaptureRunMemoryApi,
   useCompleteRunApi,
   useCreateRunApi,
+  useCurateRunLearningApi,
   usePromoteRunDeliverableApi,
   useRetryRunApi,
   useRunsApi,
   useUnlinkRunDeliverableApi,
   useUpdateRunReviewApi,
 } from "../../../api/hooks/runs/useRunsApi";
+
+type RunLearningDraft = {
+  role: AgentRole;
+  lesson: string;
+  signal: ReviewLearningSignal | "";
+  signalPath: string;
+};
 
 export function useRunsTimeline() {
   const {
@@ -31,11 +45,13 @@ export function useRunsTimeline() {
   const promoteRunDeliverable = usePromoteRunDeliverableApi();
   const unlinkRunDeliverable = useUnlinkRunDeliverableApi();
   const captureRunMemory = useCaptureRunMemoryApi();
+  const curateRunLearning = useCurateRunLearningApi();
   const retryRun = useRetryRunApi();
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [runLearningDrafts, setRunLearningDrafts] = useState<Record<string, Partial<RunLearningDraft>>>({});
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
@@ -124,6 +140,54 @@ export function useRunsTimeline() {
     });
   }
 
+  function getRunLearningDraft(run: Run): RunLearningDraft {
+    const relatedAgent = run.agentId ? agentList.find((agent) => agent.id === run.agentId) : undefined;
+    const stepRoles = ((run.output as { steps?: Array<{ agentRole?: AgentRole }> } | undefined)?.steps ?? [])
+      .map((step) => step.agentRole)
+      .filter((role): role is AgentRole => Boolean(role));
+    const role = relatedAgent?.role
+      ?? (stepRoles.includes("builder") ? "builder" : stepRoles.at(-1))
+      ?? (run.type === "review" ? "qa" : "builder");
+    const goal = (run.output as { goal?: unknown } | undefined)?.goal
+      ?? (run.input as { goal?: unknown } | undefined)?.goal;
+    const lesson = typeof goal === "string" && goal.trim()
+      ? `Approved outcome: ${goal.trim()}`
+      : `Approved ${run.type} run ${run.id}.`;
+    const defaults: RunLearningDraft = {
+      role,
+      lesson,
+      signal: "",
+      signalPath: run.deliverablePath ?? run.memory?.wikiPath ?? "",
+    };
+    return { ...defaults, ...(runLearningDrafts[run.id] ?? {}) };
+  }
+
+  function setRunLearningDraft(runId: string, patch: Partial<RunLearningDraft>) {
+    setRunLearningDrafts((current) => ({
+      ...current,
+      [runId]: { ...(current[runId] ?? {}), ...patch },
+    }));
+  }
+
+  function handleCurateRunLearning(run: Run) {
+    const draft = getRunLearningDraft(run);
+    const lesson = draft.lesson.trim();
+    if (!lesson) {
+      return;
+    }
+    const input: CurateRunLearningInput = {
+      role: draft.role,
+      lesson,
+      ...(draft.signal
+        ? {
+            signal: draft.signal,
+            signalPath: draft.signalPath.trim(),
+          }
+        : {}),
+    };
+    curateRunLearning.mutate({ runId: run.id, input });
+  }
+
   return {
     runList,
     filteredRunList,
@@ -146,8 +210,12 @@ export function useRunsTimeline() {
     isPromotingRunDeliverable: promoteRunDeliverable.isPending,
     isUnlinkingRunDeliverable: unlinkRunDeliverable.isPending,
     isCapturingRunMemory: captureRunMemory.isPending,
+    isCuratingRunLearning: curateRunLearning.isPending,
     isRetryingRun: retryRun.isPending,
     capturedMemoryPath: captureRunMemory.data?.wikiPath ?? null,
+    capturedRoleMemoryPath: curateRunLearning.data?.roleMemoryPath ?? null,
+    getRunLearningDraft,
+    setRunLearningDraft,
     setRunLogMessage,
     setAgentFilter,
     setReviewFilter,
@@ -199,5 +267,6 @@ export function useRunsTimeline() {
           summary: "Review memory captured from dashboard.",
         },
       }),
+    curateRunLearning: handleCurateRunLearning,
   };
 }
