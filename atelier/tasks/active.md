@@ -110,3 +110,10 @@ Tasks currently in progress.
   - [x] Surface contradiction, stale, and needs-review signals in Wiki lint and Knowledge Graph.
   - [x] Make exact retries idempotent and reject conflicting replacements.
   - [x] Document the operator and recovery contract.
+
+- [x] Curation signal resolution
+  - [x] Require an explicit resolved/dismissed outcome and operator note.
+  - [x] Persist resolution in role-memory Markdown and structured run metadata.
+  - [x] Remove only exact resolved signals from active Wiki lint.
+  - [x] Show total, open, and resolved signal counts in role memory.
+  - [x] Preserve idempotency and reject conflicting second resolutions.

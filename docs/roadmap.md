@@ -143,10 +143,16 @@ Make approved review outcomes feed curated role memory and contradiction/stalene
 
 Result: completed and approved runs with captured memory can promote one explicit lesson into durable `wiki/role-memory/<role>.md`. Optional contradiction, stale, and needs-review signals surface through Wiki lint and Knowledge Graph without changing the target page. Exact retries are idempotent and conflicting replacements are rejected. See [`docs/review-memory-learning-loop.md`](review-memory-learning-loop.md).
 
+### P4.b — Curation signal resolution ✅ completed 2026-08-24
+
+Close the feedback loop without deleting history or silently editing the signaled page.
+
+Result: Review now resolves or dismisses an open learning signal with a required operator note. The decision is appended to role-memory Markdown, persisted on the run, logged in the Wiki, removed from active lint, and reflected in total/open/resolved role statistics. Exact retries are idempotent and conflicting replacements fail closed.
+
 ### Next — Daily-use soak and learning feedback
 
 - Run the P3/P4 flow against the local Mongo worker during real personal/project work.
-- Resolve captured curation signals through the existing Wiki/Dream review surfaces.
+- Resolve captured curation signals explicitly from Review and verify the target-page decision remains useful over time.
 - Record repeated friction and only then select the next bounded feature slice.
 
 ## Later — Tailwind / Pixel polish
