@@ -276,6 +276,9 @@ export function KnowledgeInspector({
                   Completed: {selectedRoleMemory.stats.completed} · Blocked: {selectedRoleMemory.stats.blocked} ·
                   Failed: {selectedRoleMemory.stats.failed} · Pending review: {selectedRoleMemory.stats.pendingReview}
                 </p>
+                <p className="mt-1 text-ink-muted">
+                  Curated learnings: {selectedRoleMemory.stats.curatedLearnings} · Curation signals: {selectedRoleMemory.stats.curationSignals}
+                </p>
                 {selectedRoleMemory.focus.length > 0 && (
                   <div className="mt-2">
                     <p className="text-ink-faint">Focus</p>
@@ -305,6 +308,19 @@ export function KnowledgeInspector({
                           {run.type} · {run.status}
                           {run.reviewStatus ? ` · ${run.reviewStatus}` : ""} ·{" "}
                           {new Date(run.updatedAt).toLocaleString()}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedRoleMemory.learnings.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-ink-faint">Approved learnings</p>
+                    <ul className="mt-1 space-y-1 text-ink-muted">
+                      {selectedRoleMemory.learnings.map((learning) => (
+                        <li key={`${learning.runId}-${learning.capturedAt}`}>
+                          {learning.lesson}
+                          {learning.signal ? ` · ${learning.signal}: ${learning.signalPath}` : ""}
                         </li>
                       ))}
                     </ul>

@@ -11,7 +11,16 @@ import {
   ShieldCheck,
   TimerReset,
 } from "lucide-react";
-import { RUN_REVIEW_STATUSES, type Run, type Task } from "@atellier/shared";
+import {
+  AGENT_ROLES,
+  REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_SIGNALS,
+  RUN_REVIEW_STATUSES,
+  type AgentRole,
+  type ReviewLearningSignal,
+  type Run,
+  type Task,
+} from "@atellier/shared";
 import { ValidationSummary } from "../../components/ValidationSummary";
 import { useRunsTimeline } from "../runs/hooks/useRunsTimeline";
 import { WikiPanel } from "../wiki/components/WikiPanel";
@@ -43,7 +52,9 @@ export function ReviewView() {
     isPromotingRunDeliverable,
     isUnlinkingRunDeliverable,
     isCapturingRunMemory,
+    isCuratingRunLearning,
     capturedMemoryPath,
+    capturedRoleMemoryPath,
     isAppendingRunLog,
     isCompletingRun,
     setAgentFilter,
@@ -56,6 +67,9 @@ export function ReviewView() {
     promoteRunDeliverable,
     unlinkRunDeliverable,
     captureRunMemory,
+    curateRunLearning,
+    getRunLearningDraft,
+    setRunLearningDraft,
   } = useRunsTimeline();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -206,6 +220,12 @@ export function ReviewView() {
           </p>
         ) : null}
 
+        {capturedRoleMemoryPath ? (
+          <p className="mb-4 m-0 border border-purple/25 rounded-lg px-2.5 py-2 text-[0.74rem] text-purple bg-purple/10 overflow-wrap-anywhere">
+            Curated role memory: {capturedRoleMemoryPath}
+          </p>
+        ) : null}
+
         {/* Tabs */}
         <div className="review-tabs">
           {TABS.map(({ id, label }) => (
@@ -248,6 +268,7 @@ export function ReviewView() {
             const validation = readRunValidation(run);
             const validationHasIssues = Boolean(validation && !validation.passed);
             const linkedTask = run.taskId ? taskList.find((task) => task.id === run.taskId) : undefined;
+            const learningDraft = getRunLearningDraft(run);
 
             return (
               <div
@@ -404,6 +425,84 @@ export function ReviewView() {
                     </button>
                   </div>
                 )}
+
+                {run.status === "completed" && run.reviewStatus === "approved" && run.memory && !run.memory.learning ? (
+                  <div className="mt-2.5 ml-6 border border-purple/20 rounded-lg p-2.5 bg-purple/[0.04]">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="m-0 text-[0.68rem] font-bold tracking-[0.08em] uppercase text-purple">
+                        Curate approved learning
+                      </p>
+                      <span className="text-[0.66rem] text-ink-faint">Explicit Wiki write</span>
+                    </div>
+                    <div className="grid grid-cols-[minmax(120px,0.35fr)_1fr] gap-2">
+                      <select
+                        aria-label={`Learning role for ${run.id}`}
+                        value={learningDraft.role}
+                        onChange={(event) => setRunLearningDraft(run.id, { role: event.target.value as AgentRole })}
+                        disabled={isCuratingRunLearning}
+                      >
+                        {AGENT_ROLES.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                      <input
+                        aria-label={`Learning note for ${run.id}`}
+                        value={learningDraft.lesson}
+                        maxLength={REVIEW_LEARNING_MAX_LENGTH}
+                        onChange={(event) => setRunLearningDraft(run.id, { lesson: event.target.value })}
+                        disabled={isCuratingRunLearning}
+                      />
+                      <select
+                        aria-label={`Curation signal for ${run.id}`}
+                        value={learningDraft.signal}
+                        onChange={(event) => setRunLearningDraft(run.id, {
+                          signal: event.target.value as ReviewLearningSignal | "",
+                        })}
+                        disabled={isCuratingRunLearning}
+                      >
+                        <option value="">No curation signal</option>
+                        {REVIEW_LEARNING_SIGNALS.map((signal) => (
+                          <option key={signal} value={signal}>{signal}</option>
+                        ))}
+                      </select>
+                      {learningDraft.signal ? (
+                        <input
+                          aria-label={`Curation signal path for ${run.id}`}
+                          value={learningDraft.signalPath}
+                          onChange={(event) => setRunLearningDraft(run.id, { signalPath: event.target.value })}
+                          placeholder="wiki/path/to-page.md"
+                          disabled={isCuratingRunLearning}
+                        />
+                      ) : (
+                        <p className="m-0 self-center text-[0.68rem] text-ink-faint">
+                          Optional signals appear in Wiki lint and Knowledge Graph.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-2 h-7 px-2.5 text-[0.75rem] border-purple/35 text-purple bg-purple/10 hover:bg-purple/20"
+                      onClick={() => curateRunLearning(run)}
+                      disabled={
+                        isCuratingRunLearning ||
+                        !learningDraft.lesson.trim() ||
+                        Boolean(learningDraft.signal && !learningDraft.signalPath.trim())
+                      }
+                    >
+                      <Archive size={13} />
+                      {isCuratingRunLearning ? "Curating..." : "Curate learning"}
+                    </button>
+                  </div>
+                ) : null}
+
+                {run.memory?.learning ? (
+                  <div className="mt-2 ml-6 text-[0.68rem] text-purple overflow-wrap-anywhere">
+                    Role learning: {run.memory.learning.role} · {run.memory.learning.roleMemoryPath}
+                    {run.memory.learning.signal
+                      ? ` · ${run.memory.learning.signal}: ${run.memory.learning.signalPath}`
+                      : ""}
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -430,6 +529,11 @@ function DailyLoopChain({ run, task }: { run: Run; task: Task }) {
     { label: "QA", value: hasQaEvidence(run) ? "passed" : "pending", complete: hasQaEvidence(run) },
     { label: "Review", value: run.reviewStatus ?? "unlinked", complete: run.reviewStatus === "approved" },
     { label: "Memory", value: run.memory ? "captured" : "pending", complete: Boolean(run.memory) },
+    {
+      label: "Learning",
+      value: run.memory?.learning ? run.memory.learning.role : "pending",
+      complete: Boolean(run.memory?.learning),
+    },
   ];
 
   return (

@@ -103,3 +103,10 @@ Tasks currently in progress.
   - [x] Advance task state through execution, review, changes, and approved memory.
   - [x] Make repeated review and memory actions idempotent.
   - [x] Expose the complete evidence chain in Review and document recovery.
+
+- [x] Review-to-memory learning loop
+  - [x] Keep synthesis capture and role-learning curation as separate explicit actions.
+  - [x] Persist approved role learnings in human-readable Wiki Markdown and structured run metadata.
+  - [x] Surface contradiction, stale, and needs-review signals in Wiki lint and Knowledge Graph.
+  - [x] Make exact retries idempotent and reject conflicting replacements.
+  - [x] Document the operator and recovery contract.

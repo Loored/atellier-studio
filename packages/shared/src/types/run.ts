@@ -1,3 +1,5 @@
+import type { CurateReviewLearningInput, ReviewLearningRecord } from "./review-learning";
+
 export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint", "orchestration"] as const;
 
 export type RunType = (typeof RUN_TYPES)[number];
@@ -65,6 +67,7 @@ export type RunMemoryCapture = {
   logPath: string;
   summary: string;
   capturedAt: string;
+  learning?: ReviewLearningRecord;
 };
 
 export type Run = {
@@ -123,5 +126,13 @@ export type CaptureRunMemoryInput = {
 export type CaptureRunMemoryResponse = {
   run: Run;
   wikiPath: string;
+  logPath: string;
+};
+
+export type CurateRunLearningInput = CurateReviewLearningInput;
+
+export type CurateRunLearningResponse = {
+  run: Run;
+  roleMemoryPath: string;
   logPath: string;
 };

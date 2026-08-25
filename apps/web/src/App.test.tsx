@@ -18,6 +18,7 @@ const updateRunReviewMock = vi.hoisted(() => vi.fn());
 const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
 const captureRunMemoryMock = vi.hoisted(() => vi.fn());
+const curateRunLearningMock = vi.hoisted(() => vi.fn());
 const retryRunMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const getOrchestrationStatusMock = vi.hoisted(() => vi.fn());
@@ -97,6 +98,7 @@ vi.mock("./api/services/runs.service", () => ({
     promoteDeliverable: promoteDeliverableMock,
     unlinkDeliverable: unlinkDeliverableMock,
     captureMemory: captureRunMemoryMock,
+    curateLearning: curateRunLearningMock,
     retry: retryRunMock,
   },
 }));
@@ -332,6 +334,37 @@ describe("App", () => {
         updatedAt: "2026-05-04T00:00:00.000Z",
       },
       wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+      logPath: "wiki/log.md",
+    });
+    curateRunLearningMock.mockResolvedValue({
+      run: {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+          learning: {
+            runId: "run-3",
+            role: "qa",
+            lesson: "Preserve validation evidence for approved deliverables.",
+            memoryPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+            roleMemoryPath: "wiki/role-memory/qa.md",
+            logPath: "wiki/log.md",
+            signal: "stale",
+            signalPath: "wiki/deliverables/run-3.md",
+            capturedAt: "2026-05-04T00:00:00.000Z",
+          },
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      roleMemoryPath: "wiki/role-memory/qa.md",
       logPath: "wiki/log.md",
     });
     retryRunMock.mockResolvedValue({
@@ -702,6 +735,47 @@ describe("App", () => {
       });
     });
     expect(await screen.findByText(/Captured memory: wiki\/synthesis\/run-run-3-review-memory-captured-from-dashboard\.md/i)).toBeInTheDocument();
+  });
+
+  it("curates an approved run into explicit role learning", async () => {
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    const learningNote = await screen.findByLabelText("Learning note for run-3");
+    await user.clear(learningNote);
+    await user.type(learningNote, "Preserve validation evidence for approved deliverables.");
+    await user.selectOptions(screen.getByLabelText("Learning role for run-3"), "qa");
+    await user.selectOptions(screen.getByLabelText("Curation signal for run-3"), "stale");
+    await user.click(screen.getByRole("button", { name: "Curate learning" }));
+
+    await waitFor(() => {
+      expect(curateRunLearningMock).toHaveBeenCalledWith("run-3", {
+        role: "qa",
+        lesson: "Preserve validation evidence for approved deliverables.",
+        signal: "stale",
+        signalPath: "wiki/deliverables/run-3.md",
+      });
+    });
+    expect(await screen.findByText(/Curated role memory: wiki\/role-memory\/qa\.md/i)).toBeInTheDocument();
   });
 
   it("filters deliverables by type and review", async () => {

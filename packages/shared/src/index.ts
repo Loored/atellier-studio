@@ -10,3 +10,4 @@ export * from "./types/health";
 export * from "./types/codex-worker";
 export * from "./types/knowledge-graph";
 export * from "./types/effect-execution";
+export * from "./types/review-learning";

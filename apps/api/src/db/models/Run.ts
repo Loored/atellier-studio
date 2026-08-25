@@ -1,5 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import {
+  AGENT_ROLES,
+  REVIEW_LEARNING_SIGNALS,
   RUN_EXECUTION_KINDS,
   RUN_EXECUTION_PHASES,
   RUN_LOG_LEVELS,
@@ -42,12 +44,29 @@ const RunExecutionSchema = new Schema(
   { _id: false },
 );
 
+const ReviewLearningSchema = new Schema(
+  {
+    runId: { type: String, required: true },
+    taskId: String,
+    role: { type: String, enum: AGENT_ROLES, required: true },
+    lesson: { type: String, required: true },
+    memoryPath: { type: String, required: true },
+    roleMemoryPath: { type: String, required: true },
+    logPath: { type: String, required: true },
+    signal: { type: String, enum: REVIEW_LEARNING_SIGNALS, required: false },
+    signalPath: String,
+    capturedAt: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const RunMemoryCaptureSchema = new Schema(
   {
     wikiPath: { type: String, required: true },
     logPath: { type: String, required: true },
     summary: { type: String, required: true },
     capturedAt: { type: String, required: true },
+    learning: { type: ReviewLearningSchema, required: false },
   },
   { _id: false },
 );

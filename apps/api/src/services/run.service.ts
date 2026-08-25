@@ -1,9 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
+  AGENT_ROLES,
+  REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH,
+  REVIEW_LEARNING_SIGNALS,
   type AppendRunLogInput,
   type CaptureRunMemoryInput,
   type CaptureRunMemoryResponse,
+  type CurateRunLearningInput,
+  type CurateRunLearningResponse,
   type CompleteRunInput,
   type CreateRunInput,
   type AgentValidationResult,
@@ -14,6 +20,7 @@ import {
   type RunMemoryCapture,
   type RunReviewStatus,
   type RunStatus,
+  type ReviewLearningRecord,
   type TaskStatus,
 } from "@atellier/shared";
 import { RunModel } from "../db/models/Run";
@@ -700,6 +707,148 @@ export class RunService {
     }
     if (outcome.disposition === "failed") {
       throw new Error(`Run memory capture failed: ${outcome.error}`);
+    }
+    return outcome.result;
+  }
+
+  async curateLearning(
+    id: string,
+    input: CurateRunLearningInput,
+  ): Promise<CurateRunLearningResponse | null> {
+    const run = await this.getById(id);
+    if (!run) {
+      return null;
+    }
+    if (run.status !== "completed" || run.reviewStatus !== "approved") {
+      throw new Error("Only completed, approved runs can curate role learning.");
+    }
+    if (!run.memory) {
+      throw new Error("Capture run memory before curating role learning.");
+    }
+    const role = input.role;
+    if (!AGENT_ROLES.includes(role)) {
+      throw new Error("Role learning target is invalid.");
+    }
+    const lesson = input.lesson.trim();
+    if (!lesson) {
+      throw new Error("Role learning lesson is required.");
+    }
+    if (lesson.length > REVIEW_LEARNING_MAX_LENGTH) {
+      throw new Error(`Role learning lesson must be ${REVIEW_LEARNING_MAX_LENGTH} characters or fewer.`);
+    }
+
+    const signal = input.signal;
+    if (signal && !REVIEW_LEARNING_SIGNALS.includes(signal)) {
+      throw new Error("Role learning signal is invalid.");
+    }
+    const signalPath = input.signalPath?.trim().replace(/^atelier\//, "");
+    if (signal && !signalPath) {
+      throw new Error("Role learning signal path is required when a signal is selected.");
+    }
+    if (!signal && signalPath) {
+      throw new Error("Role learning signal path requires a selected signal.");
+    }
+    if (signalPath && (!signalPath.startsWith("wiki/") || !signalPath.endsWith(".md"))) {
+      throw new Error("Role learning signal path must reference a Wiki markdown page.");
+    }
+    if (signalPath && signalPath.length > REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH) {
+      throw new Error(
+        `Role learning signal path must be ${REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH} characters or fewer.`,
+      );
+    }
+    if (run.memory.learning) {
+      const existing = run.memory.learning;
+      const matchesExisting =
+        existing.role === role &&
+        existing.lesson === lesson &&
+        existing.signal === signal &&
+        existing.signalPath === signalPath;
+      if (!matchesExisting) {
+        throw new Error("Run already has curated role learning with different content.");
+      }
+      return {
+        run,
+        roleMemoryPath: existing.roleMemoryPath,
+        logPath: existing.logPath,
+      };
+    }
+    if (signalPath) {
+      try {
+        await this.wikiService.readPage(signalPath);
+      } catch {
+        throw new Error("Role learning signal path must reference an existing Wiki page.");
+      }
+    }
+
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify({ runId: run.id, role, lesson, signal, signalPath }))
+      .digest("hex");
+    const outcome = await this.effectIdempotency.execute(
+      {
+        toolName: "run-role-learning-curation",
+        classification: "irreversible",
+        idempotencyKey: `run-learning:${run.id}`,
+        fingerprint,
+      },
+      async () => {
+        const capturedAt = new Date().toISOString();
+        const roleMemoryPage = await this.wikiService.appendRoleLearning({
+          runId: run.id,
+          taskId: run.taskId,
+          role,
+          lesson,
+          memoryPath: run.memory!.wikiPath,
+          signal,
+          signalPath,
+          capturedAt,
+        });
+        const log = await this.wikiService.appendLog({
+          eventType: "decision",
+          title: "Approved review learning curated",
+          summary: lesson,
+          runId: run.id,
+          taskId: run.taskId,
+          agentId: run.agentId,
+          details: {
+            role,
+            roleMemoryPath: roleMemoryPage.path,
+            memoryPath: run.memory!.wikiPath,
+            signal: signal ?? "none",
+            signalPath: signalPath ?? "none",
+          },
+        });
+        const learning: ReviewLearningRecord = {
+          runId: run.id,
+          taskId: run.taskId,
+          role,
+          lesson,
+          memoryPath: run.memory!.wikiPath,
+          roleMemoryPath: roleMemoryPage.path,
+          logPath: log.path,
+          signal,
+          signalPath,
+          capturedAt,
+        };
+        const curatedRun = await this.recordMemoryCapture(run.id, {
+          ...run.memory!,
+          learning,
+        });
+        if (!curatedRun) {
+          throw new Error(`Run ${run.id} disappeared while recording role learning.`);
+        }
+        return {
+          run: curatedRun,
+          roleMemoryPath: roleMemoryPage.path,
+          logPath: log.path,
+        } satisfies CurateRunLearningResponse;
+      },
+    );
+
+    if (outcome.disposition === "in-progress") {
+      throw new Error("Role learning curation is already in progress.");
+    }
+    if (outcome.disposition === "failed") {
+      throw new Error(`Role learning curation failed: ${outcome.error}`);
     }
     return outcome.result;
   }

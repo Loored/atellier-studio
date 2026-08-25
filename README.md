@@ -6,7 +6,7 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Durable Local Orchestration Runtime + complete daily-use loop + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Review Memory Capture + Knowledge Graph v2.
+Current stage: Operational Spine + Durable Local Orchestration Runtime + complete daily-use and review-learning loops + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Knowledge Graph v2.
 
 Implemented:
 
@@ -24,6 +24,7 @@ Implemented:
 - Wiki Dream UI: trigger dream runs, preview reports, and save approved reports under `wiki/dreams`
 - Review memory capture: `POST /runs/:id/capture-memory` writes durable `wiki/synthesis/` pages
 - Daily-use loop: Wiki ingest creates source-linked tasks; durable runs carry task grounding; Review exposes the full evidence chain; approved memory capture closes the task idempotently
+- Review-to-memory learning: an explicit `POST /runs/:id/curate-learning` promotes one approved lesson into durable role Markdown and optional Wiki lint/graph signals
 - MCP server package (`apps/mcp-server`) exposes the local REST API as stdio tools for Claude Code / Cowork
 - Multi-provider agent executors: mock, OpenAI, Anthropic, Groq, and Ollama with Ollama role overrides
 - Codex Worker control-plane: create / plan / approve-step / execute-next / cancel / retry-step / finalize, with persisted per-step evidence artifacts
@@ -212,9 +213,9 @@ pnpm codex:wiki-lint
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-1. **Review-to-memory learning loop**: promote approved outcomes into curated role memory and contradiction/staleness signals without silent writes.
+1. **Daily-use soak and learning feedback**: use the complete loop against the local Mongo worker, resolve real curation signals, and record friction before expanding product scope.
 
-Already shipped: memory hygiene, Knowledge Graph v2 and follow-ups, role memory, Durable Runtime v1/v1.1, provider cancellation, irreversible-effect idempotency, the feature-flagged controlled Codex Worker adapter, and the complete daily-use operational loop.
+Already shipped: memory hygiene, Knowledge Graph v2 and follow-ups, role memory, Durable Runtime v1/v1.1, provider cancellation, irreversible-effect idempotency, the feature-flagged controlled Codex Worker adapter, the complete daily-use operational loop, and the explicit review-to-memory learning loop.
 
 Auth, cloud deploy, multiplayer, vector search, graph DB, external meeting/chat/drive integrations, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
 

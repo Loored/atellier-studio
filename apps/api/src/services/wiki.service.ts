@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile, appendFile, readdir, stat, rm } from "node:fs/promises";
 import path from "node:path";
 import {
+  AGENT_ROLES,
+  REVIEW_LEARNING_SIGNALS,
   type AppendWikiLogInput,
   type AppendWikiLogResponse,
   type WikiIngestInput,
@@ -13,9 +15,12 @@ import {
   type WikiQueryMatch,
   type WikiQueryResponse,
   type WikiRelatedPage,
+  type ReviewLearningRecord,
   type WikiDreamDecisionRecord,
   type WikiDreamDecisionRecordInput,
 } from "@atellier/shared";
+
+type AppendRoleLearningInput = Omit<ReviewLearningRecord, "roleMemoryPath" | "logPath">;
 
 const DEFAULT_INDEX = `# Atellier Studio Wiki Index
 
@@ -32,6 +37,7 @@ const DEFAULT_INDEX = `# Atellier Studio Wiki Index
 - decisions
 - synthesis
 - dreams
+- role-memory
 `;
 
 const DEFAULT_LOG = `# Atellier Studio Wiki Log
@@ -63,7 +69,7 @@ export class WikiService {
   async ensureWiki(): Promise<void> {
     await mkdir(this.wikiRoot, { recursive: true });
     await Promise.all(
-      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "sources", "deliverables", "dreams"].map((segment) =>
+      ["clients", "projects", "entities", "workflows", "decisions", "synthesis", "sources", "deliverables", "dreams", "role-memory"].map((segment) =>
         mkdir(path.join(this.wikiRoot, segment), { recursive: true }),
       ),
     );
@@ -142,6 +148,114 @@ export class WikiService {
       path: this.logPath,
       entry,
     };
+  }
+
+  async appendRoleLearning(input: AppendRoleLearningInput): Promise<WikiPageResponse> {
+    await this.ensureWiki();
+    const roleMemoryPath = `wiki/role-memory/${input.role}.md`;
+    const { resolved } = this.resolveAtelierPath(roleMemoryPath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    try {
+      await writeFile(
+        resolved,
+        [
+          `# Role Memory - ${input.role}`,
+          "",
+          "Approved review learnings curated by the operator.",
+          "",
+        ].join("\n"),
+        { encoding: "utf8", flag: "wx" },
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
+    }
+
+    const machineRecord = Buffer.from(JSON.stringify(input), "utf8").toString("base64url");
+    const entry = [
+      `## [${input.capturedAt}] Run ${input.runId}`,
+      "",
+      `- Run ID: ${input.runId}`,
+      `- Task ID: ${input.taskId ?? "none"}`,
+      `- Memory path: ${input.memoryPath}`,
+      `- Signal: ${input.signal ?? "none"}`,
+      `- Signal path: ${input.signalPath ?? "none"}`,
+      "",
+      "### Learning",
+      "",
+      input.lesson,
+      "",
+      `<!-- atellier-review-learning ${machineRecord} -->`,
+      "",
+    ].join("\n");
+    await appendFile(resolved, entry, "utf8");
+    const content = await readFile(resolved, "utf8");
+    await this.upsertWikiIndexEntry(roleMemoryPath, content);
+
+    return {
+      path: roleMemoryPath,
+      content,
+      ready: true,
+    };
+  }
+
+  async listReviewLearnings(): Promise<ReviewLearningRecord[]> {
+    await this.ensureWiki();
+    const roleMemoryRoot = path.join(this.wikiRoot, "role-memory");
+    let files: string[] = [];
+    try {
+      files = await this.listMarkdownFiles(roleMemoryRoot);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return [];
+      }
+      throw error;
+    }
+
+    const learnings: ReviewLearningRecord[] = [];
+    for (const filePath of files) {
+      const content = await readFile(filePath, "utf8");
+      const roleMemoryPath = this.toRelativeAtelierPath(filePath);
+      for (const match of content.matchAll(/<!-- atellier-review-learning ([a-zA-Z0-9_-]+) -->/g)) {
+        try {
+          const parsed = JSON.parse(
+            Buffer.from(match[1] ?? "", "base64url").toString("utf8"),
+          ) as Partial<AppendRoleLearningInput>;
+          if (
+            typeof parsed.runId !== "string" ||
+            typeof parsed.role !== "string" ||
+            !AGENT_ROLES.includes(parsed.role as (typeof AGENT_ROLES)[number]) ||
+            typeof parsed.lesson !== "string" ||
+            typeof parsed.memoryPath !== "string" ||
+            typeof parsed.capturedAt !== "string"
+          ) {
+            continue;
+          }
+          const signal = typeof parsed.signal === "string" && REVIEW_LEARNING_SIGNALS.includes(
+            parsed.signal as (typeof REVIEW_LEARNING_SIGNALS)[number],
+          )
+            ? parsed.signal as (typeof REVIEW_LEARNING_SIGNALS)[number]
+            : undefined;
+          learnings.push({
+            runId: parsed.runId,
+            taskId: typeof parsed.taskId === "string" ? parsed.taskId : undefined,
+            role: parsed.role as (typeof AGENT_ROLES)[number],
+            lesson: parsed.lesson,
+            memoryPath: parsed.memoryPath,
+            roleMemoryPath,
+            logPath: "wiki/log.md",
+            signal,
+            signalPath: signal && typeof parsed.signalPath === "string" ? parsed.signalPath : undefined,
+            capturedAt: parsed.capturedAt,
+          });
+        } catch {
+          // Keep malformed manual edits inspectable without breaking the read model.
+        }
+      }
+    }
+
+    return learnings.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
   }
 
   async recordDreamDecision(input: WikiDreamDecisionRecordInput): Promise<WikiDreamDecisionRecord> {
@@ -461,6 +575,18 @@ export class WikiService {
       });
     }
 
+    const reviewLearningSignals = (await this.listReviewLearnings()).filter(
+      (learning) => learning.signal && learning.signalPath,
+    );
+    for (const learning of reviewLearningSignals) {
+      addIssue({
+        code: "curation_signal",
+        path: learning.signalPath!,
+        message: `Approved ${learning.role} learning marks this page as ${learning.signal}. Learning: ${learning.lesson.slice(0, 160)}`,
+        suggestion: `Review the ${learning.signal} signal from run ${learning.runId} and record the resolution.`,
+      });
+    }
+
     const checkedAt = new Date().toISOString();
     if (options.recordLog !== false) {
       await this.appendLog({
@@ -648,6 +774,7 @@ export class WikiService {
       "deliverables",
       "notes",
       "dreams",
+      "role-memory",
     ]);
     if (!allowedSegments.has(segment)) {
       throw new Error("Writable wiki path must target an allowed wiki category.");
