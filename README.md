@@ -59,7 +59,38 @@ docker compose up -d mongo
 
 ## Development
 
-Run both apps:
+Recommended local startup:
+
+```bash
+./scripts/dev-local
+```
+
+The launcher uses Node directly, loads the repository `.env` without overriding explicit shell variables, prefers the repository-pinned `pnpm@9.15.4` through Corepack, checks dependencies and ports, starts Colima when needed, ensures Mongo is healthy, and launches the API, durable worker, and web app. It waits for API and web health before reporting:
+
+- Web: `http://127.0.0.1:5174`
+- API: `http://127.0.0.1:4000`
+
+It never installs dependencies or kills an existing port owner. `Ctrl+C` stops only launcher-owned API, worker, and web processes; Mongo remains running. Run the non-mutating preflight with:
+
+```bash
+./scripts/dev-local --check
+```
+
+If `pnpm` is already available, the equivalent package script is:
+
+```bash
+pnpm dev:local
+```
+
+Override isolated validation ports or the Mongo database explicitly:
+
+```bash
+API_PORT=4010 WEB_PORT=5180 \
+MONGO_URI=mongodb://127.0.0.1:27017/atellier_launcher_validation \
+AGENT_EXECUTOR_MODE=mock ./scripts/dev-local
+```
+
+Manual workspace startup remains available. This starts every workspace with a `dev` script, including the MCP server, but does not start Docker or the standalone durable worker:
 
 ```bash
 pnpm dev

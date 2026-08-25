@@ -15,6 +15,8 @@
 | [../../docs/review-memory-learning-loop.md](../../docs/review-memory-learning-loop.md) | Explicit approved-learning curation, durable role-memory Markdown, Wiki signals, idempotency, and recovery. | operations | 2026-08-24 | 0 |
 | [../runs/2026-05-12-knowledge-graph-read-model.md](../runs/2026-05-12-knowledge-graph-read-model.md) | Run log for the first read-only Knowledge Graph vertical slice and Graph view. | operations | 2026-05-12 | 0 |
 | [../runs/2026-08-24-execution-safety-adapter.md](../runs/2026-08-24-execution-safety-adapter.md) | Run log for provider cancellation, irreversible-effect idempotency, and the controlled real Codex Worker adapter. | operations | 2026-08-24 | 0 |
+| [../runs/2026-08-24-curation-signal-resolution.md](../runs/2026-08-24-curation-signal-resolution.md) | Run log for explicit, idempotent role-learning signal resolution and active-lint closure. | operations | 2026-08-24 | 0 |
+| [../runs/2026-08-25-local-dev-launcher.md](../runs/2026-08-25-local-dev-launcher.md) | Run log for the safe Corepack-aware Mongo, API, worker, and web local launcher. | operations | 2026-08-25 | 0 |
 | [synthesis/2026-05-04-ui-security-review.md](./synthesis/2026-05-04-ui-security-review.md) | UI/UX, PDF, and security review notes for the Milestone 0 dashboard and local API defaults. | synthesis | 2026-05-04 | 0 |
 | [workflows/agent-skill-orchestration.md](./workflows/agent-skill-orchestration.md) | Skill-triggered orchestration pattern for Atellier build and LLM Wiki ingest loops. | workflows | 2026-05-05 | 1 |
 | [workflows/daily-use-operational-loop.md](./workflows/daily-use-operational-loop.md) | Durable source-to-memory reference workflow with linked task state and approval-gated memory. | workflows | 2026-08-24 | 0 |

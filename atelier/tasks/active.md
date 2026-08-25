@@ -117,3 +117,10 @@ Tasks currently in progress.
   - [x] Remove only exact resolved signals from active Wiki lint.
   - [x] Show total, open, and resolved signal counts in role memory.
   - [x] Preserve idempotency and reject conflicting second resolutions.
+
+- [x] Local Dev Launcher v1
+  - [x] Resolve pinned pnpm through Corepack when the global command is unavailable.
+  - [x] Check Node, dependencies, ports, Docker/Compose, and Mongo before startup.
+  - [x] Start API, durable worker, and web with deterministic local URLs.
+  - [x] Wait for real localhost readiness and stop only launcher-owned processes.
+  - [x] Document preflight, overrides, manual fallback, and shutdown behavior.

@@ -48,9 +48,47 @@ brew services start colima
 - MongoDB container: `atellier-mongo`
 - Mongo port: `localhost:27017`
 - API: `http://127.0.0.1:4000`
-- Web dev server has used: `http://127.0.0.1:5174/`
+- Web: `http://127.0.0.1:5174/`
 
 Prefer `127.0.0.1` over `localhost` in web/API defaults because this machine can resolve `localhost` to IPv6 while the API is reachable on IPv4 loopback.
+
+## Recommended Startup
+
+From the repository root:
+
+```bash
+./scripts/dev-local
+```
+
+This executable only requires `node` on `PATH`. It loads the repository `.env` while preserving explicit shell overrides and prefers the pinned package manager through `corepack pnpm`, so a missing global `pnpm` command is not a blocker when Corepack is available.
+
+Startup sequence:
+
+1. Load `.env`, then validate Node 22+, pinned pnpm access, installed dependencies, and free API/Web ports.
+2. Validate Docker CLI and Compose; start Colima only if the Docker daemon is offline.
+3. Run `docker compose up -d mongo` and wait for a real Mongo ping.
+4. Start the Mongo-backed API, standalone durable worker, and Vite on fixed local ports.
+5. Wait for API `/health` and the Vite HTML response before reporting readiness.
+
+Safe preflight without starting services:
+
+```bash
+./scripts/dev-local --check
+```
+
+Alternative when `pnpm` is already available:
+
+```bash
+pnpm dev:local
+```
+
+The launcher fails closed when a configured port is occupied and never kills that process. Override `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT`, or `MONGO_URI` when an isolated local run is needed. `Ctrl+C` signals only child processes started by this launcher, waits for the worker's graceful shutdown, and leaves Mongo running.
+
+If dependencies are missing, install them explicitly; the launcher never changes the dependency tree:
+
+```bash
+corepack pnpm install --frozen-lockfile
+```
 
 ## Runtime Modes
 

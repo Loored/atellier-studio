@@ -40,6 +40,7 @@ Long history and setup details live in docs so this file stays small.
 - Mongo container: `atellier-mongo` from `mongo:7`, exposed on `localhost:27017`.
 - API default: `http://127.0.0.1:4000`
 - Web dev server has used: `http://127.0.0.1:5174/`
+- Preferred full local startup: `./scripts/dev-local` (Corepack-aware preflight, Mongo, API, worker, and fixed-port web).
 
 See `docs/operations/local-setup.md` for install commands and solved setup pitfalls.
 
@@ -104,6 +105,13 @@ Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 pla
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-25 - Local Dev Launcher v1
+
+- `./scripts/dev-local` is the preferred one-command Mongo-backed startup path; `pnpm dev:local` is the package-script equivalent.
+- The launcher loads the repository `.env` with shell overrides taking priority, prefers repository-pinned pnpm through Corepack, validates Node/dependencies/ports/Docker/Mongo, then starts API, durable worker, and web and waits for readiness.
+- Port conflicts fail closed without killing the existing process. `Ctrl+C` stops only launcher-owned services and leaves Mongo running.
+- Isolated localhost validation passed on API `4010`, Web `5180`, and `atellier_launcher_validation`; the Dashboard rendered against Mongo with a clean browser console, and both ports closed after graceful shutdown.
 
 ### 2026-08-24 - Review-to-memory learning loop
 
