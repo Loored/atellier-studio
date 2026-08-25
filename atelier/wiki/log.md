@@ -11922,3 +11922,14 @@
 - tasks proposed: P4 review-to-memory learning loop remains the next active milestone.
 - validation: monorepo typecheck/build passed; API 117/117 and web 22/22 passed with mock/local executors only (3 opt-in Mongo tests skipped); read-only Wiki lint reported zero issues.
 - next: review-to-memory learning loop for curated role memory and contradiction/staleness signals.
+
+## [2026-08-24T19:39:25.000-06:00] ingest | Review-to-memory learning loop implementation knowledge
+- Summary: Added explicit, approval-gated promotion from captured run synthesis into durable role memory plus optional Wiki lint and Knowledge Graph signals.
+- Source: implementation and deterministic validation on `codex/review-memory-learning-loop`; no new immutable external raw source.
+- run: `atelier/runs/2026-08-24-review-memory-learning-loop.md`
+- pages created: `docs/review-memory-learning-loop.md`, `atelier/wiki/workflows/review-memory-learning-loop.md`, `atelier/runs/2026-08-24-review-memory-learning-loop.md`.
+- pages updated: `atelier/wiki/index.md`, `atelier/tasks/active.md`, `README.md`, `CODEX_MEMORY.md`, `docs/roadmap.md`.
+- contradictions: none found; P4 now separates generic capture from explicit role learning and keeps target-page changes operator-controlled.
+- tasks proposed: daily-use soak against the local Mongo worker and resolution of real curation signals before choosing another feature slice.
+- validation: monorepo typecheck/build passed; API 119/119 and web 24/24 passed with mock/local services only (3 opt-in Mongo tests skipped); read-only Wiki lint reported zero issues.
+- next: use the complete P3/P4 loop in real work, resolve signals, and record repeated friction.

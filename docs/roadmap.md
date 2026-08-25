@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-08-24 — Daily-use operational loop completed on `codex/daily-use-operational-loop`.
-**Active plan:** Extend approved review outcomes into curated role-memory and curation signals without silent writes.
+**Last updated:** 2026-08-24 — Review-to-memory learning loop completed on `codex/review-memory-learning-loop`.
+**Active plan:** Use the complete local workflow daily, resolve real curation signals, and collect evidence before selecting another feature slice.
 
 ## Strategic stance
 
@@ -137,9 +137,17 @@ The milestone is complete when an interrupted run can recover, the operator can 
 
 Result: Wiki ingest now creates source-linked tasks; durable orchestrations retain and ground every step with that task; task status follows execution and review; Review shows the full chain; and approved memory capture is persisted and idempotent. See [`docs/daily-use-operational-loop.md`](daily-use-operational-loop.md).
 
-### P4 — Review-to-memory learning loop
+### P4 — Review-to-memory learning loop ✅ completed 2026-08-24
 
 Make approved review outcomes feed curated role memory and contradiction/staleness signals. Keep writes inspectable and approval-driven; do not introduce silent autonomous edits.
+
+Result: completed and approved runs with captured memory can promote one explicit lesson into durable `wiki/role-memory/<role>.md`. Optional contradiction, stale, and needs-review signals surface through Wiki lint and Knowledge Graph without changing the target page. Exact retries are idempotent and conflicting replacements are rejected. See [`docs/review-memory-learning-loop.md`](review-memory-learning-loop.md).
+
+### Next — Daily-use soak and learning feedback
+
+- Run the P3/P4 flow against the local Mongo worker during real personal/project work.
+- Resolve captured curation signals through the existing Wiki/Dream review surfaces.
+- Record repeated friction and only then select the next bounded feature slice.
 
 ## Later — Tailwind / Pixel polish
 

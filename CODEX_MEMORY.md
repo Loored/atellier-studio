@@ -99,11 +99,19 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Review-to-memory learning**: promote approved outcomes into curated role memory and curation signals without silent autonomous writes.
+1. **Daily-use soak and learning feedback**: use the complete P3/P4 flow against the local Mongo worker, resolve real curation signals, and record repeated friction before expanding scope.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-24 - Review-to-memory learning loop
+
+- Generic synthesis capture and role-learning curation remain two separate operator actions.
+- A completed, approved run with `Run.memory` can promote one lesson into durable `wiki/role-memory/<role>.md`; `Run.memory.learning` records the link.
+- Optional `contradiction`, `stale`, and `needs-review` signals must target an existing Wiki page and surface in Wiki lint and Knowledge Graph without editing that page.
+- Exact retries reuse the irreversible effect `run-learning:<runId>`; different second content is rejected.
+- Operator and recovery contract: `docs/review-memory-learning-loop.md`.
 
 ### 2026-08-24 - Daily-use operational loop
 
