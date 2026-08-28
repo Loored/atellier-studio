@@ -11,6 +11,8 @@ import { validateAgentResponse } from "./agent-response-validator";
 
 export type AgentRunExecutionOptions = {
   signal?: AbortSignal;
+  maxOutputTokens?: number;
+  transformResponse?: (response: string) => string;
 };
 
 export class AgentExecutionTimeoutError extends Error {
@@ -55,7 +57,7 @@ export class AgentRunService {
     input: RunAgentInput,
     options: AgentRunExecutionOptions = {},
   ): Promise<RunAgentResult | null> {
-    return this.runInternal(agentId, input, undefined, this.maxHandoffDepth, new Set(), options.signal);
+    return this.runInternal(agentId, input, undefined, this.maxHandoffDepth, new Set(), options);
   }
 
   async runWithStream(
@@ -64,7 +66,7 @@ export class AgentRunService {
     emit: (event: AgentRunStreamEvent) => void,
     options: AgentRunExecutionOptions = {},
   ): Promise<RunAgentResult | null> {
-    return this.runInternal(agentId, input, emit, this.maxHandoffDepth, new Set(), options.signal);
+    return this.runInternal(agentId, input, emit, this.maxHandoffDepth, new Set(), options);
   }
 
   private resolveExecutor(modeOverride?: ExecutorMode): { mode: ExecutorMode; executor: AgentExecutorService } {
@@ -85,8 +87,9 @@ export class AgentRunService {
     emit?: (event: AgentRunStreamEvent) => void,
     remainingHandoffDepth = this.maxHandoffDepth,
     lineage = new Set<string>(),
-    signal?: AbortSignal,
+    options: AgentRunExecutionOptions = {},
   ): Promise<RunAgentResult | null> {
+    const { signal } = options;
     const agent = await this.agents.getById(agentId);
     if (!agent) {
       return null;
@@ -94,6 +97,10 @@ export class AgentRunService {
     lineage.add(agentId);
 
     const { mode: selectedExecutorMode, executor } = this.resolveExecutor(input.executorModeOverride);
+    const verifiedFiles = [...new Set([
+      ...this.verifiedRepoFiles,
+      ...(input.verifiedRepoFiles ?? []),
+    ])].sort();
     emit?.({ type: "status", status: "queued" });
 
     const run = await this.runs.create({
@@ -104,12 +111,17 @@ export class AgentRunService {
         instruction: input.instruction,
         context: input.context,
         executorMode: selectedExecutorMode,
-        verifiedRepoFiles: this.verifiedRepoFiles,
+        verifiedRepoFiles: verifiedFiles,
         ...(input.orchestrationStep && {
           orchestrationRunId: input.orchestrationStep.orchestrationRunId,
           orchestrationStepId: input.orchestrationStep.stepId,
           orchestrationStepLabel: input.orchestrationStep.label,
           orchestrationPhase: input.orchestrationStep.phase,
+          orchestrationValidationProfile: input.orchestrationStep.validationProfile,
+          orchestrationLogicalStepId: input.orchestrationStep.logicalStepId,
+          orchestrationRepairAttempt: input.orchestrationStep.repairAttempt,
+          orchestrationRepairAttemptLimit: input.orchestrationStep.repairAttemptLimit,
+          orchestrationRepairKind: input.orchestrationStep.repairKind,
         }),
       },
     });
@@ -145,14 +157,22 @@ export class AgentRunService {
         agent,
         instruction: input.instruction,
         context: input.context,
+        verifiedFiles,
         signal,
+        maxOutputTokens: options.maxOutputTokens,
       });
       assertExecutionActive(signal);
 
+      const settledResponse = options.transformResponse
+        ? options.transformResponse(execution.response)
+        : execution.response;
+
       const validation = validateAgentResponse({
         role: agent.role,
-        response: execution.response,
-        verifiedRepoFiles: this.verifiedRepoFiles,
+        profile: input.orchestrationStep?.validationProfile,
+        instruction: input.instruction,
+        response: settledResponse,
+        verifiedRepoFiles: verifiedFiles,
       });
 
       const combinedInvalidReferencedFiles = validation.invalidReferencedFiles;
@@ -168,14 +188,14 @@ export class AgentRunService {
         for (const issue of validation.issues) {
           await this.runs.appendLog(run.id, {
             level: issue.severity === "error" ? "error" : "warn",
-            message: `[${validation.role}] ${issue.message}`,
+            message: `[${validation.profile ?? validation.role}] ${issue.message}`,
           });
         }
       }
 
       assertExecutionActive(signal);
 
-      for (const chunk of this.chunkText(execution.response, 80)) {
+      for (const chunk of this.chunkText(settledResponse, 80)) {
         emit?.({ type: "chunk", content: chunk });
       }
       emit?.({ type: "status", status: "finalizing" });
@@ -184,7 +204,7 @@ export class AgentRunService {
         agentId,
         runId: run.id,
         role: "assistant",
-        content: execution.response,
+        content: settledResponse,
       });
 
       assertExecutionActive(signal);
@@ -200,13 +220,14 @@ export class AgentRunService {
           : `${agent.name} completed execution.`,
         output: {
           messageId: assistantMessage.id,
-          response: execution.response,
+          response: settledResponse,
           needsHuman: execution.needsHuman,
           validation: {
             role: validation.role,
+            profile: validation.profile,
             passed: validation.passed,
             issues: validation.issues,
-            verifiedRepoFiles: this.verifiedRepoFiles,
+            verifiedRepoFiles: verifiedFiles,
             invalidReferencedFiles: combinedInvalidReferencedFiles,
             referencedFiles: validation.referencedFiles,
             candidateFiles: validation.candidateFiles,
@@ -253,7 +274,7 @@ export class AgentRunService {
             sourceAgent: updatedAgent,
             sourceRunId: completedRun.id,
             sourceInstruction: input.instruction,
-            sourceResponse: execution.response,
+          sourceResponse: settledResponse,
             handoffAgentId: input.handoffAgentId,
             handoffInstruction: input.handoffInstruction,
             remainingHandoffDepth: remainingHandoffDepth - 1,
@@ -376,6 +397,7 @@ export class AgentRunService {
 
     const validation = validateAgentResponse({
       role: targetAgent.role,
+      instruction: composedInstruction,
       response: handoffExecution.response,
       verifiedRepoFiles: this.verifiedRepoFiles,
     });

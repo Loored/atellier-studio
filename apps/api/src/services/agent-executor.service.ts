@@ -4,7 +4,9 @@ export type ExecuteAgentInstructionInput = {
   agent: Agent;
   instruction: string;
   context?: string;
+  verifiedFiles?: string[];
   signal?: AbortSignal;
+  maxOutputTokens?: number;
 };
 
 export type ExecuteAgentInstructionResult = {
@@ -133,11 +135,37 @@ Output format: intake summary (source type → key facts → implied tasks → h
 };
 
 // Role-aware rich mock output templates.
-function buildMockResponse(agent: Agent, instruction: string, context?: string): string {
+function buildMockResponse(
+  agent: Agent,
+  instruction: string,
+  context?: string,
+  verifiedFiles: string[] = [],
+): string {
   const name = agent.name;
   const role = agent.role;
   const taskSnippet = instruction.length > 100 ? `${instruction.slice(0, 100)}…` : instruction;
   const ctxLine = context ? `\n_Context: ${context.slice(0, 80)}${context.length > 80 ? "…" : ""}_\n` : "";
+  const candidateFile = verifiedFiles[0] ?? "apps/api/src/services/wiki.service.ts";
+
+  if (role === "builder" && /Phase:\s*runtime/i.test(instruction)) {
+    return [
+      `## Runtime Report — ${name}`,
+      ctxLine,
+      `## Checks to Run`,
+      `1. Inspect the requested artifact against the linked source content.`,
+      `2. Confirm the acceptance criteria and human-review boundary.`,
+      ``,
+      `## Expected Pass/Fail Signals`,
+      `- Pass: the artifact is present, grounded, and reviewable.`,
+      `- Fail: the response only promises future work or lacks source evidence.`,
+      ``,
+      `## Blockers`,
+      `- None identified in the proposed artifact.`,
+      ``,
+      `## QA Handoff`,
+      `- Revalidate the artifact content rather than step-completion metadata.`,
+    ].join("\n");
+  }
 
   const sections: Record<AgentRole, string> = {
     pm: [
@@ -164,10 +192,13 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
       `**Task:** ${taskSnippet}`,
       ``,
       `**Candidate files:**`,
-      `- apps/api/src/services/wiki.service.ts`,
+      `- ${candidateFile}`,
       ``,
       `**Summary:**`,
       `Proposed an additive service-layer change using existing patterns.`,
+      ``,
+      `## Requested Artifact`,
+      `A complete bounded artifact for the requested goal. It records the intended outcome, the source-grounded decisions, the acceptance criteria, and the human-review boundary so QA can evaluate evidence instead of a promise of future work.`,
       ``,
       `**Risk assessment:** Low — no breaking contract changes expected`,
       ``,
@@ -188,6 +219,8 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
       `- ⚠ Minor: confirm error path is handled explicitly`,
       ``,
       `**Verdict: APPROVED**`,
+      ``,
+      `**Recommendation:** Proceed to human review.`,
       ``,
       `**Handoff → Wiki Curator:** Document this cycle in operational memory.`,
     ].join("\n"),
@@ -282,7 +315,7 @@ export class MockAgentExecutorService implements AgentExecutorService {
       });
     }
     return {
-      response: buildMockResponse(input.agent, input.instruction, input.context),
+      response: buildMockResponse(input.agent, input.instruction, input.context, input.verifiedFiles),
       needsHuman: true,
     };
   }
@@ -295,6 +328,8 @@ function buildExecutorSystemPrompt(
   const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
   const customInstructions = input.agent.instructions?.trim();
 
+  const verifiedFiles = [...new Set([...(repoFileHints ?? []), ...(input.verifiedFiles ?? [])])].sort();
+
   return [
     `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
     "",
@@ -302,10 +337,10 @@ function buildExecutorSystemPrompt(
     "This chat executor cannot edit repository files. Be truthful about that boundary.",
     "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
     "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
-    repoFileHints?.length
+    verifiedFiles.length
       ? [
-          "Verified repository files you may reference:",
-          ...repoFileHints.map((filePath) => `- ${filePath}`),
+          "Verified repository and Atellier vault files you may reference:",
+          ...verifiedFiles.map((filePath) => `- ${filePath}`),
         ].join("\n")
       : "",
     customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
@@ -370,7 +405,7 @@ export class OpenAiCompatibleAgentExecutorService implements AgentExecutorServic
             { role: "user", content: userPrompt },
           ],
           temperature: 0.4,
-          max_tokens: 1024,
+          max_tokens: input.maxOutputTokens ?? 1024,
         }),
       });
     } catch (error) {
@@ -464,7 +499,7 @@ export class AnthropicAgentExecutorService implements AgentExecutorService {
         signal: input.signal,
         body: JSON.stringify({
           model: this.config.model,
-          max_tokens: ANTHROPIC_MAX_TOKENS,
+          max_tokens: input.maxOutputTokens ?? ANTHROPIC_MAX_TOKENS,
           temperature: ANTHROPIC_TEMPERATURE,
           // Naive prompt caching: the system prompt (role expertise + repo hints)
           // is stable across runs of the same agent, so cache it ephemerally.

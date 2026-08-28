@@ -54,6 +54,21 @@ export type SkillOrchestrationStepResult = {
   agentRole: AgentRole;
   runId: string;
   status: RunStatus;
+  logicalStepId?: string;
+  repairAttempt?: number;
+  repairAttemptLimit?: number;
+  repairKind?: "deterministic" | "semantic";
+};
+
+export type OrchestrationRepairSummary = {
+  maxAttempts: number;
+  attemptsUsed: number;
+  resolved: boolean;
+  exhausted: boolean;
+  finalStepId: string;
+  lastValidArtifactStepId?: string;
+  lastQaStepId?: string;
+  blockerMessages: string[];
 };
 
 export type SkillOrchestrationResult = {
@@ -61,6 +76,9 @@ export type SkillOrchestrationResult = {
   goal: string;
   orchestrationRun: Run;
   steps: SkillOrchestrationStepResult[];
+  repair?: OrchestrationRepairSummary;
+  qaRetry?: OrchestrationRepairSummary;
+  semanticRepair?: OrchestrationRepairSummary;
 };
 
 export type OrchestrationStepStatusEntry = {
@@ -73,6 +91,10 @@ export type OrchestrationStepStatusEntry = {
   runId?: string;
   status: "pending" | RunStatus;
   isActive: boolean;
+  logicalStepId?: string;
+  repairAttempt?: number;
+  repairAttemptLimit?: number;
+  repairKind?: "deterministic" | "semantic";
 };
 
 export type OrchestrationStatusResult = {
@@ -85,6 +107,9 @@ export type OrchestrationStatusResult = {
   steps: OrchestrationStepStatusEntry[];
   activeStep: OrchestrationStepStatusEntry | null;
   nextStep: OrchestrationStepStatusEntry | null;
+  repair?: OrchestrationRepairSummary;
+  qaRetry?: OrchestrationRepairSummary;
+  semanticRepair?: OrchestrationRepairSummary;
 };
 
 export type StartSkillOrchestrationResponse = {

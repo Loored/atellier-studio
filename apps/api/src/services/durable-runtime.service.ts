@@ -170,9 +170,10 @@ export class DurableRuntimeService {
   }
 
   private async executeOnce(): Promise<boolean> {
+    const reconciled = await this.queue.reconcileCompletedFinalizing();
     const run = await this.queue.claim(this.workerId);
     if (!run) {
-      return false;
+      return reconciled > 0;
     }
 
     this.currentRunId = run.id;

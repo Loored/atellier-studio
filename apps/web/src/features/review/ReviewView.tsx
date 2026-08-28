@@ -120,8 +120,12 @@ export function ReviewView() {
     })
     .filter((validation): validation is NonNullable<ReturnType<typeof readRunValidation>> => Boolean(validation));
 
-  const validationAlertIssues = validationAlerts.flatMap((validation) => validation.issues ?? []);
-  const validationAlertInvalidRefs = validationAlerts.flatMap((validation) => validation.invalidReferencedFiles ?? []);
+  const validationAlertIssues = dedupeValidationIssues(
+    validationAlerts.flatMap((validation) => validation.issues ?? []),
+  );
+  const validationAlertInvalidRefs = [...new Set(
+    validationAlerts.flatMap((validation) => validation.invalidReferencedFiles ?? []),
+  )].sort();
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -209,7 +213,8 @@ export function ReviewView() {
             </div>
             <ValidationSummary
               validation={{
-                role: "builder",
+                role: "aggregate",
+                profile: `${validationAlerts.length} affected run${validationAlerts.length === 1 ? "" : "s"}`,
                 passed: false,
                 issues: validationAlertIssues,
                 verifiedRepoFiles: [],
@@ -328,6 +333,8 @@ export function ReviewView() {
                 )}
 
                 {linkedTask ? <DailyLoopChain run={run} task={linkedTask} /> : null}
+
+                {run.type === "orchestration" ? <OrchestrationArtifactReview run={run} /> : null}
 
                 {validation ? (
                   <div className="mt-2 ml-6">
@@ -573,6 +580,72 @@ export function ReviewView() {
   );
 }
 
+type OrchestrationReviewOutput = {
+  artifact?: { content?: string; sourceRunId?: string; stepId?: string };
+  repair?: { finalStepId?: string };
+  qaRetry?: {
+    attemptsUsed?: number;
+    maxAttempts?: number;
+    exhausted?: boolean;
+    finalStepId?: string;
+  };
+  semanticRepair?: {
+    attemptsUsed?: number;
+    maxAttempts?: number;
+    exhausted?: boolean;
+    finalStepId?: string;
+    lastValidArtifactStepId?: string;
+    lastQaStepId?: string;
+  };
+};
+
+function OrchestrationArtifactReview({ run }: { run: Run }) {
+  const output = run.output as OrchestrationReviewOutput | undefined;
+  const artifact = output?.artifact;
+  const qaRetry = output?.qaRetry;
+  const semantic = output?.semanticRepair;
+  if (!artifact?.content && !qaRetry && !semantic) return null;
+
+  return (
+    <div className="mt-2 ml-6 rounded-lg border border-purple/20 bg-purple/[0.04] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-ink-muted">
+        <strong className="text-ink text-[0.74rem]">Reviewable artifact</strong>
+        {artifact?.stepId ? <span>Preserved from: <b className="text-teal">{artifact.stepId}</b></span> : null}
+        {semantic?.finalStepId ? <span>Latest attempt: <b className="text-orange">{semantic.finalStepId}</b></span> : null}
+        {semantic?.lastQaStepId ? <span>Last QA: <b className="text-ink">{semantic.lastQaStepId}</b></span> : null}
+        {qaRetry?.attemptsUsed ? (
+          <span>{qaRetry.attemptsUsed}/{qaRetry.maxAttempts ?? 2} QA format retries</span>
+        ) : null}
+        {semantic?.attemptsUsed ? (
+          <span>{semantic.attemptsUsed}/{semantic.maxAttempts ?? 3} semantic attempts</span>
+        ) : null}
+      </div>
+      {semantic?.exhausted ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          Semantic repair exhausted. The artifact below remains reviewable, but approval and memory stay blocked.
+        </p>
+      ) : null}
+      {qaRetry?.exhausted ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          QA format retries exhausted. The artifact remains reviewable, but semantic repair, approval, and memory stay blocked.
+        </p>
+      ) : null}
+      {artifact?.content ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[0.72rem] font-semibold text-purple hover:text-ink">
+            Inspect preserved artifact
+          </summary>
+          <pre className="mt-2 mb-0 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-md border border-[var(--border-card)] bg-[var(--bg-app)] p-3 font-sans text-[0.72rem] leading-[1.55] text-ink-muted">
+            {artifact.content}
+          </pre>
+        </details>
+      ) : (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">No valid artifact is available for review.</p>
+      )}
+    </div>
+  );
+}
+
 function DailyLoopChain({ run, task }: { run: Run; task: Task }) {
   const stages = [
     { label: "Source", value: `${task.sourceIds?.length ?? 0} linked`, complete: Boolean(task.sourceIds?.length) },
@@ -650,6 +723,7 @@ function readRunValidation(run: {
     | {
         validation?: {
           role?: string;
+          profile?: string;
           passed?: boolean;
           issues?: Array<{ code?: string; message?: string; severity?: string }>;
           verifiedRepoFiles?: string[];
@@ -662,4 +736,16 @@ function readRunValidation(run: {
     | undefined;
 
   return output?.validation ?? null;
+}
+
+function dedupeValidationIssues<T extends { code?: string; message?: string; severity?: string }>(issues: T[]): T[] {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = [issue.code, issue.message, issue.severity].join("|");
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }

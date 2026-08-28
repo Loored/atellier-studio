@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ORCHESTRATION_SKILL_IDS, type ExecutorMode, type OrchestrationSkillId } from "@atellier/shared";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
+  isOrchestrationStatusSettled,
   useOrchestrationSkillsApi,
   useOrchestrationStatusApi,
   useStartSkillOrchestrationApi,
@@ -47,7 +48,8 @@ export function useSkillOrchestrationPanel() {
   const isTerminal = liveStatus
     ? ["completed", "failed", "blocked", "cancelled"].includes(liveStatus.status)
     : false;
-  const { data: runEventsResponse } = useRunEventsApi(activeRunId, !isTerminal);
+  const isSettled = isOrchestrationStatusSettled(liveStatus);
+  const { data: runEventsResponse } = useRunEventsApi(activeRunId, !isSettled);
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
@@ -78,7 +80,7 @@ export function useSkillOrchestrationPanel() {
 
   useEffect(() => {
     if (!liveStatus || invalidatedRef.current) return;
-    if (["completed", "failed", "blocked", "cancelled"].includes(liveStatus.status)) {
+    if (isOrchestrationStatusSettled(liveStatus)) {
       invalidatedRef.current = true;
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.agents.all }),
@@ -153,6 +155,7 @@ export function useSkillOrchestrationPanel() {
     linkedTask,
     mode,
     liveStatus,
+    isOrchestrationSettled: isSettled,
     runEvents: runEventsResponse?.events ?? [],
     isOpenAiExecution,
     executorModel,

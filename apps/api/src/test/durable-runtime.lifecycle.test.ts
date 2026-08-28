@@ -46,6 +46,7 @@ function createClaimedRun(): Run {
 function createQueue(claim: ReturnType<typeof vi.fn>) {
   return {
     leaseMs: 3_000,
+    reconcileCompletedFinalizing: vi.fn().mockResolvedValue(0),
     claim,
     heartbeat: vi.fn().mockResolvedValue(true),
     isCancellationRequested: vi.fn().mockResolvedValue(false),
@@ -70,6 +71,21 @@ function createOrchestrations(executeClaimed: ReturnType<typeof vi.fn>) {
 }
 
 describe("durable runtime lifecycle", () => {
+  it("reconciles a completed parent left in finalizing before claiming new work", async () => {
+    const claim = vi.fn().mockResolvedValue(null);
+    const queue = createQueue(claim);
+    vi.mocked(queue.reconcileCompletedFinalizing).mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    const runtime = new DurableRuntimeService(queue, createOrchestrations(vi.fn()), {
+      workerId: "worker-reconcile",
+    });
+
+    await expect(runtime.runOnce()).resolves.toBe(true);
+    await expect(runtime.runOnce()).resolves.toBe(false);
+
+    expect(queue.reconcileCompletedFinalizing).toHaveBeenCalledTimes(2);
+    expect(claim).toHaveBeenCalledTimes(2);
+  });
+
   it("aborts only the matching active orchestration after cancellation is persisted", async () => {
     const run = createClaimedRun();
     const executionStarted = deferred();

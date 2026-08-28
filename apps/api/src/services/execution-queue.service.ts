@@ -53,6 +53,18 @@ export class ExecutionQueueService {
     return run;
   }
 
+  async reconcileCompletedFinalizing(runId?: string): Promise<number> {
+    const reconciled = await this.runs.reconcileCompletedFinalizingExecutions(runId);
+    for (const run of reconciled) {
+      await this.events.append(run.id, {
+        type: "completed",
+        phase: "completed",
+        message: "Orchestration execution completed by terminal-state reconciliation.",
+      });
+    }
+    return reconciled.length;
+  }
+
   async heartbeat(runId: string, workerId: string): Promise<boolean> {
     return this.runs.heartbeatExecution(runId, workerId, this.leaseMs);
   }
@@ -131,6 +143,15 @@ export class ExecutionQueueService {
       workerId,
     );
     if (!run) {
+      const reconciled = await this.reconcileCompletedFinalizing(runId);
+      if (reconciled > 0) {
+        const settled = await this.runs.getById(runId);
+        if (settled) return settled;
+      }
+      const settled = await this.runs.getById(runId);
+      if (settled?.status === "completed" && settled.execution?.phase === "completed") {
+        return settled;
+      }
       throw new Error(`Execution lease lost before run ${runId} could be finalized.`);
     }
     await this.events.append(runId, {

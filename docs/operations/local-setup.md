@@ -109,8 +109,10 @@ Optional model and policy controls:
 ```bash
 OPENAI_MODEL=gpt-4.1-mini
 AGENT_MAX_HANDOFF_DEPTH=1
-AGENT_EXECUTION_TIMEOUT_MS=45000
+AGENT_EXECUTION_TIMEOUT_MS=120000
 ```
+
+Keep the 120-second default for source-grounded local runs that must return a complete document; shorter limits can interrupt Ollama before the artifact is reviewable.
 
 Current product risk: real execution can burn quota. Future work should make executor mode, model, and model profile highly visible in UI before running agents.
 

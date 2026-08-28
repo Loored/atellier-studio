@@ -106,6 +106,53 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 
 ## Recent Operational Notes
 
+### 2026-08-25 - Autonomous Repair Loop v1
+
+- The Build Loop now runs `scope -> build -> deterministic artifact validation -> repair-1..3 when needed -> runtime -> qa -> memory`.
+- Runtime and QA run only after the latest Builder artifact passes deterministic validation. Three failed corrections finish the parent with `readiness: needs-human`, exact blockers, and approval still disabled.
+- Repair attempts persist stable IDs and attempt metadata; worker reclaim and explicit retry reuse completed attempts instead of duplicating them.
+- Parent output and orchestration status expose `repair` evidence (`attemptsUsed`, `maxAttempts`, `resolved`, `exhausted`, final step, blockers), and the dashboard renders a compact repair summary.
+- Status polling continues through the short parent-`completed`/execution-`finalizing` window and settles only when the durable phase is also terminal.
+- Human review, approval, and memory capture remain explicit boundaries; this slice automates bounded correction, not broad unsupervised authority.
+- Run record: `atelier/runs/2026-08-25-autonomous-repair-loop.md`.
+
+### 2026-08-26 - Long artifact generation and incremental repair
+
+- Artifact-builder orchestration steps use a 2048-token output budget; ordinary steps retain the 1024-token provider default.
+- Repairs generate only deterministic missing entries, and the backend merges each patch with the preceding Requested Artifact before revalidation and persistence.
+- Long artifacts receive a larger downstream context allowance so Runtime and QA can inspect the complete artifact.
+- Real Ollama run `6a8f6b4a1e35355494d1eac2` generated Day 1 through Day 14 with zero repairs. QA then requested semantic improvements, confirming completeness is solved while semantic QA-to-repair remains the next boundary.
+- Run record: `atelier/runs/2026-08-26-long-artifact-repair.md`.
+
+### 2026-08-26 - Semantic QA repair loop
+
+- After deterministic validation, a QA `CHANGES REQUESTED` verdict triggers up to three `semantic-repair-N -> qa-recheck-N` cycles.
+- Semantic Builder passes receive the complete latest artifact and QA feedback, return a full corrected artifact, and retain deterministic validation.
+- Wiki Curator runs only after the latest QA explicitly approves. Exhaustion records `semanticRepair`, sets `readiness: needs-human`, omits memory, and keeps human approval blocked.
+- Dashboard distinguishes deterministic and semantic repair evidence.
+- Real Ollama run `6a8f74b45eb53eb0cba161d4` exhausted 3/3 semantic attempts safely; the control loop worked, while local QA quality remained the limiting factor.
+- That soak exposed and led to a fix for semantic steps being classified as generic Builder; `semantic-repair-*` must always use the `artifact-builder` validation profile before QA can run.
+- Semantic completion now preserves the last deterministically valid requested artifact separately from the latest attempted repair and latest QA (`lastValidArtifactStepId`, `lastQaStepId`); later malformed repairs remain blockers but cannot erase the reviewable deliverable.
+- Real Ollama run `6a912ec756b741dc192de796` verified the all-invalid semantic path: `semantic-repair-1..3` failed, the complete Build artifact remained attached, summary IDs were `semantic-repair-3` / `build` / `qa`, memory was omitted, and approval returned HTTP 409.
+- Review now renders preserved orchestration artifacts and their semantic lineage. Explicit per-day fields requested by the goal are deterministically validated, and semantic repairs replace only corrected Day entries in the last valid artifact before merged revalidation.
+- Real run `6a913d43ca37bbc03e80e4bb` showed broad 14-day field repair exceeds the 120s local limit. Deterministic repairs now batch at most five failing days per attempt and replace complete day entries, allowing three bounded passes to cover 14 days.
+- Real run `6a913fe9af35cca136a9008b` verified batched construction: Build 1–5, repairs 6–10 and 11–14, then a focused Day 14 correction produced an 8,960-character valid artifact. QA quality remained limiting; semantic exhaustion preserved `repair-3`, omitted memory, and blocked approval with HTTP 409.
+- The same run exposed a reconciliation edge: parent status completed and activeRuns 0 while execution phase remained `finalizing` with no terminal event. Fix terminal-envelope reconciliation before the next soak.
+- Terminal-envelope reconciliation now atomically settles `completed + finalizing` runs, clears stale lease metadata, and emits one terminal event. QA responses without an explicit verdict receive two stable format retries before semantic repair; format exhaustion needs human input and cannot consume semantic repair attempts.
+- Real runs `6a915382678c0ba79e6a2e40` and `6a9154f6678c0ba79e6a2e8f` verified both paths: terminal events 19/40 settled through reconciliation, and a malformed third QA recheck exhausted two format retries, preserved `semantic-repair-3`, omitted memory, created no fourth semantic repair, and blocked approval with HTTP 409.
+- Run record: `atelier/runs/2026-08-26-semantic-qa-repair-loop.md`.
+
+### 2026-08-25 - Knowledge deliverable grounding
+
+- Linked task sources now contribute bounded read-only file contents and verified vault paths to every orchestration step; missing sources remain provenance but are not trusted as loaded evidence.
+- Build/Fix uses an `artifact-builder` contract with a required complete `Requested Artifact`; Toto Runtime uses a runtime-specific contract instead of generic Builder sections.
+- Markdown headings inside `Requested Artifact` remain part of the artifact, and Markdown-bold QA verdict labels are parsed normally.
+- N-day operating plans require every day explicitly; collapsed ranges such as `Día 2-14` are deterministic blocking errors that flow into Fix and parent validation.
+- The Atellier Build Loop parent aggregates final Fix/QA validation, stores readiness and the readable artifact, and blocks approval when evidence is missing or invalid.
+- Local agent execution now defaults to 120 seconds because the source-grounded Ollama artifact exceeded the previous 45-second budget.
+- Review deduplicates aggregate validation issues/references and reports the number of affected runs.
+- Triggering soak evidence and implementation notes: `atelier/runs/2026-08-25-knowledge-deliverable-grounding.md`.
+
 ### 2026-08-25 - Local Dev Launcher v1
 
 - `./scripts/dev-local` is the preferred one-command Mongo-backed startup path; `pnpm dev:local` is the package-script equivalent.
@@ -371,6 +418,8 @@ curl -s http://127.0.0.1:4000/health
 Run the smallest relevant subset for documentation-only changes.
 
 ## Pitfalls Already Solved
+
+- A real Ollama soak of Autonomous Repair Loop v1 produced the same Day 1–9 artifact on Build plus three repairs and correctly stopped with Days 10–14 missing. Treat this as a long-output capacity/chunking problem; do not increase the bounded retry count as the first remedy.
 
 - **`button {}` outside `@layer base` overrides all Tailwind utilities on button elements** — always keep base element rules inside `@layer base` in `styles.css`. Symptom: sidebar nav, metric cards, or any button with Tailwind color/border classes looks purple/glowing regardless of what classes are applied.
 - `pnpm` was unavailable until Corepack was enabled and `pnpm@9.15.4` prepared.

@@ -734,6 +734,60 @@ describe("App", () => {
     expect(screen.queryByText(/No runs match current filters/i)).not.toBeInTheDocument();
   });
 
+  it("deduplicates aggregate validation alerts across affected runs", async () => {
+    const validation = {
+      role: "builder",
+      profile: "artifact-builder",
+      passed: false,
+      issues: [
+        {
+          code: "artifact-builder.unverified_referenced_file",
+          severity: "error",
+          message: "Builder referenced an unverified file: wiki/sources/daily-plan.md",
+        },
+      ],
+      verifiedRepoFiles: [],
+      invalidReferencedFiles: ["wiki/sources/daily-plan.md"],
+      referencedFiles: ["wiki/sources/daily-plan.md"],
+      candidateFiles: [],
+      changedFiles: [],
+    };
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-validation-1",
+        type: "manual",
+        status: "completed",
+        reviewStatus: "pending",
+        output: { validation },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-validation-2",
+        type: "manual",
+        status: "completed",
+        reviewStatus: "pending",
+        output: { validation },
+        logs: [],
+        createdAt: "2026-05-04T00:00:01.000Z",
+        updatedAt: "2026-05-04T00:00:01.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    const alertLabel = await screen.findByText("Validation alerts (2)");
+    const alertContainer = alertLabel.parentElement;
+    expect(alertContainer).not.toBeNull();
+    const scoped = within(alertContainer as HTMLElement);
+    expect(scoped.getByText("2 affected runs")).toBeInTheDocument();
+    expect(scoped.getByText("1 invalid reference(s)")).toBeInTheDocument();
+    expect(scoped.getByText("1 issue(s)")).toBeInTheDocument();
+    expect(scoped.getAllByText(/wiki\/sources\/daily-plan\.md/)).toHaveLength(2);
+  });
+
   it("promotes a completed run to deliverable from timeline", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -888,6 +942,47 @@ describe("App", () => {
 
   it("starts a skill orchestration from the dashboard", async () => {
     const user = userEvent.setup();
+    getOrchestrationStatusMock.mockResolvedValue({
+      orchestrationRunId: "run-4",
+      skillId: "atellier-build-loop",
+      goal: "Build orchestration",
+      status: "completed",
+      steps: [
+        {
+          stepId: "repair-3",
+          label: "Auto-repair 3/3",
+          phase: "backend",
+          agentRole: "builder",
+          agentName: "Pepe Builder",
+          runId: "repair-run-3",
+          status: "completed",
+          isActive: false,
+          logicalStepId: "fix",
+          repairAttempt: 3,
+          repairAttemptLimit: 3,
+        },
+      ],
+      activeStep: null,
+      nextStep: null,
+      repair: {
+        maxAttempts: 3,
+        attemptsUsed: 3,
+        resolved: false,
+        exhausted: true,
+        finalStepId: "repair-3",
+        blockerMessages: ["Requested Artifact is missing Day 2."],
+      },
+      semanticRepair: {
+        maxAttempts: 3,
+        attemptsUsed: 2,
+        resolved: true,
+        exhausted: false,
+        finalStepId: "qa-recheck-2",
+        lastValidArtifactStepId: "semantic-repair-2",
+        lastQaStepId: "qa-recheck-2",
+        blockerMessages: [],
+      },
+    });
     render(<App />);
 
     await screen.findByText("Atellier Build Loop");
@@ -909,6 +1004,60 @@ describe("App", () => {
         taskId: "task-1",
       });
     });
+    expect(await scoped.findByRole("alert")).toHaveTextContent("Auto-repair needs input");
+    expect(scoped.getByText("Requested Artifact is missing Day 2.")).toBeInTheDocument();
+    expect(scoped.getByText(/deterministic repair/i)).toBeInTheDocument();
+    expect(scoped.getByText("Semantic repair resolved")).toBeInTheDocument();
+    expect(scoped.getByText(/Final QA approved on qa-recheck-2/i)).toBeInTheDocument();
+    expect(scoped.getByText(/Last valid artifact: semantic-repair-2 · Last QA: qa-recheck-2/i)).toBeInTheDocument();
+  });
+
+  it("shows preserved orchestration artifacts and semantic evidence in Review", async () => {
+    listRunsMock.mockResolvedValue([{
+      id: "orchestration-review-1",
+      taskId: "task-1",
+      type: "orchestration",
+      status: "completed",
+      reviewStatus: "pending",
+      deliverablePath: "wiki/deliverables/orchestration-review-1.md",
+      output: {
+        artifact: {
+          content: "### Day 1\nObjective: Use the system.\nHuman Approval Boundary: Approve before memory.",
+          sourceRunId: "builder-run-1",
+          stepId: "build",
+        },
+        semanticRepair: {
+          attemptsUsed: 3,
+          maxAttempts: 3,
+          exhausted: true,
+          finalStepId: "semantic-repair-3",
+          lastValidArtifactStepId: "build",
+          lastQaStepId: "qa",
+        },
+        validation: {
+          role: "qa",
+          profile: "orchestration",
+          passed: false,
+          issues: [{ code: "orchestration.semantic_repair_attempts_exhausted", severity: "error", message: "Semantic repair exhausted." }],
+          invalidReferencedFiles: [],
+        },
+      },
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
+    }]);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+
+    expect(await screen.findByText("Preserved from:")).toBeInTheDocument();
+    expect(screen.getByText("build", { selector: "b" })).toBeInTheDocument();
+    expect(screen.getByText(/Latest attempt:/)).toBeInTheDocument();
+    expect(screen.getByText(/Semantic repair exhausted.*approval and memory stay blocked/i)).toBeInTheDocument();
+    await user.click(screen.getByText("Inspect preserved artifact"));
+    expect(screen.getByText(/Human Approval Boundary: Approve before memory/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Capture memory" })).toBeDisabled();
   });
 
   it("runs wiki ingest and query actions from the wiki panel", async () => {
