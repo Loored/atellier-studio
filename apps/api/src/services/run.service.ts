@@ -535,6 +535,67 @@ export class RunService {
     return next;
   }
 
+  async reconcileCompletedFinalizingExecutions(id?: string): Promise<Run[]> {
+    const finishedAt = new Date().toISOString();
+    const reconciled: Run[] = [];
+
+    if (this.storageMode === "mongo") {
+      while (true) {
+        const query: Record<string, unknown> = {
+          ...(id && { _id: id }),
+          type: "orchestration",
+          status: "completed",
+          "execution.kind": "skill-orchestration",
+          "execution.phase": "finalizing",
+        };
+        const run = await RunModel.findOneAndUpdate(
+          query,
+          {
+            $set: {
+              "execution.phase": "completed",
+              "execution.finishedAt": finishedAt,
+              updatedAt: new Date(),
+            },
+            $unset: {
+              "execution.leaseOwner": "",
+              "execution.leaseExpiresAt": "",
+              "execution.heartbeatAt": "",
+              "execution.currentStepId": "",
+              "execution.lastError": "",
+            },
+          },
+          { new: true },
+        );
+        if (!run) break;
+        reconciled.push(toJsonRecord<Run>(run));
+        if (id) break;
+      }
+      return reconciled;
+    }
+
+    for (const current of this.records.values()) {
+      if (
+        (id && current.id !== id)
+        || current.type !== "orchestration"
+        || current.status !== "completed"
+        || current.execution?.kind !== "skill-orchestration"
+        || current.execution.phase !== "finalizing"
+      ) {
+        continue;
+      }
+      const execution = { ...current.execution, phase: "completed" as const, finishedAt };
+      delete execution.leaseOwner;
+      delete execution.leaseExpiresAt;
+      delete execution.heartbeatAt;
+      delete execution.currentStepId;
+      delete execution.lastError;
+      const next = { ...current, execution, updatedAt: finishedAt };
+      this.records.set(current.id, next);
+      reconciled.push(next);
+    }
+    return reconciled;
+  }
+
   async allocateEventSequence(id: string, expectedLeaseOwner?: string): Promise<number | null> {
     const nowIso = new Date().toISOString();
     if (this.storageMode === "mongo") {
@@ -1276,6 +1337,8 @@ export class RunService {
   private buildDeliverableMarkdown(run: Run, summary?: string): string {
     const title = summary?.trim() || `Run ${run.id} Deliverable`;
     const outputBlock = run.output === undefined ? "_No output captured._" : `\`\`\`json\n${JSON.stringify(run.output, null, 2)}\n\`\`\``;
+    const artifact = (run.output as { artifact?: { content?: unknown } } | undefined)?.artifact?.content;
+    const artifactContent = typeof artifact === "string" && artifact.trim() ? artifact.trim() : null;
     return [
       `# ${title}`,
       "",
@@ -1290,7 +1353,15 @@ export class RunService {
       "",
       summary?.trim() || "Completed run deliverable.",
       "",
-      "## Output",
+      ...(artifactContent
+        ? [
+            "## Requested Artifact",
+            "",
+            artifactContent,
+            "",
+          ]
+        : []),
+      "## Execution Evidence",
       "",
       outputBlock,
       "",

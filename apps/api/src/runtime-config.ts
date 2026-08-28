@@ -76,7 +76,7 @@ export function readRuntimeConfig(): RuntimeEnvironmentConfig {
       ollamaModelProfile: parseModelProfile(process.env.OLLAMA_MODEL_PROFILE),
       ollamaModelByRole: readOllamaRoleOverrides(),
       maxHandoffDepth: Number(process.env.AGENT_MAX_HANDOFF_DEPTH ?? 1),
-      executionTimeoutMs: Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 45_000),
+      executionTimeoutMs: Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 120_000),
       runtimeLeaseMs: Number(process.env.RUN_WORKER_LEASE_MS ?? 30_000),
       runtimePollMs: Number(process.env.RUN_WORKER_POLL_MS ?? 1_000),
       codexWorkerRealEnabled: process.env.CODEX_WORKER_REAL_ENABLED === "true",

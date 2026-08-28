@@ -58,6 +58,8 @@ export type CreateAppServicesOptions = {
   storageMode?: StorageMode;
   atelierRoot?: string;
   agentExecutorMode?: AgentExecutorMode;
+  /** Test/local harness override for deterministic executor scenarios. */
+  agentExecutor?: AgentExecutorService;
   openaiApiKey?: string;
   openaiModel?: string;
   openaiModelProfile?: ModelProfile;
@@ -147,7 +149,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
   ];
   const executorMode: AgentExecutorMode = options.agentExecutorMode
     ?? (options.openaiApiKey ? "openai" : "mock");
-  const fallbackExecutor = createAgentExecutorService({
+  const fallbackExecutor = options.agentExecutor ?? createAgentExecutorService({
     mode: executorMode,
     openai: options.openaiApiKey
       ? {

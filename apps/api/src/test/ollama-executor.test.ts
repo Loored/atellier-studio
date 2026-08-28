@@ -85,6 +85,23 @@ describe("OllamaAgentExecutorService", () => {
     expect(url).toBe("http://my-host:9999/v1/chat/completions");
   });
 
+  it("honors a per-execution output token budget", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }),
+    );
+    const executor = new OllamaAgentExecutorService({ model: "llama3.2" });
+
+    await executor.execute({
+      agent: fixtureAgent,
+      instruction: "Produce a long artifact.",
+      maxOutputTokens: 2048,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { max_tokens: number };
+    expect(body.max_tokens).toBe(2048);
+  });
+
   it("throws an Ollama-labeled error on a non-2xx response", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
