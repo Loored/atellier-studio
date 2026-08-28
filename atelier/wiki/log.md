@@ -11934,6 +11934,162 @@
 - validation: monorepo typecheck/build passed; API 119/119 and web 24/24 passed with mock/local services only (3 opt-in Mongo tests skipped); read-only Wiki lint reported zero issues.
 - next: use the complete P3/P4 loop in real work, resolve signals, and record repeated friction.
 
+## [2026-08-25T02:56:06.299Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-08-25T02:56:47.825Z] ingest | fuente
+- Summary: Ingested source into wiki/sources/2026-08-25-fuente.md
+- rawPath: raw/ingest/2026-08-25-fuente.md
+- summaryPagePath: wiki/sources/2026-08-25-fuente.md
+
+## [2026-08-25T02:57:54.748Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8d04b23ae4fa0e06ddd546
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:57:54.893Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8d04b23ae4fa0e06ddd563
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:57:55.065Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8d04b23ae4fa0e06ddd581
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:57:55.224Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8d04b33ae4fa0e06ddd59f
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:57:55.366Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8d04b33ae4fa0e06ddd5bd
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:57:55.543Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8d04b33ae4fa0e06ddd5db
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:57:55.721Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 6a8d04b33ae4fa0e06ddd5fa
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T02:58:03.902Z] run_completed | Atellier Build Loop completed
+- Run ID: 6a8d04b19060b8c9304d223b
+- Task ID: 6a8d04739060b8c9304d2223
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8d04b19060b8c9304d223b-atellier-build-loop-completed.md
+
+## [2026-08-25T02:58:27.115Z] decision | Deliverable accepted
+- Run ID: 6a8d04b33ae4fa0e06ddd5fa
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:28.198Z] decision | Deliverable accepted
+- Run ID: 6a8d04b33ae4fa0e06ddd5db
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:29.194Z] decision | Deliverable accepted
+- Run ID: 6a8d04b33ae4fa0e06ddd5bd
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:30.143Z] decision | Deliverable accepted
+- Run ID: 6a8d04b33ae4fa0e06ddd59f
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:31.579Z] decision | Deliverable accepted
+- Run ID: 6a8d04b23ae4fa0e06ddd581
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:32.254Z] decision | Deliverable accepted
+- Run ID: 6a8d04b23ae4fa0e06ddd563
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:33.245Z] decision | Deliverable accepted
+- Run ID: 6a8d04b23ae4fa0e06ddd546
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Run marked as approved.
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:58:41.493Z] decision | Run memory captured
+- Run ID: 6a8d04b33ae4fa0e06ddd5fa
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Captured review memory for run 6a8d04b33ae4fa0e06ddd5fa.
+- memoryPath: wiki/synthesis/run-6a8d04b33ae4fa0e06ddd5fa-review-memory-captured-from-dashboard.md
+- type: manual
+- reviewStatus: approved
+- deliverablePath: none
+
+## [2026-08-25T02:59:18.003Z] decision | Approved review learning curated
+- Run ID: 6a8d04b33ae4fa0e06ddd5fa
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Approved manual run 6a8d04b33ae4fa0e06ddd5fa.
+- role: wiki-curator
+- roleMemoryPath: wiki/role-memory/wiki-curator.md
+- memoryPath: wiki/synthesis/run-6a8d04b33ae4fa0e06ddd5fa-review-memory-captured-from-dashboard.md
+- signal: stale
+- signalPath: wiki/synthesis/run-6a8d04b33ae4fa0e06ddd5fa-review-memory-captured-from-dashboard.md
+
 ## [2026-08-24T21:15:00.000-06:00] ingest | Curation signal resolution implementation knowledge
 - Summary: Added explicit resolved/dismissed decisions for approved role-learning signals with required notes, durable role-memory history, exact lint closure, and open/resolved graph statistics.
 - Source: implementation, deterministic tests, and read-only visual validation on `codex/curation-signal-resolution`; no new immutable external raw source.
@@ -11944,6 +12100,36 @@
 - validation: monorepo typecheck/build passed; API 120/120 and web 25/25 passed (3 opt-in Mongo tests skipped); browser console clean.
 - next: continue the daily-use soak and record repeated operator friction before expanding scope; subsequent Wiki lint runs reported no issues.
 
+## [2026-08-25T04:32:10.379Z] decision | Review learning signal resolved
+- Run ID: 6a8d04b33ae4fa0e06ddd5fa
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: missing expected pages
+- role: wiki-curator
+- roleMemoryPath: wiki/role-memory/wiki-curator.md
+- signal: stale
+- signalPath: wiki/synthesis/run-6a8d04b33ae4fa0e06ddd5fa-review-memory-captured-from-dashboard.md
+- outcome: dismissed
+
+## [2026-08-25T04:32:35.369Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-08-25T04:32:41.105Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-08-25T04:32:41.716Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
+## [2026-08-25T04:32:49.967Z] query | Wiki query: missing
+- Summary: Returned 5 matches
+- limit: 5
+
+## [2026-08-25T04:32:54.995Z] wiki_lint | Wiki lint run
+- Summary: No issues found.
+- issues: 0
+
 ## [2026-08-25T21:59:05.000Z] ingest | Local Dev Launcher v1 operational knowledge
 - Summary: Converted repeated local startup friction into one safe launcher for Mongo, API, the durable worker, and fixed-port web development.
 - Source: implementation and isolated localhost validation on `codex/local-dev-launcher`; no new immutable external raw source.
@@ -11953,3 +12139,1196 @@
 - validation: 6/6 launcher tests, frozen install, and direct Shared/API/Web/MCP builds passed; isolated Mongo/API/worker/web readiness passed; Dashboard rendered with a clean console; launcher-owned ports closed after graceful shutdown; the pre-existing API remained healthy after occupied-port detection.
 - tasks proposed: continue the daily-use P3/P4 soak using the launcher and record only repeated friction before selecting another bounded slice.
 - next: run the first meaningful source-to-memory workflow against the standard local Mongo session.
+
+## [2026-08-25T22:21:13.872Z] ingest | Plan operativo de 14 días para usar Atellier diariamente
+- Summary: Ingested source into wiki/sources/2026-08-25-plan-operativo-de-14-d-as-para-usar-atellier-diariamente.md
+- rawPath: raw/ingest/2026-08-25-plan-operativo-de-14-d-as-para-usar-atellier-diariamente.md
+- summaryPagePath: wiki/sources/2026-08-25-plan-operativo-de-14-d-as-para-usar-atellier-diariamente.md
+
+## [2026-08-25T22:27:46.862Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e16c24bcdfe33b27d0733
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:28:09.504Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e16e24bcdfe33b27d0773
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:28:30.019Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8e16f94bcdfe33b27d07ab
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:28:47.063Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e170e4bcdfe33b27d07e2
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:29:13.325Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e171f4bcdfe33b27d0812
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:29:30.408Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e17394bcdfe33b27d084d
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:30:01.774Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 6a8e174a4bcdfe33b27d087d
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-25T22:30:10.574Z] run_completed | Atellier Build Loop completed
+- Run ID: 6a8e15830337eb9bb30593f0
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8e15830337eb9bb30593f0-atellier-build-loop-completed.md
+
+## [2026-08-25T22:49:51Z] ingest | Knowledge deliverable grounding implementation
+- Summary: Converted the first real source-to-memory validation failure into bounded source-content grounding, requested-artifact evidence, step-specific validation, and deduplicated Review alerts.
+- Source: parent run `6a8e15830337eb9bb30593f0`, linked task `6a8e155b0337eb9bb30593d6`, deterministic tests, and implementation on `codex/knowledge-deliverable-grounding`; no new immutable external raw source.
+- run: `atelier/runs/2026-08-25-knowledge-deliverable-grounding.md`
+- pages updated: `docs/daily-use-operational-loop.md`, `atelier/wiki/workflows/daily-use-operational-loop.md`, `docs/roadmap.md`, `atelier/tasks/active.md`, `atelier/wiki/index.md`, `CODEX_MEMORY.md`.
+- contradictions: prior path-only grounding and generic Builder validation were insufficient for knowledge deliverables; the updated contract requires readable source evidence and a complete artifact before approval.
+- validation: API 124/124 passed with 3 opt-in Mongo tests skipped; Web 26/26 passed; Shared/API/Web/MCP typecheck passed; local UI/runtime validation pending.
+- next: run the same source-linked task through a fresh Atellier Build Loop with local Ollama and review the actual requested artifact before approval.
+
+## [2026-08-26T03:30:33.624Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e5db916b28c52f094d7db
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:34:28.436Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e5eaa46f22ad1da0b6a53
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:35:21.315Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e5ec446f22ad1da0b6a8b
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:35:45.082Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8e5ef946f22ad1da0b6ae2
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:36:20.734Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e5f1146f22ad1da0b6b1a
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:37:35.867Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e5f3546f22ad1da0b6b60
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:38:08.777Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e5f7f46f22ad1da0b6bcf
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:38:49.610Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 6a8e5fa046f22ad1da0b6c11
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:38:59.056Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8e5ea9bdd0060e1f543533
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8e5ea9bdd0060e1f543533-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T03:45:52.541Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e6149402cea65991e8059
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:46:35.406Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6170402cea65991e809f
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:47:03.245Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8e619b402cea65991e80ec
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:47:29.787Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e61b7402cea65991e8127
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:48:20.447Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e61d1402cea65991e8161
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:48:51.202Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e6204402cea65991e81b6
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:49:36.239Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 6a8e6223402cea65991e81f5
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:49:37.831Z] run_completed | Atellier Build Loop completed
+- Run ID: 6a8e61485bf860c94d618ffc
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8e61485bf860c94d618ffc-atellier-build-loop-completed.md
+
+## [2026-08-26T03:53:43.213Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e63291d18db92b36a41bf
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:54:38.900Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e63471d18db92b36a41fb
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:55:17.607Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8e637f1d18db92b36a4257
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:55:44.297Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e63a51d18db92b36a429e
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:57:02.480Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e63c01d18db92b36a42d9
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:57:45.333Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8e640e1d18db92b36a434c
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:58:14.685Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 6a8e64391d18db92b36a4399
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T03:58:15.666Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8e6329c777ea7207017b8b
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8e6329c777ea7207017b8b-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T04:00:03Z] validation | Knowledge deliverable grounding verified with local Ollama
+
+- Summary: Completed the source-grounded Build Loop soak and hardened its evidence contract using the real model output.
+- Source: linked task `6a8e155b0337eb9bb30593d6`, immutable raw source, Wiki source summary, and final parent run `6a8e6329c777ea7207017b8b`.
+- Outcome: all seven steps completed in one attempt with zero invalid source references; the parent persisted the actual artifact and correctly finished `changes-required`.
+- Blocking evidence: final Fix run `6a8e63c01d18db92b36a42d9` collapsed required daily entries and was rejected by `artifact-builder.incomplete_enumerated_artifact` instead of receiving a false approval.
+- Runtime: the documented local agent timeout is now 120 seconds; Markdown artifact subheadings and bold QA verdicts are parsed without truncation or false negatives.
+- UI: Review deduplicates the historical validation set to three affected runs, one invalid reference, and three unique issues.
+- run: `atelier/runs/2026-08-25-knowledge-deliverable-grounding.md`
+- next: review the generated deliverable, request changes while the 14 explicit days are missing, then evaluate a focused structured-artifact generation slice or Builder model routing based on repeated evidence.
+
+## [2026-08-25T22:30:00-06:00] implementation | Autonomous Repair Loop v1
+
+- Summary: deterministic Builder failures now trigger up to three automatic correction attempts before Runtime and QA.
+- Evidence: stable `repair-1..3` child IDs, exact validation feedback, durable completed-step reuse, parent repair summary, and visible orchestration status.
+- Exhaustion: downstream Runtime/QA/memory work is skipped and the parent records `readiness: needs-human` with concrete blockers.
+- Boundary: human approval and approved Wiki memory capture remain explicit; free-form QA findings do not trigger unbounded autonomous retries.
+- Run: `atelier/runs/2026-08-25-autonomous-repair-loop.md`
+- Next: validate the local Mongo/browser flow and then soak the bounded loop with real Ollama artifacts.
+
+## [2026-08-26T15:26:30-06:00] validation | Autonomous Repair Loop v1 verified locally
+
+- Automated evidence: API 129 passed with 3 opt-in Mongo tests skipped; Web 28 passed; Shared/API/Web/MCP typechecks passed.
+- Local flow: Mongo-backed Dashboard executed a `mock` three-day plan and persisted `repair-1`, `repair-2`, and `repair-3` without invoking Ollama or external providers.
+- Terminal evidence: run `completed`, durable phase `completed`, event `#19`, attempts `3/3`, exact missing-day blocker, and visible `Auto-repair needs input` alert.
+- Hardening: polling now continues through the transient `completed` + `finalizing` window until the durable execution envelope is terminal.
+- Run: `atelier/runs/2026-08-25-autonomous-repair-loop.md`
+- Next: use the same bounded loop with real Ollama artifacts and record which deterministic blocker classes resolve reliably.
+
+## [2026-08-26T04:34:33.701Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e6cd994cfc912596fccc8
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:34:33.802Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6cd994cfc912596fcce4
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:34:33.894Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6cd994cfc912596fcd03
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:34:34.007Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6cd994cfc912596fcd22
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:34:34.105Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6cda94cfc912596fcd41
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:34:42.638Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8e6cd915c66fcd1550438f
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8e6cd915c66fcd1550438f-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T04:36:34.915Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8e6d5294cfc912596fcdec
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:36:34.995Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6d5294cfc912596fce08
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:36:35.102Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6d5394cfc912596fce27
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:36:35.206Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6d5394cfc912596fce46
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:36:35.335Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8e6d5394cfc912596fce65
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T04:36:36.255Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8e6d5215c66fcd155043ff
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8e6d5215c66fcd155043ff-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T21:25:10.881Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8f59b694cfc91259703835
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T21:25:10.949Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f59b694cfc91259703851
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T21:25:11.041Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f59b794cfc91259703870
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T21:25:11.128Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f59b794cfc9125970388f
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T21:25:11.192Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f59b794cfc912597038ae
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T21:25:17.592Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8f59b615c66fcd15504468
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8f59b615c66fcd15504468-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T22:03:21.631Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8f628c94cfc912597041a5
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:04:25.669Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f62a994cfc912597041e1
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:05:35.588Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f62e994cfc9125970424a
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:06:49.826Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f632f94cfc912597042b9
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:08:03.205Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f637994cfc9125970432c
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:08:10.887Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8f628b15c66fcd155044e1
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8f628b15c66fcd155044e1-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T22:40:42.153Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8f6b4ab907ef626d25bfbc
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:42:09.854Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f6b6ab907ef626d25bffb
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:42:33.633Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8f6bc1b907ef626d25c078
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:43:06.452Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8f6bd9b907ef626d25c0af
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:43:41.780Z] run_completed | Wiki Curator completed execution and requests review.
+- Run ID: 6a8f6bfab907ef626d25c0f0
+- Agent ID: 69f95fc3b0aa4c2956a76773
+- Summary: Wiki Curator completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T22:43:52.133Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8f6b4a1e35355494d1eac2
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8f6b4a1e35355494d1eac2-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-26T22:47:00.000Z] decision | Long artifact generation and incremental repair validated
+
+- Artifact-builder execution now receives a 2048-token output budget while ordinary agent steps retain the conservative default.
+- Deterministic repairs request only missing entries and merge them into the preceding Requested Artifact before validation.
+- Downstream context preserves long artifacts for Runtime and QA review.
+- Real Ollama run `6a8f6b4a1e35355494d1eac2` produced all 14 requested days with zero repairs; QA identified remaining semantic quality issues for a later bounded slice.
+- Run log: `../runs/2026-08-26-long-artifact-repair.md`
+
+## [2026-08-26T23:31:00.000Z] decision | Bounded semantic QA repair loop validated
+
+- QA changes now trigger up to three durable semantic Builder repairs with a fresh QA recheck after each passing artifact.
+- Stable `semantic-repair-N` and `qa-recheck-N` steps expose the loop in orchestration status and Dashboard.
+- Wiki memory is gated on explicit final QA approval; exhaustion produces `needs-human` and preserves human review.
+- Real Ollama run `6a8f74b45eb53eb0cba161d4` exhausted 3/3 attempts without running memory, confirming the safety boundary.
+- Run log: `../runs/2026-08-26-semantic-qa-repair-loop.md`
+
+## [2026-08-27T00:00:00.000Z] validation | Corrected semantic classifier passed; last-valid artifact regression found
+
+- Real run `6a90d2aba1f9703a01ae32cb` confirmed semantic repairs use the artifact-builder profile.
+- Invalid repairs were blocked before QA, memory was omitted, and approval returned HTTP 409.
+- Parent completion incorrectly selected the newest invalid repair instead of preserving the last valid semantic artifact.
+- Next fix: separate latest attempted repair from last deterministically valid artifact.
+
+## [2026-08-26T23:20:56.347Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a8f74b4ea7266ef3f0ffb3c
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:22:28.598Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f74d8ea7266ef3f0ffb7f
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:23:08.255Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a8f7534ea7266ef3f0ffc01
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:23:44.921Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8f755cea7266ef3f0ffc4a
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:25:33.937Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f7581ea7266ef3f0ffc90
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:27:32.119Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8f75edea7266ef3f0ffd28
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:28:38.300Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f7664ea7266ef3f0ffdcb
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:30:02.436Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8f76a6ea7266ef3f0ffe35
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:31:51.771Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a8f76faea7266ef3f0ffeb5
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:33:04.951Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a8f7767ea7266ef3f0fff4f
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-26T23:33:13.307Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a8f74b45eb53eb0cba161d4
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a8f74b45eb53eb0cba161d4-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-28T00:14:11.125Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a90d2acd6a14e25de5d059a
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:17:08.465Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a90d34cd6a14e25de5d0691
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:17:32.470Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a90d384d6a14e25de5d06eb
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:17:57.499Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a90d39cd6a14e25de5d0723
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:19:05.472Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a90d3b5d6a14e25de5d075d
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:20:05.748Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a90d3f9d6a14e25de5d07c5
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:20:43.076Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a90d435d6a14e25de5d0828
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:21:29.803Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a90d45bd6a14e25de5d0874
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T00:21:37.957Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a90d2aba1f9703a01ae32cb
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a90d2aba1f9703a01ae32cb-atellier-build-loop-completed-with-validation-bl.md
+## [2026-08-28] Semantic repair last-valid-artifact preservation
+
+- Parent orchestration evidence now preserves the newest deterministically valid `Requested Artifact` when later semantic repairs are malformed.
+- Semantic summaries expose the latest attempt, last valid artifact, and last completed QA independently.
+- Approval and memory gates remain closed on semantic exhaustion.
+- Automated suites passed (API 135, Web 28, all package typechecks). Real Ollama run `6a912ec756b741dc192de796` exhausted three invalid semantic repairs while preserving `build` as its last valid reviewable artifact; approval remained blocked with HTTP 409 and memory was omitted.
+
+## [2026-08-28] Reviewable artifacts and field-complete semantic patches
+
+- Review exposes the preserved artifact and semantic lineage inline.
+- Explicit daily fields are validated per day with exact missing-field evidence.
+- Semantic repair outputs replace only corrected Day entries in the last valid artifact before deterministic revalidation.
+- Automated validation passed: API 137, Web 29, and all workspace typechecks.
+- Real run `6a913d43ca37bbc03e80e4bb` correctly caught collapsed days and missing daily fields, but broad correction timed out; deterministic repair is now batched to five complete days per attempt.
+- Follow-up run `6a913fe9af35cca136a9008b` successfully assembled all 14 field-complete days through bounded batches and preserved the valid `repair-3` artifact. Local QA failed to produce a verdict; semantic exhaustion safely omitted memory and kept approval blocked.
+- Runtime follow-up: the parent completed but its execution envelope remained `finalizing` after active work reached zero; terminal reconciliation is the next durability boundary.
+
+## [2026-08-28T06:46:59.942Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a912ec7956764dc8e2428b7
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:48:39.533Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a912ee4956764dc8e2428f2
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:49:15.860Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a912f47956764dc8e242979
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:49:47.474Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a912f6b956764dc8e2429be
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:50:42.815Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a912f8b956764dc8e2429ff
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:51:16.314Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a912fc2956764dc8e242a5d
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:52:00.476Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a912fe4956764dc8e242aa3
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T06:52:14.905Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a912ec756b741dc192de796
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a912ec756b741dc192de796-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-28T07:48:59.081Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a913d44397d868c6ca40030
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T07:50:28.314Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a913d6b397d868c6ca40077
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:00:01.059Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a913fea0d8cd040043370fc
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:05:04.128Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9140d5e778b3e25d440022
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:06:23.500Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a914130e778b3e25d440096
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:08:23.613Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a91417fe778b3e25d440101
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:10:21.675Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9141f7e778b3e25d4401a7
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:10:58.312Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a91426de778b3e25d440247
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:11:50.259Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a914292e778b3e25d440290
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:12:38.073Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9142c6e778b3e25d4402e6
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:13:23.075Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9142f6e778b3e25d440331
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:14:25.459Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a914323e778b3e25d44037b
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T08:15:04.488Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a913fe9af35cca136a9008b
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a913fe9af35cca136a9008b-atellier-build-loop-completed-with-validation-bl.md
+
+## 2026-08-28 - QA contract retry and durable terminal reconciliation
+
+- Malformed QA output now receives two bounded, stable format retries before any semantic repair.
+- QA format exhaustion preserves the valid artifact and blocks semantic repair, approval, and memory for human review.
+- Durable workers idempotently reconcile completed orchestration parents left in `finalizing` and emit the missing terminal event once.
+- Automated validation: API 143 passed (3 Mongo opt-in skipped), Web 29 passed, and all workspace typechecks passed.
+- Real runs `6a915382678c0ba79e6a2e40` and `6a9154f6678c0ba79e6a2e8f` verified terminal reconciliation and bounded QA-recheck format exhaustion. The latter preserved `semantic-repair-3`, omitted memory, created no extra semantic repair, and rejected approval with HTTP 409.
+
+## [2026-08-28T09:23:53.796Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a915383c6f8eb4ce78d1606
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:25:08.861Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9153a9c6f8eb4ce78d164c
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:26:06.798Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9153f5c6f8eb4ce78d16bf
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:27:57.641Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a91542ec6f8eb4ce78d171f
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:28:44.821Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a91549dc6f8eb4ce78d17bc
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:28:53.722Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a915382678c0ba79e6a2e40
+- Task ID: 6a8e155b0337eb9bb30593d6
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a915382678c0ba79e6a2e40-atellier-build-loop-completed-with-validation-bl.md
+
+## [2026-08-28T09:29:42.418Z] run_completed | Pepe PM completed execution and requests review.
+- Run ID: 6a9154f7760305cd59c1028b
+- Agent ID: 69f95fc3b0aa4c2956a7670b
+- Summary: Pepe PM completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:30:40.355Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a915506760305cd59c102b6
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:31:11.878Z] run_completed | Toto Runtime completed execution and requests review.
+- Run ID: 6a915540760305cd59c10311
+- Agent ID: 69f95fc3b0aa4c2956a7672f
+- Summary: Toto Runtime completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:31:38.072Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a91555f760305cd59c10350
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:32:47.425Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a91557a760305cd59c1038a
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:33:19.762Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a9155bf760305cd59c103f1
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:34:33.931Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a9155df760305cd59c10433
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:36:12.310Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a91562a760305cd59c104a0
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:37:06.235Z] run_completed | Pepe Builder completed execution and requests review.
+- Run ID: 6a91568c760305cd59c10529
+- Agent ID: 69f95fc3b0aa4c2956a7671d
+- Summary: Pepe Builder completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:38:08.675Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a9156c2760305cd59c10580
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:39:22.174Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a915700760305cd59c105e6
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:40:42.554Z] run_completed | Jaco QA completed execution and requests review.
+- Run ID: 6a91574a760305cd59c10657
+- Agent ID: 69f95fc3b0aa4c2956a76741
+- Summary: Jaco QA completed execution and requests review.
+- type: manual
+- status: completed
+- reviewStatus: pending
+- deliverablePath: none
+
+## [2026-08-28T09:40:50.334Z] run_completed | Atellier Build Loop completed with validation blockers
+- Run ID: 6a9154f6678c0ba79e6a2e8f
+- Summary: Atellier Build Loop completed with validation blockers
+- type: orchestration
+- status: completed
+- reviewStatus: pending
+- deliverablePath: wiki/deliverables/6a9154f6678c0ba79e6a2e8f-atellier-build-loop-completed-with-validation-bl.md

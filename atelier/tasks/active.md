@@ -124,3 +124,19 @@ Tasks currently in progress.
   - [x] Start API, durable worker, and web with deterministic local URLs.
   - [x] Wait for real localhost readiness and stop only launcher-owned processes.
   - [x] Document preflight, overrides, manual fallback, and shutdown behavior.
+
+- [x] Knowledge deliverable grounding and validation
+  - [x] Feed bounded linked-source contents into every orchestration step.
+  - [x] Verify Wiki/raw aliases without treating them as invented repository files.
+  - [x] Give Runtime and artifact-producing Builder steps explicit output contracts.
+  - [x] Persist requested-artifact readiness on the parent run and block unsafe approval.
+  - [x] Reject collapsed N-day ranges deterministically and feed exact validation evidence into Fix.
+  - [x] Allow 120 seconds for complete source-grounded local artifacts.
+  - [x] Deduplicate aggregate validation alerts in Review.
+
+- [x] Autonomous Repair Loop v1
+  - [x] Validate the Builder artifact before Runtime and QA.
+  - [x] Feed exact deterministic errors into at most three automatic correction attempts.
+  - [x] Persist stable repair IDs and reuse completed attempts during recovery.
+  - [x] Stop downstream work with `needs-human` readiness and concrete blockers after exhaustion.
+  - [x] Show repair attempts and terminal repair evidence in the orchestration panel.

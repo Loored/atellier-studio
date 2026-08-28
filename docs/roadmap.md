@@ -153,9 +153,18 @@ Result: Review now resolves or dismisses an open learning signal with a required
 
 Resolve the repeated startup friction without introducing broader infrastructure. `./scripts/dev-local` now validates Node, pinned pnpm access, dependencies, ports, Docker/Compose, and Mongo; starts API, durable worker, and web on deterministic loopback URLs; waits for health; and shuts down only its own processes. It does not install packages, kill port owners, stop Mongo, or enable cloud/runtime authority.
 
+### P4.d — Knowledge deliverable grounding ✅ completed 2026-08-25
+
+The first real source-to-memory soak exposed path-only grounding, a code-shaped Runtime validator, duplicated Review alerts, and approval without the requested plan. Linked source contents are now loaded under bounded read-only context, vault paths participate in verification, Build/Fix and Runtime use step-specific contracts, the parent run persists a requested artifact plus final readiness evidence, and Review deduplicates aggregate validation. Live Ollama evidence then added deterministic N-day completeness checks, Markdown-safe artifact/verdict parsing, validation feedback propagation, and a 120-second local execution default.
+
+### P4.e — Autonomous Repair Loop v1 ✅ completed 2026-08-25
+
+Deterministic artifact failures now trigger up to three automatic Builder correction attempts before Runtime and QA. Every attempt has a stable persisted step ID, receives exact validation feedback, appears in orchestration status, and is reused during durable recovery. A passing artifact continues to final QA; exhaustion stops downstream work and records `readiness: needs-human` with concrete blockers. Human approval and memory capture remain explicit.
+
 ### Next — Daily-use soak and learning feedback
 
-- Run the P3/P4 flow against the local Mongo worker during real personal/project work.
+- Soak the bounded repair loop against the local Mongo worker and real Ollama artifacts; record which deterministic blocker classes are actually repairable.
+- Evaluate a later semantic QA-to-repair loop only after repeated evidence; do not turn free-form QA findings into unbounded retries.
 - Resolve captured curation signals explicitly from Review and verify the target-page decision remains useful over time.
 - Record repeated friction and only then select the next bounded feature slice.
 

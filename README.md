@@ -6,7 +6,7 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Durable Local Orchestration Runtime + complete daily-use and review-learning loops + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Knowledge Graph v2.
+Current stage: Operational Spine + Durable Local Orchestration Runtime + bounded autonomous artifact repair + complete daily-use and review-learning loops + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Knowledge Graph v2.
 
 Implemented:
 
@@ -155,8 +155,10 @@ Optional execution policy controls:
 
 ```bash
 AGENT_MAX_HANDOFF_DEPTH=1
-AGENT_EXECUTION_TIMEOUT_MS=45000
+AGENT_EXECUTION_TIMEOUT_MS=120000
 ```
+
+The 120-second default leaves enough room for source-grounded local models to return complete knowledge artifacts instead of timing out mid-document.
 
 Run the API without MongoDB for local UI review:
 
@@ -245,7 +247,7 @@ pnpm codex:wiki-lint
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-1. **Daily-use soak and learning feedback**: use the complete loop against the local Mongo worker, resolve real curation signals, and record friction before expanding product scope.
+1. **Daily-use repair soak and learning feedback**: use the bounded three-attempt repair loop against the local Mongo worker, resolve real curation signals, and record which failures repeat before expanding product scope.
 
 Already shipped: memory hygiene, Knowledge Graph v2 and follow-ups, role memory, Durable Runtime v1/v1.1, provider cancellation, irreversible-effect idempotency, the feature-flagged controlled Codex Worker adapter, the complete daily-use operational loop, explicit review-to-memory learning, and auditable curation-signal resolution.
 
