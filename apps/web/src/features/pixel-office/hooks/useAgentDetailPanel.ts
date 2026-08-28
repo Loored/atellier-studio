@@ -352,6 +352,7 @@ function readRunValidation(run: Run | null) {
     | {
         validation?: {
           role?: string;
+          profile?: string;
           passed?: boolean;
           issues?: Array<{ code?: string; message?: string; severity?: string }>;
           verifiedRepoFiles?: string[];

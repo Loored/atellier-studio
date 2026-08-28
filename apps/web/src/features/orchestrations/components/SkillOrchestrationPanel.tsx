@@ -54,6 +54,7 @@ export function SkillOrchestrationPanel() {
     linkedTask,
     mode,
     liveStatus,
+    isOrchestrationSettled,
     runEvents,
     isOpenAiExecution,
     executorModel,
@@ -83,9 +84,12 @@ export function SkillOrchestrationPanel() {
   const doneCount = liveStatus?.steps.filter((s) => s.status === "completed").length ?? 0;
   const totalCount = liveStatus?.steps.length ?? selectedSkill?.steps.length ?? 0;
 
-  const statusBadgeClass = orchStatus === "completed"
+  const displayStatus = orchStatus === "completed" && !isOrchestrationSettled
+    ? "finalizing"
+    : orchStatus;
+  const statusBadgeClass = displayStatus === "completed"
     ? "status-badge status-badge-completed"
-    : orchStatus && ["failed", "blocked", "cancelled"].includes(orchStatus)
+    : displayStatus && ["failed", "blocked", "cancelled"].includes(displayStatus)
       ? "status-badge status-badge-failed"
       : "status-badge status-badge-running";
 
@@ -100,7 +104,7 @@ export function SkillOrchestrationPanel() {
         <div className="inline-flex items-center gap-2">
           {mode === "live" ? (
             <>
-              {orchStatus && <span className={statusBadgeClass}>{orchStatus}</span>}
+              {displayStatus && <span className={statusBadgeClass}>{displayStatus}</span>}
               {!isTerminal ? (
                 <button
                   type="button"
@@ -173,6 +177,98 @@ export function SkillOrchestrationPanel() {
             </div>
           )}
 
+          {liveStatus?.repair && liveStatus.repair.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.repair.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.repair.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn(
+                  "text-[0.76rem]",
+                  liveStatus.repair.exhausted ? "text-orange" : "text-teal",
+                )}>
+                  {liveStatus.repair.exhausted
+                    ? "Auto-repair needs input"
+                    : "Auto-repair resolved"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.repair.attemptsUsed}/{liveStatus.repair.maxAttempts} attempts
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.repair.exhausted
+                  ? (liveStatus.repair.blockerMessages[0] ?? "Deterministic validation still has blockers.")
+                  : `Deterministic validation passed on ${liveStatus.repair.finalStepId}.`}
+              </p>
+            </div>
+          )}
+
+          {liveStatus?.qaRetry && liveStatus.qaRetry.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.qaRetry.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.qaRetry.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn("text-[0.76rem]", liveStatus.qaRetry.exhausted ? "text-orange" : "text-teal")}>
+                  {liveStatus.qaRetry.exhausted ? "QA format needs input" : "QA format recovered"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.qaRetry.attemptsUsed}/{liveStatus.qaRetry.maxAttempts} retries
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.qaRetry.exhausted
+                  ? (liveStatus.qaRetry.blockerMessages[0] ?? "QA did not return a usable verdict.")
+                  : `QA returned a usable verdict on ${liveStatus.qaRetry.finalStepId}.`}
+              </p>
+            </div>
+          )}
+
+          {liveStatus?.semanticRepair && liveStatus.semanticRepair.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.semanticRepair.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.semanticRepair.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn("text-[0.76rem]", liveStatus.semanticRepair.exhausted ? "text-orange" : "text-teal")}>
+                  {liveStatus.semanticRepair.exhausted ? "Semantic repair needs input" : "Semantic repair resolved"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.semanticRepair.attemptsUsed}/{liveStatus.semanticRepair.maxAttempts} attempts
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.semanticRepair.exhausted
+                  ? (liveStatus.semanticRepair.blockerMessages[0] ?? "Final QA still requests changes.")
+                  : `Final QA approved on ${liveStatus.semanticRepair.finalStepId}.`}
+              </p>
+              {liveStatus.semanticRepair.lastValidArtifactStepId && (
+                <p className="m-0 mt-1 text-[0.66rem] leading-[1.4] text-ink-faint overflow-wrap-anywhere">
+                  Last valid artifact: {liveStatus.semanticRepair.lastValidArtifactStepId}
+                  {liveStatus.semanticRepair.lastQaStepId && ` · Last QA: ${liveStatus.semanticRepair.lastQaStepId}`}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Step list */}
           <ol className="grid gap-2 list-none m-0 p-0 max-h-[280px] overflow-auto">
             {liveStatus
@@ -191,6 +287,9 @@ export function SkillOrchestrationPanel() {
                       <strong className="block text-ink text-[0.82rem] overflow-wrap-anywhere">{step.label}</strong>
                       <span className="text-ink-muted text-[0.72rem] overflow-wrap-anywhere">
                         {step.agentName} · {step.phase}
+                        {step.repairKind === "semantic"
+                          ? " · semantic repair"
+                          : step.repairAttempt ? " · deterministic repair" : ""}
                       </span>
                     </div>
                   </li>

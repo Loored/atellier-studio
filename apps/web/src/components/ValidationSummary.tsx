@@ -6,6 +6,7 @@ type ValidationIssue = {
 
 type ValidationSummaryValue = {
   role?: string;
+  profile?: string;
   passed?: boolean;
   issues?: ValidationIssue[];
   verifiedRepoFiles?: string[];
@@ -44,7 +45,7 @@ export function ValidationSummary({ validation, className = "" }: Props) {
         </span>
       </div>
       <div className="mt-1 text-ink-muted">
-        <span className="text-ink">{validation.role ?? "unknown"}</span>
+        <span className="text-ink">{validation.profile ?? validation.role ?? "unknown"}</span>
         {validation.changedFiles?.length !== undefined ? (
           <>
             <span className="mx-1.5">·</span>
