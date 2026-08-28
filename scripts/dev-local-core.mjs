@@ -125,3 +125,16 @@ export function formatCommand(command, args) {
     .map((part) => (/^[A-Za-z0-9_./:@=-]+$/.test(part) ? part : JSON.stringify(part)))
     .join(" ");
 }
+
+export function findAtellierWorkerProcesses(processList, repositoryRoot, currentPid = process.pid) {
+  const normalizedRoot = repositoryRoot.replace(/\\/g, "/");
+  return processList.split(/\r?\n/).flatMap((line) => {
+    const match = /^\s*(\d+)\s+(.+)$/.exec(line);
+    if (!match?.[1] || !match[2]) return [];
+    const pid = Number(match[1]);
+    const command = match[2].replace(/\\/g, "/");
+    if (pid === currentPid || !command.includes(normalizedRoot)) return [];
+    if (!/(?:src\/worker\.ts|@atellier\/api\s+dev:worker)/.test(command)) return [];
+    return [{ pid, command }];
+  });
+}

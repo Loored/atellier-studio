@@ -142,6 +142,13 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 - Real runs `6a915382678c0ba79e6a2e40` and `6a9154f6678c0ba79e6a2e8f` verified both paths: terminal events 19/40 settled through reconciliation, and a malformed third QA recheck exhausted two format retries, preserved `semantic-repair-3`, omitted memory, created no fourth semantic repair, and blocked approval with HTTP 409.
 - Run record: `atelier/runs/2026-08-26-semantic-qa-repair-loop.md`.
 
+### 2026-08-28 - QA evidence and repetition guard
+
+- Scope acceptance criteria now become a persisted QA checklist with explicit PASS/FAIL evidence per criterion.
+- Incomplete checklists use bounded QA-format retries; materially repeated findings stop before another semantic repair and require human input.
+- `./scripts/dev-local` detects existing repository workers and fails without killing them. Duplicate manual worker group `80728` was stopped; launcher group `55803` remains.
+- Run record: `atelier/runs/2026-08-28-qa-evidence-loop.md`.
+
 ### 2026-08-25 - Knowledge deliverable grounding
 
 - Linked task sources now contribute bounded read-only file contents and verified vault paths to every orchestration step; missing sources remain provenance but are not trusted as loaded evidence.

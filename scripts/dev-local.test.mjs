@@ -4,6 +4,7 @@ import {
   choosePackageManager,
   createLauncherConfig,
   createServiceSpecs,
+  findAtellierWorkerProcesses,
   isSupportedNodeVersion,
   parseCliArgs,
   parsePort,
@@ -81,4 +82,18 @@ test("rejects overlapping API and Web endpoints", () => {
     () => createLauncherConfig({ API_PORT: "4000", WEB_PORT: "4000" }),
     /must be different/,
   );
+});
+
+test("detects worker processes only for the current repository", () => {
+  const processes = [
+    "  101 node /repo/atellier/apps/api/src/worker.ts",
+    "  102 pnpm --dir /repo/atellier --filter @atellier/api dev:worker",
+    "  103 node /other/repo/apps/api/src/worker.ts",
+    "  104 node /repo/atellier/apps/api/src/main.ts",
+  ].join("\n");
+  assert.deepEqual(
+    findAtellierWorkerProcesses(processes, "/repo/atellier", 999).map((worker) => worker.pid),
+    [101, 102],
+  );
+  assert.deepEqual(findAtellierWorkerProcesses(processes, "/repo/atellier", 101).map((worker) => worker.pid), [102]);
 });

@@ -982,6 +982,12 @@ describe("App", () => {
         lastQaStepId: "qa-recheck-2",
         blockerMessages: [],
       },
+      qaChecklist: {
+        sourceStepId: "scope",
+        qaStepId: "qa-recheck-2",
+        complete: true,
+        items: [{ criterion: "Artifact is complete", status: "pass", evidence: "All requested days are present." }],
+      },
     });
     render(<App />);
 
@@ -1010,6 +1016,8 @@ describe("App", () => {
     expect(scoped.getByText("Semantic repair resolved")).toBeInTheDocument();
     expect(scoped.getByText(/Final QA approved on qa-recheck-2/i)).toBeInTheDocument();
     expect(scoped.getByText(/Last valid artifact: semantic-repair-2 · Last QA: qa-recheck-2/i)).toBeInTheDocument();
+    expect(scoped.getByText("QA acceptance checklist")).toBeInTheDocument();
+    expect(scoped.getByText(/Artifact is complete — All requested days are present/i)).toBeInTheDocument();
   });
 
   it("shows preserved orchestration artifacts and semantic evidence in Review", async () => {
@@ -1034,6 +1042,16 @@ describe("App", () => {
           lastValidArtifactStepId: "build",
           lastQaStepId: "qa",
         },
+        qaChecklist: {
+          complete: true,
+          qaStepId: "qa-recheck-1",
+          items: [{ criterion: "Approval boundary is explicit", status: "fail", evidence: "The final approver is unnamed." }],
+        },
+        repeatedFeedback: {
+          detected: true,
+          firstQaStepId: "qa",
+          repeatedQaStepId: "qa-recheck-1",
+        },
         validation: {
           role: "qa",
           profile: "orchestration",
@@ -1054,6 +1072,9 @@ describe("App", () => {
     expect(screen.getByText("build", { selector: "b" })).toBeInTheDocument();
     expect(screen.getByText(/Latest attempt:/)).toBeInTheDocument();
     expect(screen.getByText(/Semantic repair exhausted.*approval and memory stay blocked/i)).toBeInTheDocument();
+    expect(screen.getByText(/Repeated QA findings stopped semantic repair/i)).toBeInTheDocument();
+    await user.click(screen.getByText(/Inspect QA acceptance checklist/i));
+    expect(screen.getByText(/Approval boundary is explicit — The final approver is unnamed/i)).toBeInTheDocument();
     await user.click(screen.getByText("Inspect preserved artifact"));
     expect(screen.getByText(/Human Approval Boundary: Approve before memory/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
