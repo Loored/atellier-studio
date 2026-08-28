@@ -167,6 +167,7 @@ Deterministic artifact failures now trigger up to three automatic Builder correc
 - Evaluate a later semantic QA-to-repair loop only after repeated evidence; do not turn free-form QA findings into unbounded retries.
 - Resolve captured curation signals explicitly from Review and verify the target-page decision remains useful over time.
 - Record repeated friction and only then select the next bounded feature slice.
+- ✅ Persist acceptance-criteria QA checklists, stop materially repeated feedback, and reject duplicate local workers before launch.
 
 ## Later — Tailwind / Pixel polish
 
