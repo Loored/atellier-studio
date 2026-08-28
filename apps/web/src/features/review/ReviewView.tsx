@@ -589,6 +589,16 @@ type OrchestrationReviewOutput = {
     exhausted?: boolean;
     finalStepId?: string;
   };
+  qaChecklist?: {
+    complete?: boolean;
+    qaStepId?: string;
+    items?: Array<{ criterion?: string; status?: "pass" | "fail"; evidence?: string }>;
+  };
+  repeatedFeedback?: {
+    detected?: boolean;
+    firstQaStepId?: string;
+    repeatedQaStepId?: string;
+  };
   semanticRepair?: {
     attemptsUsed?: number;
     maxAttempts?: number;
@@ -603,6 +613,8 @@ function OrchestrationArtifactReview({ run }: { run: Run }) {
   const output = run.output as OrchestrationReviewOutput | undefined;
   const artifact = output?.artifact;
   const qaRetry = output?.qaRetry;
+  const qaChecklist = output?.qaChecklist;
+  const repeatedFeedback = output?.repeatedFeedback;
   const semantic = output?.semanticRepair;
   if (!artifact?.content && !qaRetry && !semantic) return null;
 
@@ -629,6 +641,26 @@ function OrchestrationArtifactReview({ run }: { run: Run }) {
         <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
           QA format retries exhausted. The artifact remains reviewable, but semantic repair, approval, and memory stay blocked.
         </p>
+      ) : null}
+      {repeatedFeedback?.detected ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          Repeated QA findings stopped semantic repair ({repeatedFeedback.firstQaStepId} → {repeatedFeedback.repeatedQaStepId}).
+        </p>
+      ) : null}
+      {qaChecklist?.items?.length ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[0.72rem] font-semibold text-purple hover:text-ink">
+            Inspect QA acceptance checklist ({qaChecklist.items.filter((item) => item.status === "pass").length}/{qaChecklist.items.length} pass)
+          </summary>
+          <ul className="mt-2 mb-0 grid gap-1 pl-4 text-[0.7rem] text-ink-muted">
+            {qaChecklist.items.map((item, index) => (
+              <li key={`${item.criterion}-${index}`}>
+                <b className={item.status === "pass" ? "text-teal" : "text-orange"}>{item.status?.toUpperCase()}</b>
+                {` · ${item.criterion} — ${item.evidence}`}
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
       {artifact?.content ? (
         <details className="mt-2">

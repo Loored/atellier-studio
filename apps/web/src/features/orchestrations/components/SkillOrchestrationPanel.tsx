@@ -236,6 +236,34 @@ export function SkillOrchestrationPanel() {
             </div>
           )}
 
+          {liveStatus?.qaChecklist && (
+            <div className="mb-3 rounded-lg border border-purple/20 bg-purple/[0.04] px-2.5 py-2.5" role="status">
+              <div className="flex items-center justify-between gap-2">
+                <strong className="text-[0.76rem] text-purple">QA acceptance checklist</strong>
+                <span className="text-[0.68rem] text-ink-faint">
+                  {liveStatus.qaChecklist.items.filter((item) => item.status === "pass").length}/{liveStatus.qaChecklist.items.length} pass
+                </span>
+              </div>
+              <ul className="m-0 mt-1.5 grid gap-1 p-0 list-none">
+                {liveStatus.qaChecklist.items.map((item, index) => (
+                  <li key={`${item.criterion}-${index}`} className="text-[0.68rem] leading-[1.4] text-ink-muted">
+                    <b className={item.status === "pass" ? "text-teal" : "text-orange"}>{item.status.toUpperCase()}</b>
+                    {` · ${item.criterion} — ${item.evidence}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {liveStatus?.repeatedFeedback?.detected && (
+            <div role="alert" className="mb-3 rounded-lg border border-orange/30 bg-orange/[0.07] px-2.5 py-2.5">
+              <strong className="text-[0.76rem] text-orange">Repeated QA feedback stopped the loop</strong>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted">
+                {liveStatus.repeatedFeedback.firstQaStepId} → {liveStatus.repeatedFeedback.repeatedQaStepId}
+              </p>
+            </div>
+          )}
+
           {liveStatus?.semanticRepair && liveStatus.semanticRepair.attemptsUsed > 0 && (
             <div
               role={liveStatus.semanticRepair.exhausted ? "alert" : "status"}

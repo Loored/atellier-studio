@@ -26,6 +26,7 @@ const SECTION_PATTERNS: Record<AgentValidationProfile, string[]> = {
 };
 
 const IMPLEMENTATION_VERBS = ["implemented", "edited", "updated", "changed", "modified", "added", "fixed"];
+const QA_IMPLEMENTATION_CLAIM_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:(?:i|we)\s+)?(?:implemented|edited|updated|changed|modified|added|fixed)\b/i;
 
 export function validateAgentResponse(input: ValidationInput): AgentValidationResult {
   const response = input.response.trim();
@@ -121,7 +122,7 @@ export function validateAgentResponse(input: ValidationInput): AgentValidationRe
   }
 
   if (profile === "qa") {
-    if (IMPLEMENTATION_VERBS.some((verb) => normalizedResponse.includes(verb))) {
+    if (QA_IMPLEMENTATION_CLAIM_PATTERN.test(response)) {
       issues.push({
         code: "qa.claims_implementation",
         severity: "error",
@@ -241,6 +242,117 @@ export function extractQaVerdict(response: string): "approved" | "changes-reques
   }
 
   return match[1].toLowerCase() === "approved" ? "approved" : "changes-requested";
+}
+
+export function extractAcceptanceCriteria(response: string): string[] {
+  return extractBulletSection(response, "acceptance criteria");
+}
+
+export function extractQaChecklist(response: string): Array<{
+  criterion: string;
+  status: "pass" | "fail";
+  evidence: string;
+}> {
+  const lines = extractSectionLines(response, "acceptance checklist");
+  const items: Array<{ criterion: string; status: "pass" | "fail"; evidence: string }> = [];
+  let pendingCriterion: string | null = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]?.replace(/\*\*|__/g, "").trim() ?? "";
+    const numberedCriterion = /^\d+[.)]\s+(.+)$/.exec(line);
+    if (numberedCriterion?.[1]) {
+      pendingCriterion = numberedCriterion[1].trim();
+      continue;
+    }
+    const match = /^[-*]\s*\[(pass|fail)\]\s*(.*?)(?:\s*(?:—|-)?\s*evidence\s*:\s*(.+))?$/i.exec(line);
+    if (!match?.[1]) continue;
+    const criterion = match[2]?.trim() || pendingCriterion;
+    if (!criterion) continue;
+    const inlineEvidence = match[3]?.trim();
+    const followingEvidence = lines[index + 1]?.replace(/\*\*|__/g, "").trim().match(/^evidence\s*:\s*(.+)$/i)?.[1]?.trim();
+    const evidence = inlineEvidence || followingEvidence;
+    if (!evidence) continue;
+    items.push({
+      criterion,
+      status: match[1].toLowerCase() as "pass" | "fail",
+      evidence,
+    });
+    pendingCriterion = null;
+  }
+  return items;
+}
+
+export function extractQaFeedbackSignature(response: string): string | null {
+  const findings = extractSectionLines(response, "findings")
+    .join(" ")
+    .replace(/^[-*]\s*/gm, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9áéíóúüñ]+/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  return findings || null;
+}
+
+export function isQaFeedbackRepeated(previous: string | null, current: string | null): boolean {
+  if (!previous || !current) return false;
+  if (previous === current) return true;
+  const previousTokens = new Set(previous.split(" ").filter((token) => token.length > 2));
+  const currentTokens = new Set(current.split(" ").filter((token) => token.length > 2));
+  const union = new Set([...previousTokens, ...currentTokens]);
+  if (union.size === 0) return false;
+  const overlap = [...previousTokens].filter((token) => currentTokens.has(token)).length;
+  return overlap >= 3 && overlap / union.size >= 0.65;
+}
+
+export function qaChecklistCoversCriteria(
+  items: Array<{ criterion: string }>,
+  criteria: string[],
+): boolean {
+  const expectedCriteria = criteria.length > 0
+    ? criteria
+    : ["The requested artifact satisfies the explicit goal and is ready for human review."];
+  const actualCriteria = new Set(items.map((item) => normalizeCriterion(item.criterion)));
+  return expectedCriteria.every((criterion) => actualCriteria.has(normalizeCriterion(criterion)));
+}
+
+function normalizeCriterion(criterion: string): string {
+  return criterion
+    .toLowerCase()
+    .replace(/[^a-z0-9áéíóúüñ]+/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function extractBulletSection(response: string, sectionName: string): string[] {
+  const lines = extractSectionLines(response, sectionName);
+  const bulletLines = lines.filter((line) => /^[-*]\s+/.test(line));
+  const numberedLines = lines.filter((line) => /^\s*\d+[.)]\s+/.test(line));
+  const selected = bulletLines.length > 0 ? bulletLines : numberedLines.length > 0 ? numberedLines : lines;
+  return selected
+    .map((line) => line.replace(/^[-*]\s+/, "").replace(/^\s*\d+[.)]\s+/, "").trim())
+    .filter(Boolean);
+}
+
+function extractSectionLines(response: string, sectionName: string): string[] {
+  const lines = response.split(/\r?\n/);
+  const heading = new RegExp(`^(?:#{1,6}\\s*)?${escapeRegExp(sectionName)}\\s*:?\\s*$`, "i");
+  const markdownNeutral = (line: string) => line.replace(/\*\*|__/g, "").trim();
+  const headingNeutral = (line: string) => markdownNeutral(line)
+    .replace(/^[-*]\s*/, "")
+    .replace(/^\d+[.)]\s*/, "");
+  const startIndex = lines.findIndex((line) => heading.test(headingNeutral(line)));
+  if (startIndex < 0) return [];
+  const section: string[] = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    const neutralLine = markdownNeutral(line);
+    const neutralHeading = headingNeutral(line);
+    if (neutralLine && (
+      /^#{1,6}\s+/.test(neutralLine)
+      || /^[A-Za-z][A-Za-z\s/-]+\s*:\s*$/.test(neutralHeading)
+    )) break;
+    if (line.trim()) section.push(line.trim());
+  }
+  return section;
 }
 
 function extractChangedFiles(response: string): string[] {

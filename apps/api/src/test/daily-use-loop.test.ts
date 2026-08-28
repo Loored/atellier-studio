@@ -23,6 +23,7 @@ function createRepairScenarioExecutor(
   semanticInvalidFromAttempt?: number,
   qaMalformedAttempts = 0,
   malformedQaRechecksFromAttempt?: number,
+  repeatQaFeedback = false,
 ): AgentExecutorService {
   let qaAttempts = 0;
   return {
@@ -113,13 +114,24 @@ function createRepairScenarioExecutor(
           };
         }
         const isRecheck = /Step:\s*QA recheck/i.test(input.instruction);
+        const requestsChanges = semanticNeverApproves || (semanticQaCycle && !isRecheck);
+        const distinctFinding = [
+          "Clarify temporary execution evidence.",
+          "Distinguish durable Wiki memory from temporary logs.",
+          "Name the exact human approval boundary.",
+          "Identify the final accountable approver.",
+        ][Math.min(qaAttempts - 1, 3)];
         return {
           needsHuman: false,
           response: [
-            `Verdict: ${semanticNeverApproves || (semanticQaCycle && !isRecheck) ? "CHANGES REQUESTED" : "APPROVED"}`,
+            `Verdict: ${requestsChanges ? "CHANGES REQUESTED" : "APPROVED"}`,
+            "Acceptance Checklist:",
+            `- [${requestsChanges ? "FAIL" : "PASS"}] Day 1, Day 2, and Day 3 are explicit and QA approves. — Evidence: ${requestsChanges ? "Approval boundary remains unclear." : "All three days and boundaries are explicit."}`,
             "Findings:",
-            semanticNeverApproves || (semanticQaCycle && !isRecheck)
-              ? "Clarify temporary evidence, durable memory, and human approval."
+            requestsChanges
+              ? (repeatQaFeedback
+                  ? "Clarify temporary evidence, durable memory, and human approval."
+                  : distinctFinding ?? "Clarify remaining acceptance evidence.")
               : "All three days are explicit and reviewable.",
             "Recommendation:",
             "Proceed to human review.",
@@ -545,7 +557,7 @@ describe("daily-use operational loop", () => {
       (run.input as { orchestrationStepId?: string }).orchestrationStepId === "semantic-repair-1",
     );
     expect((semanticRun?.input as { instruction?: string }).instruction).toContain(
-      "Clarify temporary evidence, durable memory, and human approval.",
+      "Clarify temporary execution evidence.",
     );
     expect((semanticRun?.input as { instruction?: string }).instruction).toContain("Return only the corrected Day entries");
     expect((semanticRun?.input as { orchestrationValidationProfile?: string }).orchestrationValidationProfile)
@@ -679,6 +691,41 @@ describe("daily-use operational loop", () => {
       (run.input as { orchestrationStepId?: string }).orchestrationStepId,
     );
     expect(stepIds).toContain("qa-recheck-1-format-retry-2");
+    expect(stepIds).not.toContain("semantic-repair-2");
+    expect(stepIds).not.toContain("memory");
+  });
+
+  it("stops semantic repair when QA repeats the same findings", async () => {
+    await server.close();
+    services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+      agentExecutor: createRepairScenarioExecutor(true, true, true, undefined, 0, undefined, true),
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+    const started = (await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: { goal: "Create a complete 3-day operating plan." },
+    })).json<StartSkillOrchestrationResponse>();
+
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+    const completedRun = await services.runs.getById(started.runId);
+    expect(completedRun?.output).toMatchObject({
+      readiness: "needs-human",
+      repeatedFeedback: {
+        detected: true,
+        firstQaStepId: "qa",
+        repeatedQaStepId: "qa-recheck-1",
+      },
+      semanticRepair: { attemptsUsed: 1, resolved: false, exhausted: false },
+      validation: { passed: false },
+    });
+    const childRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    const stepIds = childRuns.map((run) =>
+      (run.input as { orchestrationStepId?: string }).orchestrationStepId,
+    );
     expect(stepIds).not.toContain("semantic-repair-2");
     expect(stepIds).not.toContain("memory");
   });

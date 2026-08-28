@@ -10,6 +10,8 @@ import type {
   OrchestrationExecutionStep,
   OrchestrationSkillId,
   OrchestrationRepairSummary,
+  OrchestrationQaChecklistSummary,
+  OrchestrationRepeatedFeedbackSummary,
   OrchestrationSkillSummary,
   OrchestrationStatusResult,
   OrchestrationStepStatusEntry,
@@ -21,6 +23,11 @@ import type {
 import { AgentRunService } from "./agent-run.service";
 import {
   extractQaVerdict,
+  extractAcceptanceCriteria,
+  extractQaChecklist,
+  extractQaFeedbackSignature,
+  isQaFeedbackRepeated,
+  qaChecklistCoversCriteria,
   extractRequestedArtifact,
   mergeSemanticRequestedArtifactResponses,
 } from "./agent-response-validator";
@@ -342,6 +349,9 @@ export class SkillOrchestrationService {
 
     const repairSummary = this.readRepairSummary(orchRun);
     const qaRetrySummary = this.readRepairSummary(orchRun, "qaRetry");
+    const output = orchRun.output as Record<string, unknown> | undefined;
+    const qaChecklist = output?.qaChecklist as OrchestrationQaChecklistSummary | undefined;
+    const repeatedFeedback = output?.repeatedFeedback as OrchestrationRepeatedFeedbackSummary | undefined;
     const semanticRepairSummary = this.readRepairSummary(orchRun, "semanticRepair");
     const statusSteps: Array<{ step: SkillStepTemplate; run?: Run }> = template.id === "atellier-build-loop"
       ? this.buildLoopStatusSteps(template, stepRuns, repairSummary, qaRetrySummary, semanticRepairSummary)
@@ -397,6 +407,8 @@ export class SkillOrchestrationService {
       nextStep,
       ...(repairSummary && { repair: repairSummary }),
       ...(qaRetrySummary && { qaRetry: qaRetrySummary }),
+      ...(qaChecklist && { qaChecklist }),
+      ...(repeatedFeedback && { repeatedFeedback }),
       ...(semanticRepairSummary && { semanticRepair: semanticRepairSummary }),
     };
   }
@@ -549,6 +561,8 @@ export class SkillOrchestrationService {
 
       let repair: OrchestrationRepairSummary | undefined;
       let qaRetry: OrchestrationRepairSummary | undefined;
+      let qaChecklist: OrchestrationQaChecklistSummary | undefined;
+      let repeatedFeedback: OrchestrationRepeatedFeedbackSummary | undefined;
       let semanticRepair: OrchestrationRepairSummary | undefined;
       if (template.id === "atellier-build-loop") {
         const scopeStep = this.requireStep(template, "scope");
@@ -559,7 +573,8 @@ export class SkillOrchestrationService {
           ?? this.requireStep(template, "qa");
         const memoryStep = this.requireStep(template, "memory");
 
-        await executeStep(scopeStep, buildStep);
+        const scopeRun = await executeStep(scopeStep, buildStep);
+        const acceptanceCriteria = extractAcceptanceCriteria(this.readRunResponse(scopeRun) ?? "");
         let artifactRun = await executeStep(buildStep, repairTemplate);
         let artifactValidation = this.readRunValidation(artifactRun);
         let attemptsUsed = 0;
@@ -613,12 +628,19 @@ export class SkillOrchestrationService {
         }
 
         if (resolved) {
-          await executeStep(runtimeStep, finalQaStep);
-          let qaRun = await executeStep(finalQaStep, memoryStep);
+          const qaEvaluationStep: ExecutableSkillStep = {
+            ...finalQaStep,
+            instruction: [
+              finalQaStep.instruction,
+              this.buildQaChecklistInstruction(acceptanceCriteria),
+            ].join("\n\n"),
+          };
+          await executeStep(runtimeStep, qaEvaluationStep);
+          let qaRun = await executeStep(qaEvaluationStep, memoryStep);
           let latestSemanticAttemptRun: Run | undefined;
           let lastValidArtifactRun = artifactRun;
           let semanticAttemptsUsed = 0;
-          let qaVerdict = extractQaVerdict(this.readRunResponse(qaRun) ?? "");
+          let qaVerdict = this.readUsableQaVerdict(qaRun, acceptanceCriteria);
           let qaRetryAttemptsUsed = 0;
 
           while (!qaVerdict && qaRetryAttemptsUsed < QA_FORMAT_RETRY_MAX_ATTEMPTS) {
@@ -628,20 +650,20 @@ export class SkillOrchestrationService {
               message: `QA response was structurally invalid; retrying QA contract ${qaRetryAttemptsUsed}/${QA_FORMAT_RETRY_MAX_ATTEMPTS}.`,
             });
             const qaRetryStep: ExecutableSkillStep = {
-              ...finalQaStep,
+              ...qaEvaluationStep,
               id: `qa-format-retry-${qaRetryAttemptsUsed}`,
               label: `QA format retry ${qaRetryAttemptsUsed}/${QA_FORMAT_RETRY_MAX_ATTEMPTS}`,
               logicalStepId: "qa-format-retry",
               repairAttempt: qaRetryAttemptsUsed,
               repairAttemptLimit: QA_FORMAT_RETRY_MAX_ATTEMPTS,
               instruction: [
-                finalQaStep.instruction,
+                qaEvaluationStep.instruction,
                 "The previous QA response was structurally invalid. Re-evaluate the actual latest artifact; do not describe a response template.",
                 "Return exactly one explicit `Verdict: APPROVED` or `Verdict: CHANGES REQUESTED`, followed by `Findings:` and `Recommendation:`.",
               ].join("\n\n"),
             };
             qaRun = await executeStep(qaRetryStep, memoryStep);
-            qaVerdict = extractQaVerdict(this.readRunResponse(qaRun) ?? "");
+            qaVerdict = this.readUsableQaVerdict(qaRun, acceptanceCriteria);
           }
 
           qaRetry = {
@@ -658,6 +680,10 @@ export class SkillOrchestrationService {
           };
           let qaContractValid = Boolean(qaVerdict);
           let qaApproved = qaVerdict === "approved";
+          let previousFeedback = qaVerdict === "changes-requested"
+            ? extractQaFeedbackSignature(this.readRunResponse(qaRun) ?? "")
+            : null;
+          let previousFeedbackStepId = this.readOrchestrationStepId(qaRun) ?? finalQaStep.id;
 
           while (qaContractValid && !qaApproved && semanticAttemptsUsed < SEMANTIC_REPAIR_MAX_ATTEMPTS) {
             semanticAttemptsUsed += 1;
@@ -689,7 +715,7 @@ export class SkillOrchestrationService {
             }
             lastValidArtifactRun = artifactRun;
             const qaRecheckStep: ExecutableSkillStep = {
-              ...finalQaStep,
+              ...qaEvaluationStep,
               id: `qa-recheck-${semanticAttemptsUsed}`,
               label: `QA recheck ${semanticAttemptsUsed}/${SEMANTIC_REPAIR_MAX_ATTEMPTS}`,
               logicalStepId: "qa-recheck",
@@ -698,7 +724,7 @@ export class SkillOrchestrationService {
               repairKind: "semantic",
             };
             qaRun = await executeStep(qaRecheckStep, memoryStep);
-            qaVerdict = extractQaVerdict(this.readRunResponse(qaRun) ?? "");
+            qaVerdict = this.readUsableQaVerdict(qaRun, acceptanceCriteria);
             let recheckRetryAttempts = 0;
             while (!qaVerdict && recheckRetryAttempts < QA_FORMAT_RETRY_MAX_ATTEMPTS) {
               recheckRetryAttempts += 1;
@@ -714,13 +740,13 @@ export class SkillOrchestrationService {
                 repairAttempt: recheckRetryAttempts,
                 repairAttemptLimit: QA_FORMAT_RETRY_MAX_ATTEMPTS,
                 instruction: [
-                  finalQaStep.instruction,
+                  qaEvaluationStep.instruction,
                   "The previous QA response was structurally invalid. Re-evaluate the actual latest artifact; do not describe a response template.",
                   "Return exactly one explicit `Verdict: APPROVED` or `Verdict: CHANGES REQUESTED`, followed by `Findings:` and `Recommendation:`.",
                 ].join("\n\n"),
               };
               qaRun = await executeStep(recheckRetryStep, memoryStep);
-              qaVerdict = extractQaVerdict(this.readRunResponse(qaRun) ?? "");
+              qaVerdict = this.readUsableQaVerdict(qaRun, acceptanceCriteria);
             }
             if (recheckRetryAttempts > 0) {
               qaRetry = {
@@ -739,7 +765,28 @@ export class SkillOrchestrationService {
             qaContractValid = Boolean(qaVerdict);
             if (!qaContractValid) break;
             qaApproved = qaVerdict === "approved";
+            if (!qaApproved) {
+              const currentFeedback = extractQaFeedbackSignature(this.readRunResponse(qaRun) ?? "");
+              const currentStepId = this.readOrchestrationStepId(qaRun) ?? qaRecheckStep.id;
+              if (isQaFeedbackRepeated(previousFeedback, currentFeedback)) {
+                repeatedFeedback = {
+                  detected: true,
+                  firstQaStepId: previousFeedbackStepId,
+                  repeatedQaStepId: currentStepId,
+                  feedback: this.truncateForContext(currentFeedback ?? "Repeated QA findings.", 800),
+                };
+                await this.runs.appendLog(orchestrationRun.id, {
+                  level: "warn",
+                  message: `QA repeated the same findings on ${currentStepId}; stopping semantic repair for human input.`,
+                });
+                break;
+              }
+              previousFeedback = currentFeedback;
+              previousFeedbackStepId = currentStepId;
+            }
           }
+
+          qaChecklist = this.buildQaChecklistSummary(scopeRun, qaRun, acceptanceCriteria);
 
           if (qaContractValid || semanticAttemptsUsed > 0) {
             semanticRepair = {
@@ -791,6 +838,7 @@ export class SkillOrchestrationService {
             await this.runs.listByOrchestrationRunId(orchestrationRun.id),
             repair,
             qaRetry,
+            repeatedFeedback,
             semanticRepair,
           )
         : null;
@@ -806,7 +854,7 @@ export class SkillOrchestrationService {
           steps: stepResults,
           ...(completionEvidence?.artifact && { artifact: completionEvidence.artifact }),
           ...(completionEvidence && {
-            readiness: repair?.exhausted || qaRetry?.exhausted || semanticRepair?.exhausted
+            readiness: repair?.exhausted || qaRetry?.exhausted || repeatedFeedback?.detected || semanticRepair?.exhausted
               ? "needs-human"
               : completionEvidence.validation.passed
                 ? "ready-for-human-review"
@@ -815,6 +863,8 @@ export class SkillOrchestrationService {
           }),
           ...(repair && { repair }),
           ...(qaRetry && { qaRetry }),
+          ...(qaChecklist && { qaChecklist }),
+          ...(repeatedFeedback && { repeatedFeedback }),
           ...(semanticRepair && { semanticRepair }),
         },
       }, leaseOwner);
@@ -830,6 +880,8 @@ export class SkillOrchestrationService {
         steps: stepResults,
         ...(repair && { repair }),
         ...(qaRetry && { qaRetry }),
+        ...(qaChecklist && { qaChecklist }),
+        ...(repeatedFeedback && { repeatedFeedback }),
         ...(semanticRepair && { semanticRepair }),
       };
     } catch (error) {
@@ -988,6 +1040,8 @@ export class SkillOrchestrationService {
       return [
         "Output contract:",
         "Verdict: APPROVED or CHANGES REQUESTED",
+        "Acceptance Checklist:",
+        "- [PASS|FAIL] <acceptance criterion> — Evidence: <specific artifact evidence>",
         "Findings:",
         "Recommendation:",
         "Use exactly one explicit verdict and evaluate the most recent artifact rather than prior findings.",
@@ -1087,6 +1141,7 @@ export class SkillOrchestrationService {
     stepRuns: Run[],
     repair?: OrchestrationRepairSummary,
     qaRetry?: OrchestrationRepairSummary,
+    repeatedFeedback?: OrchestrationRepeatedFeedbackSummary,
     semanticRepair?: OrchestrationRepairSummary,
   ): OrchestrationCompletionEvidence {
     const artifactRuns = stepRuns.filter((run) => {
@@ -1160,6 +1215,12 @@ export class SkillOrchestrationService {
         code: "orchestration.qa_format_retries_exhausted",
         severity: "error",
         message: `QA format retry exhausted ${qaRetry.attemptsUsed}/${qaRetry.maxAttempts} attempts; human input is required.`,
+      });
+    } else if (repeatedFeedback?.detected) {
+      issues.push({
+        code: "orchestration.repeated_qa_feedback",
+        severity: "error",
+        message: `QA repeated the same findings on ${repeatedFeedback.repeatedQaStepId}; human input is required.`,
       });
     } else if (semanticRepair?.exhausted) {
       if (latestAttemptRun?.id !== artifactRun?.id && latestAttemptValidation && !latestAttemptValidation.passed) {
@@ -1271,6 +1332,44 @@ export class SkillOrchestrationService {
     return focusDays.length > 0
       ? `Repair focus: return complete entries for only Days ${focusDays.join(", ")}. Include every field required by the Goal for each focused day. Do not generate other days in this attempt.`
       : "Repair focus: correct only the explicitly reported validation blockers in a compact patch.";
+  }
+
+  private buildQaChecklistInstruction(criteria: string[]): string {
+    const items = criteria.length > 0
+      ? criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join("\n")
+      : "1. The requested artifact satisfies the explicit goal and is ready for human review.";
+    return [
+      "Acceptance criteria to evaluate:",
+      items,
+      "Return one Acceptance Checklist line per criterion using exactly:",
+      "- [PASS] criterion — Evidence: specific evidence from the latest artifact",
+      "- [FAIL] criterion — Evidence: exact missing or conflicting evidence",
+      "APPROVED requires every checklist item to PASS. CHANGES REQUESTED requires at least one FAIL.",
+    ].join("\n");
+  }
+
+  private readUsableQaVerdict(run: Run, criteria: string[]): "approved" | "changes-requested" | null {
+    const response = this.readRunResponse(run) ?? "";
+    const verdict = extractQaVerdict(response);
+    const checklist = extractQaChecklist(response);
+    if (!verdict || !qaChecklistCoversCriteria(checklist, criteria)) return null;
+    if (verdict === "approved" && checklist.some((item) => item.status === "fail")) return null;
+    if (verdict === "changes-requested" && !checklist.some((item) => item.status === "fail")) return null;
+    return verdict;
+  }
+
+  private buildQaChecklistSummary(
+    scopeRun: Run,
+    qaRun: Run,
+    criteria: string[],
+  ): OrchestrationQaChecklistSummary {
+    const items = extractQaChecklist(this.readRunResponse(qaRun) ?? "");
+    return {
+      sourceStepId: this.readOrchestrationStepId(scopeRun) ?? "scope",
+      qaStepId: this.readOrchestrationStepId(qaRun) ?? "qa",
+      complete: qaChecklistCoversCriteria(items, criteria),
+      items,
+    };
   }
 
   private readRepairSummary(

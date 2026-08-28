@@ -1,13 +1,105 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractAcceptanceCriteria,
+  extractQaChecklist,
+  extractQaFeedbackSignature,
   extractQaVerdict,
   extractRequestedArtifact,
+  isQaFeedbackRepeated,
   mergeRequestedArtifactResponses,
   mergeSemanticRequestedArtifactResponses,
+  qaChecklistCoversCriteria,
   validateAgentResponse,
 } from "../services/agent-response-validator";
 
 describe("agent response validator", () => {
+  it("extracts acceptance evidence and detects materially repeated QA findings", () => {
+    expect(extractAcceptanceCriteria([
+      "* **Acceptance Criteria**:",
+      "  1. Artifact is complete.",
+      "  2. Human boundary is explicit.",
+      "* **Handoff**:",
+      "Proceed.",
+    ].join("\n"))).toEqual(["Artifact is complete.", "Human boundary is explicit."]);
+    expect(extractQaChecklist([
+      "Verdict: CHANGES REQUESTED",
+      "Acceptance Checklist:",
+      "- [PASS] Artifact is complete — Evidence: Three days are present.",
+      "- [FAIL] Human boundary is explicit",
+      "  Evidence: Approver is unnamed.",
+      "Findings:",
+      "The final human approver is still unnamed.",
+    ].join("\n"))).toHaveLength(2);
+    const first = extractQaFeedbackSignature("Findings:\nThe final human approver is still unnamed.");
+    const paraphrase = extractQaFeedbackSignature("Findings:\nThe final human approver remains unnamed.");
+    expect(isQaFeedbackRepeated(first, paraphrase)).toBe(true);
+    expect(isQaFeedbackRepeated(first, "durable wiki memory is missing")).toBe(false);
+  });
+
+  it("does not treat passive implementation wording as a QA implementation claim", () => {
+    const validation = validateAgentResponse({
+      role: "qa",
+      response: [
+        "Verdict: CHANGES REQUESTED",
+        "Findings:",
+        "The artifact does not explain how the plan will be implemented and tracked.",
+        "Recommendation:",
+        "Add concrete evidence.",
+      ].join("\n"),
+    });
+    expect(validation.issues.some((issue) => issue.code === "qa.claims_implementation")).toBe(false);
+  });
+
+  it("extracts Ollama's numbered criterion with a nested checklist result", () => {
+    const checklist = extractQaChecklist([
+      "Acceptance Checklist:",
+      "1. The plan includes a clear objective for each day.",
+      "\t* [FAIL] Evidence: Stakeholder approval is missing.",
+      "2. Concrete actions are specified for each day.",
+      "\t* [PASS] Evidence: Every day lists concrete actions.",
+      "Findings:",
+      "Stakeholder approval is missing.",
+    ].join("\n"));
+
+    expect(checklist).toEqual([
+      {
+        criterion: "The plan includes a clear objective for each day.",
+        status: "fail",
+        evidence: "Stakeholder approval is missing.",
+      },
+      {
+        criterion: "Concrete actions are specified for each day.",
+        status: "pass",
+        evidence: "Every day lists concrete actions.",
+      },
+    ]);
+  });
+
+  it("requires the checklist to cover the actual scope criteria", () => {
+    const criteria = ["Artifact is complete.", "Human boundary is explicit."];
+    expect(qaChecklistCoversCriteria([
+      { criterion: "Artifact is complete" },
+      { criterion: "Human boundary is explicit" },
+    ], criteria)).toBe(true);
+    expect(qaChecklistCoversCriteria([
+      { criterion: "Artifact is complete" },
+      { criterion: "A different criterion" },
+    ], criteria)).toBe(false);
+  });
+
+  it("extracts criteria under a numbered PM section heading", () => {
+    expect(extractAcceptanceCriteria([
+      "2. Approach: keep the slice bounded",
+      "3. Acceptance criteria:",
+      "   - Existing tests remain green",
+      "   - New behavior matches the specification",
+      "4. Handoff: proceed to Builder",
+    ].join("\n"))).toEqual([
+      "Existing tests remain green",
+      "New behavior matches the specification",
+    ]);
+  });
+
   it("merges an incremental requested-artifact patch with the prior artifact", () => {
     const base = [
       "## Summary", "Initial plan.", "## Requested Artifact", "### Day 1", "First day.",

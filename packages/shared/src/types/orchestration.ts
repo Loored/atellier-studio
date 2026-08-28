@@ -71,6 +71,26 @@ export type OrchestrationRepairSummary = {
   blockerMessages: string[];
 };
 
+export type OrchestrationQaChecklistItem = {
+  criterion: string;
+  status: "pass" | "fail";
+  evidence: string;
+};
+
+export type OrchestrationQaChecklistSummary = {
+  sourceStepId: string;
+  qaStepId: string;
+  complete: boolean;
+  items: OrchestrationQaChecklistItem[];
+};
+
+export type OrchestrationRepeatedFeedbackSummary = {
+  detected: boolean;
+  firstQaStepId: string;
+  repeatedQaStepId: string;
+  feedback: string;
+};
+
 export type SkillOrchestrationResult = {
   skillId: OrchestrationSkillId;
   goal: string;
@@ -78,6 +98,8 @@ export type SkillOrchestrationResult = {
   steps: SkillOrchestrationStepResult[];
   repair?: OrchestrationRepairSummary;
   qaRetry?: OrchestrationRepairSummary;
+  qaChecklist?: OrchestrationQaChecklistSummary;
+  repeatedFeedback?: OrchestrationRepeatedFeedbackSummary;
   semanticRepair?: OrchestrationRepairSummary;
 };
 
@@ -109,6 +131,8 @@ export type OrchestrationStatusResult = {
   nextStep: OrchestrationStepStatusEntry | null;
   repair?: OrchestrationRepairSummary;
   qaRetry?: OrchestrationRepairSummary;
+  qaChecklist?: OrchestrationQaChecklistSummary;
+  repeatedFeedback?: OrchestrationRepeatedFeedbackSummary;
   semanticRepair?: OrchestrationRepairSummary;
 };
 
