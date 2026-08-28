@@ -64,7 +64,7 @@ This executable only requires `node` on `PATH`. It loads the repository `.env` w
 
 Startup sequence:
 
-1. Load `.env`, then validate Node 22+, pinned pnpm access, installed dependencies, and free API/Web ports.
+1. Load `.env`, then validate Node 22+, pinned pnpm access, installed dependencies, no existing repository worker, and free API/Web ports.
 2. Validate Docker CLI and Compose; start Colima only if the Docker daemon is offline.
 3. Run `docker compose up -d mongo` and wait for a real Mongo ping.
 4. Start the Mongo-backed API, standalone durable worker, and Vite on fixed local ports.
@@ -82,7 +82,7 @@ Alternative when `pnpm` is already available:
 pnpm dev:local
 ```
 
-The launcher fails closed when a configured port is occupied and never kills that process. Override `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT`, or `MONGO_URI` when an isolated local run is needed. `Ctrl+C` signals only child processes started by this launcher, waits for the worker's graceful shutdown, and leaves Mongo running.
+The launcher fails closed when a configured port is occupied or an Atellier worker for this repository already exists. It reports process IDs and never kills them. Override `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT`, or `MONGO_URI` when an isolated local run is needed. `Ctrl+C` signals only child processes started by this launcher, waits for the worker's graceful shutdown, and leaves Mongo running.
 
 If dependencies are missing, install them explicitly; the launcher never changes the dependency tree:
 

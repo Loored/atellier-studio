@@ -11,6 +11,7 @@ import {
   createLauncherConfig,
   createServiceSpecs,
   formatCommand,
+  findAtellierWorkerProcesses,
   isSupportedNodeVersion,
   parseCliArgs,
 } from "./dev-local-core.mjs";
@@ -81,6 +82,22 @@ function assertDependenciesInstalled() {
     );
   }
   log("Workspace dependencies are installed.");
+}
+
+function assertNoDuplicateWorkers() {
+  if (process.platform === "win32") {
+    log("Worker process preflight is unavailable on Windows; durable leases still protect claims.");
+    return;
+  }
+  const result = run("ps", ["-Ao", "pid=,command="]);
+  if (result.status !== 0) fail("Could not inspect local processes for duplicate Atellier workers.");
+  const workers = findAtellierWorkerProcesses(result.stdout, repositoryRoot);
+  if (workers.length > 0) {
+    fail(
+      `Found ${workers.length} existing Atellier worker process(es) for this repository (${workers.map((worker) => worker.pid).join(", ")}). Stop the prior worker or launcher before starting another; no process was killed.`,
+    );
+  }
+  log("No duplicate Atellier worker process is running for this repository.");
 }
 
 function loadRepositoryEnvironment() {
@@ -293,6 +310,7 @@ async function main() {
   assertNodeVersion();
   const packageManager = resolvePackageManager();
   assertDependenciesInstalled();
+  assertNoDuplicateWorkers();
   await assertPortsAvailable(config);
   await ensureMongo({ start: !options.check });
 
