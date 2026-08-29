@@ -116,6 +116,27 @@ Keep the 120-second default for source-grounded local runs that must return a co
 
 Current product risk: real execution can burn quota. Future work should make executor mode, model, and model profile highly visible in UI before running agents.
 
+## Real orchestration smoke runner
+
+With the API and Web already running against a non-mock executor:
+
+```bash
+pnpm --filter @atellier/api exec tsx src/test/live-flow.ts
+```
+
+The default build goal is a bounded three-day operating plan. The runner reads the completed parent run and reports operational evidence rather than treating `status: completed` as success by itself. A build loop succeeds only when readiness is `ready-for-human-review`, aggregate validation passes, and the persisted QA checklist is complete.
+
+Inspect an existing run without starting another LLM execution:
+
+```bash
+RUN_ID=<orchestration-run-id> OUTPUT_FORMAT=json \
+  pnpm --filter @atellier/api exec tsx src/test/live-flow.ts
+```
+
+Existing-run inspection only needs a reachable API and remains available when the current executor is `mock`; starting a new smoke run still requires a real configured executor.
+
+Exit codes are stable for automation: `0` ready/success, `1` failed or unexpected error, `2` needs human input, and `3` polling timeout. JSON mode suppresses progress output and prints one final result with readiness, step counts, validation, QA checklist counts, repair summaries, and blockers.
+
 ## Validation
 
 ```bash

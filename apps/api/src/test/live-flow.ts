@@ -21,31 +21,49 @@
  *   API_URL=http://127.0.0.1:4000     # API base URL
  *   FED_URL=http://127.0.0.1:5173     # FED base URL (only used in log output)
  *   SKILL=atellier-build-loop          # or llm-wiki-ingest-loop
+ *   RUN_ID=<existing orchestration id> # inspect without starting a new run
  *   GOAL="..."                         # custom orchestration goal
  *   CONTEXT="..."                      # custom orchestration context
  *   POLL_TIMEOUT_MS=180000             # how long to wait before giving up
+ *   OUTPUT_FORMAT=json                 # machine-readable final result
+ *
+ * Exit codes:
+ *   0 = ready for human review / successful non-build skill
+ *   1 = failed, cancelled, or unexpected error
+ *   2 = completed but needs human input
+ *   3 = polling timeout
  *
  * ⚠️  Real LLM calls cost real money on hosted providers (OpenAI, Anthropic).
  *     Groq has a free tier and Ollama is fully local — both are good defaults
  *     for repeated smoke testing.
  */
 
+import type { Run } from "@atellier/shared";
+import {
+  LIVE_FLOW_EXIT_CODES,
+  evaluateLiveFlow,
+  type LiveFlowOrchestrationStatus,
+  type LiveFlowResult,
+  type LiveFlowStepStatus,
+} from "./live-flow-result";
+
 const API = process.env.API_URL ?? "http://127.0.0.1:4000";
 const SKILL_ID = process.env.SKILL ?? "atellier-build-loop";
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 180_000);
 const POLL_INTERVAL_MS = 2_000;
 const FED_URL = process.env.FED_URL ?? "http://127.0.0.1:5173";
+const OUTPUT_FORMAT = process.env.OUTPUT_FORMAT ?? "text";
+const JSON_OUTPUT = OUTPUT_FORMAT === "json";
 
 const DEFAULT_GOALS: Record<string, { goal: string; context: string }> = {
   "atellier-build-loop": {
     goal:
-      "Add a /health endpoint badge that reports the current executor model. " +
-      "Keep the change minimal: a tiny React component reading from useHealthApi, " +
-      "rendered in the existing app header. No new dependencies.",
+      "Create a practical 3-day operating plan for using Atellier daily. " +
+      "Each day must include Objective, Actions, Expected Evidence, Acceptance Signal, " +
+      "Risks, and Human Approval Boundary.",
     context:
-      "Atellier Studio monorepo. Frontend uses React 19 + TanStack Query. " +
-      "useHealthApi returns { executorMode, executorModel, modelProfile }. " +
-      "The header lives in apps/web/src/app/AppShell.tsx.",
+      "Private local-first workflow. Produce the complete plan under Requested Artifact. " +
+      "Do not reference or modify repository files.",
   },
   "llm-wiki-ingest-loop": {
     goal:
@@ -80,28 +98,6 @@ type HealthStatus = {
 
 type StartResponse = { runId: string };
 
-type StepStatus = {
-  stepId: string;
-  label: string;
-  phase: string;
-  agentName: string;
-  agentRole: string;
-  agentId?: string;
-  runId?: string;
-  status: "pending" | "running" | "completed" | "failed";
-  isActive: boolean;
-};
-
-type OrchestrationStatus = {
-  orchestrationRunId: string;
-  skillId: string;
-  goal: string;
-  status: string;
-  steps: StepStatus[];
-  activeStep: StepStatus | null;
-  nextStep: StepStatus | null;
-};
-
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const hasBody = body !== undefined;
   const res = await fetch(`${API}${path}`, {
@@ -116,7 +112,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-function statusGlyph(status: StepStatus["status"]): string {
+function statusGlyph(status: LiveFlowStepStatus["status"]): string {
   switch (status) {
     case "pending": return clr("dim", "·");
     case "running": return clr("yellow", "▶");
@@ -125,7 +121,7 @@ function statusGlyph(status: StepStatus["status"]): string {
   }
 }
 
-function renderProgress(status: OrchestrationStatus): string {
+function renderProgress(status: LiveFlowOrchestrationStatus): string {
   return status.steps
     .map((step) => {
       const glyph = statusGlyph(step.status);
@@ -134,112 +130,154 @@ function renderProgress(status: OrchestrationStatus): string {
     .join("\n");
 }
 
-async function pollUntilDone(runId: string): Promise<OrchestrationStatus> {
+class PollingTimeoutError extends Error {}
+
+async function pollUntilDone(runId: string): Promise<LiveFlowOrchestrationStatus> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let lastRender = "";
 
   while (Date.now() < deadline) {
-    const status = await req<OrchestrationStatus>("GET", `/orchestrations/${runId}/status`);
+    const status = await req<LiveFlowOrchestrationStatus>("GET", `/orchestrations/${runId}/status`);
     const render = renderProgress(status);
-    if (render !== lastRender) {
+    if (!JSON_OUTPUT && render !== lastRender) {
       console.log(`\n${bold("Progress:")}`);
       console.log(render);
       lastRender = render;
     }
-    if (status.status === "completed" || status.status === "failed" || status.status === "approved") {
+    if (["completed", "failed", "approved", "blocked", "cancelled"].includes(status.status)) {
       return status;
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  throw new Error(`Orchestration polling timed out after ${POLL_TIMEOUT_MS}ms`);
+  throw new PollingTimeoutError(`Orchestration polling timed out after ${POLL_TIMEOUT_MS}ms`);
+}
+
+function renderOperationalSummary(result: LiveFlowResult): string {
+  const outcome = result.outcome === "success"
+    ? clr("green", "✓ READY FOR HUMAN REVIEW")
+    : result.outcome === "needs-human"
+      ? clr("yellow", "⚠ NEEDS HUMAN INPUT")
+      : clr("red", "✗ FAILED");
+  const lines = [
+    `  Outcome:    ${outcome}`,
+    `  Run:        ${result.runId}`,
+    `  Status:     ${result.status}`,
+    `  Readiness:  ${result.readiness ?? "not-applicable"}`,
+    `  Steps:      ${result.completedSteps}/${result.totalSteps} completed, ${result.failedSteps} failed`,
+    `  Validation: ${result.validationPassed === undefined ? "not-applicable" : result.validationPassed ? "passed" : "blocked"}`,
+  ];
+  if (result.checklist) {
+    lines.push(
+      `  QA:         ${result.checklist.complete ? "complete" : "incomplete"} ` +
+      `(${result.checklist.pass} pass / ${result.checklist.fail} fail / ${result.checklist.total} total)`,
+    );
+  }
+  for (const repair of result.repairs) {
+    lines.push(
+      `  ${repair.kind}: ${repair.attemptsUsed}/${repair.maxAttempts} attempts, ` +
+      `${repair.exhausted ? "exhausted" : repair.resolved ? "resolved" : "unresolved"}`,
+    );
+  }
+  if (result.blockers.length > 0) {
+    lines.push("  Blockers:", ...result.blockers.map((blocker) => `    - ${blocker}`));
+  }
+  return lines.join("\n");
+}
+
+function exitWithError(message: string, exitCode: number): never {
+  if (JSON_OUTPUT) {
+    console.log(JSON.stringify({
+      outcome: exitCode === LIVE_FLOW_EXIT_CODES.timeout ? "timeout" : "failed",
+      exitCode,
+      error: message,
+    }, null, 2));
+  } else {
+    console.error(clr("red", `\n✗ ${message}`));
+  }
+  process.exit(exitCode);
 }
 
 async function main(): Promise<void> {
-  console.log(bold("\n🧪 Multi-agent live smoke test\n"));
+  if (!new Set(["text", "json"]).has(OUTPUT_FORMAT)) {
+    exitWithError(`OUTPUT_FORMAT must be either text or json; received ${OUTPUT_FORMAT}.`, LIVE_FLOW_EXIT_CODES.failed);
+  }
+  if (!Number.isFinite(POLL_TIMEOUT_MS) || POLL_TIMEOUT_MS <= 0) {
+    exitWithError("POLL_TIMEOUT_MS must be a positive number.", LIVE_FLOW_EXIT_CODES.failed);
+  }
+  const existingRunId = process.env.RUN_ID?.trim();
+  if (!JSON_OUTPUT) console.log(bold("\n🧪 Multi-agent live smoke test\n"));
 
   // 1. Health check.
   let health: HealthStatus;
   try {
     health = await req<HealthStatus>("GET", "/health");
   } catch (error) {
-    console.error(clr("red", `✗ Cannot reach API at ${API}.`));
-    console.error(`  ${(error as Error).message}`);
-    console.error(dim("\n  Hint: start the backend, e.g."));
-    console.error(dim("    AGENT_EXECUTOR_MODE=groq GROQ_API_KEY=gsk_... \\"));
-    console.error(dim("    pnpm --filter @atellier/api dev:memory\n"));
-    process.exit(1);
+    exitWithError(`Cannot reach API at ${API}: ${(error as Error).message}`, LIVE_FLOW_EXIT_CODES.failed);
   }
 
-  if (health.executorMode === "mock") {
-    console.error(
-      clr("red", `✗ /health reports executorMode=mock — this script needs a real executor.`),
+  if (!existingRunId && health.executorMode === "mock") {
+    exitWithError(
+      "/health reports executorMode=mock; restart with openai, anthropic, groq, or ollama.",
+      LIVE_FLOW_EXIT_CODES.failed,
     );
-    console.error(
-      dim("  Restart the API with one of: openai, anthropic, groq, ollama."),
-    );
-    console.error(dim("  Free options:"));
-    console.error(dim("    - groq (free cloud tier):  AGENT_EXECUTOR_MODE=groq GROQ_API_KEY=..."));
-    console.error(dim("    - ollama (local, free):    AGENT_EXECUTOR_MODE=ollama OLLAMA_MODEL=llama3.2"));
-    process.exit(1);
   }
 
-  console.log(
+  if (!JSON_OUTPUT) console.log(
     `${clr("green", "✓")} API healthy — ${bold(health.executorMode.toUpperCase())} ` +
       `(${health.modelProfile}) ${health.executorModel}`,
   );
 
   // 2. Resolve skill + goal.
   const defaults = DEFAULT_GOALS[SKILL_ID];
-  if (!defaults) {
-    console.error(clr("red", `✗ Unknown skill "${SKILL_ID}".`));
-    console.error(`  Known skills: ${Object.keys(DEFAULT_GOALS).join(", ")}`);
-    process.exit(1);
+  if (!existingRunId && !defaults) {
+    exitWithError(
+      `Unknown skill "${SKILL_ID}". Known skills: ${Object.keys(DEFAULT_GOALS).join(", ")}`,
+      LIVE_FLOW_EXIT_CODES.failed,
+    );
   }
-  const goal = process.env.GOAL?.trim() || defaults.goal;
-  const context = process.env.CONTEXT?.trim() || defaults.context;
+  const goal = process.env.GOAL?.trim() || defaults?.goal;
+  const context = process.env.CONTEXT?.trim() || defaults?.context;
 
-  console.log(`${clr("cyan", "→")} Skill:   ${bold(SKILL_ID)}`);
-  console.log(`${clr("cyan", "→")} Goal:    ${goal}`);
-  console.log(`${clr("cyan", "→")} Context: ${dim(context)}`);
+  if (!JSON_OUTPUT && existingRunId) {
+    console.log(`${clr("cyan", "→")} Inspecting existing orchestration: ${bold(existingRunId)}`);
+  } else if (!JSON_OUTPUT) {
+    console.log(`${clr("cyan", "→")} Skill:   ${bold(SKILL_ID)}`);
+    console.log(`${clr("cyan", "→")} Goal:    ${goal}`);
+    console.log(`${clr("cyan", "→")} Context: ${dim(context)}`);
+  }
 
   // 3. Launch orchestration (background).
-  const start = await req<StartResponse>("POST", `/orchestrations/skills/${SKILL_ID}/run`, {
-    goal,
-    context,
-  });
-  console.log(`\n${clr("magenta", "★")} Orchestration started — runId=${bold(start.runId)}`);
-  console.log(dim(`  Watch live in the UI: ${FED_URL}/runs`));
-  console.log(dim(`  Pixel Office:         ${FED_URL}/office`));
+  const runId = existingRunId ?? (await req<StartResponse>(
+    "POST",
+    `/orchestrations/skills/${SKILL_ID}/run`,
+    { goal, context },
+  )).runId;
+  if (!JSON_OUTPUT && !existingRunId) {
+    console.log(`\n${clr("magenta", "★")} Orchestration started — runId=${bold(runId)}`);
+    console.log(dim(`  Watch live in the UI: ${FED_URL}/runs`));
+    console.log(dim(`  Pixel Office:         ${FED_URL}/office`));
+  }
 
   // 4. Poll until done.
-  const final = await pollUntilDone(start.runId);
+  const final = await pollUntilDone(runId);
+  const parentRun = await req<Run>("GET", `/runs/${runId}`);
+  const result = evaluateLiveFlow(final, parentRun);
 
   // 5. Summary.
-  console.log(`\n${bold("Final state:")}`);
-  console.log(renderProgress(final));
-
-  const completed = final.steps.filter((s) => s.status === "completed").length;
-  const failed = final.steps.filter((s) => s.status === "failed").length;
-
-  if (final.status === "completed" || final.status === "approved") {
-    console.log(
-      `\n${clr("green", "✓ Orchestration finished.")} ` +
-        `${completed}/${final.steps.length} steps OK ` +
-        dim(`(run status: ${final.status})`),
-    );
-    console.log(dim(`  Open ${FED_URL}/review to inspect each agent's response.`));
+  if (JSON_OUTPUT) {
+    console.log(JSON.stringify(result, null, 2));
   } else {
-    console.log(
-      `\n${clr("red", "✗ Orchestration ended in non-success state:")} ${final.status} ` +
-        `(${completed} ok / ${failed} failed)`,
-    );
-    process.exit(1);
+    console.log(`\n${bold("Final state:")}`);
+    console.log(renderProgress(final));
+    console.log(`\n${renderOperationalSummary(result)}`);
+    console.log(dim(`\n  Open ${FED_URL}/review to inspect each agent's response.`));
   }
+  process.exitCode = result.exitCode;
 }
 
 main().catch((error) => {
-  console.error(clr("red", `\n✗ Smoke test crashed: ${(error as Error).message}`));
-  process.exit(1);
+  const exitCode = error instanceof PollingTimeoutError
+    ? LIVE_FLOW_EXIT_CODES.timeout
+    : LIVE_FLOW_EXIT_CODES.failed;
+  exitWithError(`Smoke test crashed: ${(error as Error).message}`, exitCode);
 });
-
-export {};
