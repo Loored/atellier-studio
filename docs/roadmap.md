@@ -168,6 +168,7 @@ Deterministic artifact failures now trigger up to three automatic Builder correc
 - Resolve captured curation signals explicitly from Review and verify the target-page decision remains useful over time.
 - Record repeated friction and only then select the next bounded feature slice.
 - ✅ Persist acceptance-criteria QA checklists, stop materially repeated feedback, and reject duplicate local workers before launch.
+- ✅ Make the real smoke runner fail closed on parent validation/readiness and expose stable text/JSON outcomes.
 
 ## Later — Tailwind / Pixel polish
 

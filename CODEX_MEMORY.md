@@ -149,6 +149,13 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 - `./scripts/dev-local` detects existing repository workers and fails without killing them. Duplicate manual worker group `80728` was stopped; launcher group `55803` remains.
 - Run record: `atelier/runs/2026-08-28-qa-evidence-loop.md`.
 
+### 2026-08-28 - Trustworthy live runner
+
+- `apps/api/src/test/live-flow.ts` evaluates parent readiness, aggregate validation, QA checklist evidence, repairs, and blockers instead of equating `status: completed` with success.
+- Exit codes are `0` ready/success, `1` failed/error, `2` needs-human, and `3` timeout; `OUTPUT_FORMAT=json` emits a machine-readable final result.
+- `RUN_ID` re-evaluates an existing orchestration without another LLM call. The default build smoke goal is now a bounded three-day operating plan rather than the already-implemented health badge.
+- Run record: `atelier/runs/2026-08-28-trustworthy-live-runner.md`.
+
 ### 2026-08-25 - Knowledge deliverable grounding
 
 - Linked task sources now contribute bounded read-only file contents and verified vault paths to every orchestration step; missing sources remain provenance but are not trusted as loaded evidence.
