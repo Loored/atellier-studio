@@ -6,7 +6,7 @@ It is not a game, not a public SaaS MVP, and not a generic task manager. The cur
 
 ## Current Stage
 
-Current stage: Operational Spine + Durable Local Orchestration Runtime + bounded autonomous artifact repair + complete daily-use and review-learning loops + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Knowledge Graph v2.
+Current stage: Operational Spine + Durable Local Orchestration Runtime + bounded autonomous artifact repair + explicit memory trust contract + complete daily-use and review-learning loops + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Knowledge Graph v2.
 
 Implemented:
 
@@ -20,6 +20,10 @@ Implemented:
 - Markdown wiki index, log, deliverables index, and synthesis pages
 - Wiki Brain MVP: deterministic `POST /wiki/ingest`, `POST /wiki/query`, `POST /wiki/lint`, safe `POST /wiki/page`
 - Wiki query surfaces related pages and possible contradictions
+- Wiki reads and retrieval expose memory layer, trust state, authority, provenance, and classification reason; generated content fails closed as context-only. See [`docs/memory-trust-contract.md`](docs/memory-trust-contract.md).
+- Wiki query supports explainable `balanced`, `evidence-first`, and `trusted-only` policies over Wiki and raw Markdown, with lexical and trust score components visible per result.
+- Reflection candidates deterministically surface patterns repeated across distinct episodic artifacts; generation is read-only and prepared drafts remain generated context pending explicit review.
+- Reflection review records idempotent accepted/rejected decisions with required notes; only accepted decisions can be promoted into trusted semantic notes.
 - Wiki Dream audit grounding: curator receives real lint findings and current wiki paths before proposing maintenance
 - Wiki Dream UI: trigger dream runs, preview reports, and save approved reports under `wiki/dreams`
 - Review memory capture: `POST /runs/:id/capture-memory` writes durable `wiki/synthesis/` pages

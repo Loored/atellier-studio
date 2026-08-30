@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-08-24 — Review-to-memory learning loop completed on `codex/review-memory-learning-loop`.
-**Active plan:** Use the complete local workflow daily, resolve real curation signals, and collect evidence before selecting another feature slice.
+**Last updated:** 2026-08-28 — Memory trust contract implemented on `codex/memory-trust-contract`.
+**Active plan:** Validate memory trust, retrieval, reflection, decisions, and promotion against the real local workflow before selecting another feature slice.
 
 ## Strategic stance
 
@@ -169,6 +169,11 @@ Deterministic artifact failures now trigger up to three automatic Builder correc
 - Record repeated friction and only then select the next bounded feature slice.
 - ✅ Persist acceptance-criteria QA checklists, stop materially repeated feedback, and reject duplicate local workers before launch.
 - ✅ Make the real smoke runner fail closed on parent validation/readiness and expose stable text/JSON outcomes.
+- ✅ Define and expose memory layers, trust states, authority, provenance, and conservative fail-closed defaults.
+- ✅ Make retrieval trust-aware while retaining lexical grounding and inspectable reasons.
+- ✅ Produce deterministic, inspectable reflection candidates from repeated episodic artifacts without persisting or promoting them.
+- ✅ Record idempotent accepted/rejected reflection decisions and permit guarded semantic promotion only from accepted decisions.
+- ✅ Validate the complete flow against an isolated live local vault: conflict guard, accepted promotion, trusted-only retrieval, graph provenance, and browser UI.
 
 ## Later — Tailwind / Pixel polish
 

@@ -13754,3 +13754,43 @@
 - Stable exit codes distinguish success, failure, needs-human, and timeout; JSON output supports automation.
 - Existing runs can be inspected without another LLM call, and the stale health-badge default was replaced with a bounded operating-plan goal.
 - Real run `6a92085b0d2f0aff92f5226a` correctly returned needs-human after repeated QA feedback instead of reporting technical completion as success.
+
+## 2026-08-28 - Memory trust contract
+
+- Summary: Wiki memory now exposes layer, trust state, authority, provenance paths, and a readable classification reason across ingest, reads, queries, related pages, and safe writes.
+- Safety: raw inputs are evidence-only; generated summaries, runs, unapproved deliverables, and Dream proposals fail closed as context-only; only approved or explicitly curated memory is trusted.
+- UI: Wiki surfaces render compact trust badges so operators can distinguish evidence, generated context, and trusted memory before acting.
+- Documentation: `docs/memory-trust-contract.md`.
+- Run: `atelier/runs/2026-08-28-memory-trust-contract.md`.
+- Next: use this contract in bounded trust-aware retrieval without embeddings or silent memory promotion.
+
+## 2026-08-30 - Trust-aware retrieval
+
+- Summary: Wiki query now searches Wiki and immutable raw Markdown using explicit balanced, evidence-first, or trusted-only policies.
+- Explainability: every match exposes lexical score, trust adjustment, total score, and a readable ranking reason.
+- Safety: generated context receives no authority boost; trusted-only excludes non-trusted matches and related pages.
+- Run: `atelier/runs/2026-08-30-trust-aware-retrieval.md`.
+- Next: derive reviewable reflection candidates from repeated episodes without automatic promotion.
+
+## 2026-08-30 - Reflection candidates
+
+- Summary: Added deterministic, read-only detection of patterns repeated across at least two distinct episodic artifacts.
+- Provenance: candidates retain exact run/task/deliverable/Dream evidence paths and deduplicate repetition within one file.
+- Safety: candidates and prepared drafts remain semantic/generated/context-only; generation does not write or promote memory.
+- Run: `atelier/runs/2026-08-30-reflection-candidates.md`.
+- Next: explicit accept/reject decisions and guarded promotion.
+
+## 2026-08-30 - Reflection review and guarded promotion
+
+- Summary: Added durable accepted/rejected decisions with required operator notes and a separate accepted-only semantic promotion action.
+- Idempotency: exact decision retries reuse the existing page; conflicting second decisions fail closed.
+- Safety: rejected candidates cannot be promoted, and promotion preserves both decision and episodic evidence provenance.
+- Run: `atelier/runs/2026-08-30-reflection-review-promotion.md`.
+- Next: validate the complete memory loop against the real local Wiki and inspect retrieval/graph behavior.
+
+## 2026-08-30 - Memory loop isolated live validation
+
+- Summary: Verified reflection generation, accepted decision, conflict rejection, guarded promotion, trusted-only retrieval, and Knowledge Graph provenance against an isolated local vault.
+- UI: Reflection candidate controls and trust badge rendered correctly; retrieval policy is scoped to Query; browser console reported zero errors.
+- Isolation: validation used `/private/tmp/atellier-memory-live` and did not modify the project Wiki or runtime snapshots.
+- Run: `atelier/runs/2026-08-30-reflection-review-promotion.md`.
