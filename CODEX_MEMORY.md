@@ -100,7 +100,7 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Daily-use soak and learning feedback**: use the complete P3/P4 flow against the local Mongo worker, resolve real curation signals, and record repeated friction before expanding scope.
+1. **Daily-use memory soak**: use the completed trust/retrieval/reflection loop on real project work and record false-positive reflection patterns before expanding automation.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
@@ -155,6 +155,40 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 - Exit codes are `0` ready/success, `1` failed/error, `2` needs-human, and `3` timeout; `OUTPUT_FORMAT=json` emits a machine-readable final result.
 - `RUN_ID` re-evaluates an existing orchestration without another LLM call. The default build smoke goal is now a bounded three-day operating plan rather than the already-implemented health badge.
 - Run record: `atelier/runs/2026-08-28-trustworthy-live-runner.md`.
+
+### 2026-08-28 - Memory trust contract
+
+- Wiki artifacts now carry explicit `layer`, `state`, `authority`, `provenancePaths`, and `reason` metadata across API reads, writes, ingest, query matches, and related pages.
+- Raw sources are immutable evidence; generated summaries, operational episodes, unapproved deliverables, and Dream proposals are context-only by default.
+- Approved synthesis, explicit decisions, curated role memory, and operator-curated Wiki categories are trusted. Unknown artifacts fail closed as generated context.
+- Wiki UI badges expose the classification before the operator uses a result.
+- This is classification only: trust-aware retrieval and reflection remain later bounded slices.
+- Contract: `docs/memory-trust-contract.md`; run: `atelier/runs/2026-08-28-memory-trust-contract.md`.
+
+### 2026-08-30 - Trust-aware retrieval
+
+- Wiki query searches Wiki plus immutable raw Markdown under explicit `balanced`, `evidence-first`, or `trusted-only` policy.
+- Ranking remains deterministic and inspectable: occurrence/title relevance plus a documented authority adjustment; every result returns the components and reason.
+- Generated context receives no authority boost, and trusted-only excludes non-trusted matches and related pages.
+- No embeddings, vector database, model reranker, or autonomous promotion was added.
+- Run: `atelier/runs/2026-08-30-trust-aware-retrieval.md`.
+
+### 2026-08-30 - Reflection candidates
+
+- `POST /wiki/reflections` deterministically detects patterns appearing in at least two distinct episodic runs, tasks, deliverables, or Dream reports.
+- Repeated lines within one artifact count once; normalized dates, IDs, and paths reduce incidental variation while exact evidence paths remain attached.
+- Generation is read-only. Candidates and prepared `wiki/reflections/` drafts remain semantic/generated/context-only.
+- There is intentionally no automatic acceptance or promotion; explicit accept/reject decisions are the next boundary.
+- Run: `atelier/runs/2026-08-30-reflection-candidates.md`.
+
+### 2026-08-30 - Reflection review and promotion
+
+- Reflection candidates now receive one durable accepted/rejected decision with a required normalized operator note.
+- Exact retries are idempotent; a different second decision or note fails closed.
+- Promotion is separate, requires the canonical accepted decision, preserves decision/evidence provenance, and creates a verified/trusted semantic note.
+- Rejected candidates cannot be promoted; role-memory promotion remains out of scope.
+- Run: `atelier/runs/2026-08-30-reflection-review-promotion.md`.
+- Isolated live validation passed on API 4001/Web 5175: candidate provenance, decision conflict HTTP 400, accepted promotion, trusted-only ranking, graph nodes/edges, UI placement, and zero browser console errors.
 
 ### 2026-08-25 - Knowledge deliverable grounding
 

@@ -11,6 +11,12 @@ import type {
   WikiQueryResponse,
   WikiDreamDecisionRecord,
   WikiDreamDecisionRecordInput,
+  WikiReflectionInput,
+  WikiReflectionResponse,
+  WikiReflectionDecisionInput,
+  WikiReflectionDecisionRecord,
+  WikiReflectionPromotionInput,
+  WikiReflectionPromotionRecord,
 } from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
@@ -44,10 +50,11 @@ export function useWikiQueryApi(
   query: string | null,
   limit = 5,
   sourceType: WikiQueryInput["sourceType"] = undefined,
+  retrievalPolicy: WikiQueryInput["retrievalPolicy"] = "balanced",
 ) {
   return useQueryInstance<WikiQueryResponse>({
-    queryKey: queryKeys.wiki.query(query ?? "", limit, sourceType ?? "all"),
-    queryFn: () => wikiService.query({ query: query ?? "", limit, sourceType }),
+    queryKey: queryKeys.wiki.query(query ?? "", limit, sourceType ?? "all", retrievalPolicy),
+    queryFn: () => wikiService.query({ query: query ?? "", limit, sourceType, retrievalPolicy }),
     enabled: Boolean(query && query.trim().length > 0),
   });
 }
@@ -112,6 +119,42 @@ export function useWikiLintApi(options: UseWikiLintApiOptions = {}) {
       onSuccess: async (result) => {
         notifySuccess(result.ok ? "Wiki lint passed" : "Wiki lint found issues");
         await queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log });
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type UseWikiReflectionsApiOptions = UseMutationOptions<WikiReflectionResponse, Error, WikiReflectionInput>;
+
+export function useWikiReflectionsApi(options: UseWikiReflectionsApiOptions = {}) {
+  const { notifyError } = useApiAlerts();
+  return useMutationInstance<WikiReflectionResponse, Error, WikiReflectionInput>(
+    { mutationFn: (input) => wikiService.reflect(input), ...options },
+    { onError: (error) => notifyError(error) },
+  );
+}
+
+export function useWikiReflectionDecisionApi() {
+  const { notifyError, notifySuccess } = useApiAlerts();
+  return useMutationInstance<WikiReflectionDecisionRecord, Error, WikiReflectionDecisionInput>(
+    { mutationFn: (input) => wikiService.decideReflection(input) },
+    { onSuccess: () => notifySuccess("Reflection decision saved"), onError: (error) => notifyError(error) },
+  );
+}
+
+export function useWikiReflectionPromotionApi() {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+  return useMutationInstance<WikiReflectionPromotionRecord, Error, WikiReflectionPromotionInput>(
+    { mutationFn: (input) => wikiService.promoteReflection(input) },
+    {
+      onSuccess: async () => {
+        notifySuccess("Reflection promoted");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
       },
       onError: (error) => notifyError(error),
     },

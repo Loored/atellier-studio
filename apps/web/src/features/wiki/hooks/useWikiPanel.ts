@@ -23,6 +23,9 @@ import {
   useWikiQueryApi,
   useWikiWritePageApi,
   useWikiRecordDreamDecisionApi,
+  useWikiReflectionsApi,
+  useWikiReflectionDecisionApi,
+  useWikiReflectionPromotionApi,
 } from "../../../api/hooks/wiki/useWikiApi";
 import { queryKeys } from "../../../api/query/queryKeys";
 
@@ -38,6 +41,7 @@ export function useWikiPanel() {
   const [ingestSourceType, setIngestSourceType] = useState<"note" | "research" | "client" | "decision" | "other">("note");
   const [queryInput, setQueryInput] = useState("");
   const [querySourceType, setQuerySourceType] = useState<"all" | "note" | "research" | "client" | "decision" | "other">("all");
+  const [queryRetrievalPolicy, setQueryRetrievalPolicy] = useState<"balanced" | "evidence-first" | "trusted-only">("balanced");
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const [selectedSummaryPath, setSelectedSummaryPath] = useState<string | null>(null);
   const [queryDraftOriginPath, setQueryDraftOriginPath] = useState<string | null>(null);
@@ -47,6 +51,8 @@ export function useWikiPanel() {
   const [dreamActionError, setDreamActionError] = useState<string | null>(null);
   const [lastSavedDreamPath, setLastSavedDreamPath] = useState<string | null>(null);
   const [dreamDecisionFeedback, setDreamDecisionFeedback] = useState<string | null>(null);
+  const [reflectionNotes, setReflectionNotes] = useState<Record<string, string>>({});
+  const [reflectionDecisions, setReflectionDecisions] = useState<Record<string, { decision: "accepted" | "rejected"; path: string }>>({});
 
   const { data: healthStatus } = useHealthApi();
   const isMeteredDreamExecution =
@@ -73,6 +79,7 @@ export function useWikiPanel() {
     activeQuery,
     5,
     querySourceType === "all" ? undefined : querySourceType,
+    queryRetrievalPolicy,
   );
   const { data: selectedSummaryPage, isFetching: isFetchingSummaryPage } = useWikiPageApi(selectedSummaryPath);
   const {
@@ -87,6 +94,9 @@ export function useWikiPanel() {
     data: lintResult,
   } = useWikiLintApi();
   const writePageMutation = useWikiWritePageApi();
+  const reflectionMutation = useWikiReflectionsApi();
+  const reflectionDecisionMutation = useWikiReflectionDecisionApi();
+  const reflectionPromotionMutation = useWikiReflectionPromotionApi();
   const dreamWritePageMutation = useWikiWritePageApi();
   const { mutateAsync: appendWikiLog } = useAppendWikiLogApi();
   const dreamDecisionMutation = useWikiRecordDreamDecisionApi();
@@ -351,6 +361,31 @@ export function useWikiPanel() {
     setQueryDraftOriginPath(matchPath);
   }
 
+  async function generateReflectionCandidates(): Promise<void> {
+    await reflectionMutation.mutateAsync({ minOccurrences: 2, limit: 5 });
+  }
+
+  function prepareReflectionDraft(candidateId: string): void {
+    const candidate = reflectionMutation.data?.candidates.find((item) => item.id === candidateId);
+    if (!candidate) return;
+    setWritePath(candidate.suggestedPath);
+    setWriteContent(candidate.draftMarkdown);
+    setQueryDraftOriginPath(null);
+  }
+
+  async function decideReflection(candidateId: string, decision: "accepted" | "rejected"): Promise<void> {
+    const note = reflectionNotes[candidateId]?.trim();
+    if (!note) return;
+    const result = await reflectionDecisionMutation.mutateAsync({ candidateId, decision, note });
+    setReflectionDecisions((current) => ({ ...current, [candidateId]: { decision, path: result.path } }));
+  }
+
+  async function promoteAcceptedReflection(candidateId: string): Promise<void> {
+    const record = reflectionDecisions[candidateId];
+    if (!record || record.decision !== "accepted") return;
+    await reflectionPromotionMutation.mutateAsync({ decisionPath: record.path });
+  }
+
   async function runLint(): Promise<void> {
     await lintWiki();
   }
@@ -411,11 +446,21 @@ export function useWikiPanel() {
     setIngestSourceType,
     queryInput,
     querySourceType,
+    queryRetrievalPolicy,
     setQueryInput,
     setQuerySourceType,
+    setQueryRetrievalPolicy,
     queryMatches,
     relatedPages,
     contradictions,
+    reflectionCandidates: reflectionMutation.data?.candidates ?? [],
+    scannedReflectionEpisodes: reflectionMutation.data?.scannedEpisodes ?? null,
+    isGeneratingReflections: reflectionMutation.isPending,
+    reflectionNotes,
+    setReflectionNotes,
+    reflectionDecisions,
+    isSavingReflectionDecision: reflectionDecisionMutation.isPending,
+    isPromotingReflection: reflectionPromotionMutation.isPending,
     isFetchingQuery,
     isIngesting,
     ingestResult,
@@ -460,6 +505,10 @@ export function useWikiPanel() {
     selectIngestSummary,
     submitQuery,
     promoteQueryMatchToDraft,
+    generateReflectionCandidates,
+    prepareReflectionDraft,
+    decideReflection,
+    promoteAcceptedReflection,
     runLint,
     runDream,
     saveDreamReport,
