@@ -7,6 +7,11 @@ import {
   type WikiDreamDecisionRecordInput,
   type WikiWritePageInput,
   type WikiQueryInput,
+  WIKI_RETRIEVAL_POLICIES,
+  type WikiReflectionInput,
+  WIKI_REFLECTION_DECISIONS,
+  type WikiReflectionDecisionInput,
+  type WikiReflectionPromotionInput,
 } from "@atellier/shared";
 import type { AppServices } from "../services/app-services";
 import { badRequest, bodyRecord, optionalStringField, stringField } from "./route-utils";
@@ -154,10 +159,15 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
       ? Math.floor(limitValue)
       : undefined;
     const sourceType = optionalStringField(body, "sourceType");
+    const retrievalPolicy = optionalStringField(body, "retrievalPolicy");
+    if (retrievalPolicy && !WIKI_RETRIEVAL_POLICIES.includes(retrievalPolicy as (typeof WIKI_RETRIEVAL_POLICIES)[number])) {
+      return badRequest(reply, "Invalid retrieval policy.");
+    }
     const input: WikiQueryInput = {
       query,
       limit,
       sourceType: sourceType as WikiQueryInput["sourceType"],
+      retrievalPolicy: retrievalPolicy as WikiQueryInput["retrievalPolicy"],
     };
 
     try {
@@ -169,6 +179,46 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
 
   fastify.post("/wiki/lint", async (_request, reply) => {
     return reply.code(200).send(await services.wiki.lint());
+  });
+
+  fastify.post("/wiki/reflections", async (request, reply) => {
+    const body = bodyRecord(request.body) ?? {};
+    const input: WikiReflectionInput = {
+      minOccurrences: typeof body.minOccurrences === "number" ? Math.floor(body.minOccurrences) : undefined,
+      limit: typeof body.limit === "number" ? Math.floor(body.limit) : undefined,
+    };
+    return reply.code(200).send(await services.wiki.reflect(input));
+  });
+
+  fastify.post("/wiki/reflections/decisions", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) return badRequest(reply, "Request body must be an object.");
+    const candidateId = stringField(body, "candidateId");
+    const decision = stringField(body, "decision");
+    const note = stringField(body, "note");
+    if (!candidateId || !note || !decision || !WIKI_REFLECTION_DECISIONS.includes(decision as (typeof WIKI_REFLECTION_DECISIONS)[number])) {
+      return badRequest(reply, "Candidate ID, accepted/rejected decision, and operator note are required.");
+    }
+    try {
+      return reply.code(201).send(await services.wiki.recordReflectionDecision({
+        candidateId,
+        decision: decision as WikiReflectionDecisionInput["decision"],
+        note,
+      }));
+    } catch (error) {
+      return badRequest(reply, error instanceof Error ? error.message : "Reflection decision failed.");
+    }
+  });
+
+  fastify.post("/wiki/reflections/promote", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    const decisionPath = body ? stringField(body, "decisionPath") : undefined;
+    if (!decisionPath) return badRequest(reply, "Decision path is required.");
+    try {
+      return reply.code(201).send(await services.wiki.promoteReflection({ decisionPath } satisfies WikiReflectionPromotionInput));
+    } catch (error) {
+      return badRequest(reply, error instanceof Error ? error.message : "Reflection promotion failed.");
+    }
   });
 
   fastify.post("/wiki/dream-decisions", async (request, reply) => {

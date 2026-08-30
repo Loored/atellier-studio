@@ -30,8 +30,8 @@ export const queryKeys = {
     index: [QUERY_KEYS.WIKI, "index"] as const,
     log: [QUERY_KEYS.WIKI, "log"] as const,
     page: (wikiPath: string) => [QUERY_KEYS.WIKI, "page", wikiPath] as const,
-    query: (query: string, limit: number, sourceType: string) =>
-      [QUERY_KEYS.WIKI, "query", query, limit, sourceType] as const,
+    query: (query: string, limit: number, sourceType: string, retrievalPolicy: string) =>
+      [QUERY_KEYS.WIKI, "query", query, limit, sourceType, retrievalPolicy] as const,
   },
   orchestrations: {
     skills: [QUERY_KEYS.ORCHESTRATIONS, "skills"] as const,

@@ -14,7 +14,12 @@ import type {
   RunAgentResult,
   StartSkillOrchestrationResponse,
   Task,
+  WikiIngestResponse,
   WikiPageResponse,
+  WikiQueryResponse,
+  WikiReflectionResponse,
+  WikiReflectionDecisionRecord,
+  WikiReflectionPromotionRecord,
 } from "@atellier/shared";
 import { buildServer } from "../server";
 import { createAppServices } from "../services/app-services";
@@ -1306,10 +1311,17 @@ describe("operational spine routes", () => {
     });
 
     expect(ingestResponse.statusCode).toBe(201);
-    const ingest = ingestResponse.json<{ rawPath: string; summaryPagePath: string; logPath: string }>();
+    const ingest = ingestResponse.json<WikiIngestResponse>();
     expect(ingest.rawPath).toContain("raw/ingest/");
     expect(ingest.summaryPagePath).toContain("wiki/sources/");
     expect(ingest.logPath).toBe("wiki/log.md");
+    expect(ingest.rawMemory).toMatchObject({ layer: "raw", state: "immutable-source", authority: "evidence-only" });
+    expect(ingest.summaryMemory).toMatchObject({
+      layer: "semantic",
+      state: "generated",
+      authority: "context-only",
+      provenancePaths: [ingest.rawPath],
+    });
     expect(Array.isArray((ingestResponse.json() as { proposedTasks?: unknown[] }).proposedTasks)).toBe(true);
 
     const rawPageResponse = await server.inject({
@@ -1373,15 +1385,196 @@ describe("operational spine routes", () => {
     expect(queryResponse.statusCode).toBe(200);
     const queryResult = queryResponse.json<{
       query: string;
-      matches: Array<{ path: string; snippet: string }>;
-      relatedPages: Array<{ path: string; summary: string; reason: string }>;
+      retrievalPolicy: string;
+      matches: Array<{ path: string; snippet: string; memory: { state: string; authority: string; provenancePaths: string[] }; retrieval: { lexical: number; trustAdjustment: number; total: number; reason: string } }>;
+      relatedPages: Array<{ path: string; summary: string; reason: string; memory: { state: string } }>;
       contradictions: Array<{ primaryPath: string; conflictingPath: string; reason: string }>;
     }>();
     expect(queryResult.query).toBe("preserve raw sources");
+    expect(queryResult.retrievalPolicy).toBe("balanced");
     expect(queryResult.matches.length).toBeGreaterThan(0);
     expect(queryResult.matches.some((match) => match.path.startsWith("wiki/"))).toBe(true);
+    expect(queryResult.matches.find((match) => match.path.startsWith("wiki/"))?.memory).toMatchObject({
+      state: "generated",
+      authority: "context-only",
+      provenancePaths: [expect.stringContaining("raw/ingest/")],
+    });
+    expect(queryResult.matches.find((match) => match.path.startsWith("wiki/"))?.retrieval).toMatchObject({
+      trustAdjustment: 0,
+      reason: expect.stringContaining("no authority boost"),
+    });
+    expect(queryResult.matches.find((match) => match.path.startsWith("raw/"))?.memory.authority).toBe("evidence-only");
     expect(Array.isArray(queryResult.relatedPages)).toBe(true);
     expect(Array.isArray(queryResult.contradictions)).toBe(true);
+  });
+
+  it("queries a fresh Wiki safely when no raw directory exists", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "not present", retrievalPolicy: "evidence-first" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<WikiQueryResponse>()).toMatchObject({
+      retrievalPolicy: "evidence-first",
+      matches: [],
+    });
+  });
+
+  it("applies explicit trust-aware retrieval policies", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Generated retrieval context",
+        content: "trust aware retrieval marker",
+        sourceType: "note",
+      },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/notes/trusted-retrieval-note.md",
+        content: "# Trusted note\n\ntrust aware retrieval marker\n",
+      },
+    });
+
+    const balanced = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "balanced", limit: 10 },
+    });
+    expect(balanced.statusCode).toBe(200);
+    const balancedBody = balanced.json<WikiQueryResponse>();
+    expect(balancedBody.retrievalPolicy).toBe("balanced");
+    expect(balancedBody.matches[0]).toMatchObject({
+      path: "wiki/notes/trusted-retrieval-note.md",
+      memory: { authority: "trusted" },
+      retrieval: { trustAdjustment: 4 },
+    });
+
+    const evidenceFirst = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "evidence-first", limit: 10 },
+    });
+    expect(evidenceFirst.json<WikiQueryResponse>().matches[0]).toMatchObject({
+      memory: { authority: "evidence-only" },
+      retrieval: { trustAdjustment: 4 },
+    });
+
+    const trustedOnly = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "trusted-only", limit: 10 },
+    });
+    const trustedOnlyBody = trustedOnly.json<WikiQueryResponse>();
+    expect(trustedOnlyBody.matches).toHaveLength(1);
+    expect(trustedOnlyBody.matches[0]?.memory.authority).toBe("trusted");
+
+    const invalid = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "automatic-trust" },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json<{ error: string }>().error).toContain("Invalid retrieval policy");
+  });
+
+  it("derives generated reflection candidates from repeated episodic evidence without persisting them", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const repeated = "Validation blockers need explicit evidence before approval.";
+    await writeFile(path.join(atelierRoot, "runs", "run-one.md"), `# Run one\n\n- Summary: ${repeated}\n- Summary: ${repeated}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "run-two.md"), `# Run two\n\n- Blocker: ${repeated}\n`, "utf8");
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections",
+      payload: { minOccurrences: 2, limit: 5 },
+    });
+    expect(response.statusCode).toBe(200);
+    const result = response.json<WikiReflectionResponse>();
+    expect(result).toMatchObject({ scannedEpisodes: 2, minOccurrences: 2 });
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+      pattern: repeated,
+      occurrenceCount: 2,
+      evidencePaths: ["runs/run-one.md", "runs/run-two.md"],
+      suggestedPath: expect.stringMatching(/^wiki\/reflections\/reflection-/),
+      memory: {
+        layer: "semantic",
+        state: "generated",
+        authority: "context-only",
+        provenancePaths: ["runs/run-one.md", "runs/run-two.md"],
+      },
+    });
+    expect(result.candidates[0]?.draftMarkdown).toContain("- Status: proposed");
+
+    const unsavedPage = await server.inject({
+      method: "GET",
+      url: `/wiki/page?path=${encodeURIComponent(result.candidates[0]!.suggestedPath)}`,
+    });
+    expect(unsavedPage.statusCode).toBe(404);
+
+    const accept = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: result.candidates[0]!.id, decision: "accepted", note: "This is a reusable approval rule." },
+    });
+    expect(accept.statusCode).toBe(201);
+    const decision = accept.json<WikiReflectionDecisionRecord>();
+    expect(decision).toMatchObject({ decision: "accepted", note: "This is a reusable approval rule." });
+
+    const retry = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: result.candidates[0]!.id, decision: "accepted", note: "This is a reusable approval rule." },
+    });
+    expect(retry.statusCode).toBe(201);
+    expect(retry.json<WikiReflectionDecisionRecord>().path).toBe(decision.path);
+
+    const conflict = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: result.candidates[0]!.id, decision: "rejected", note: "Changed mind." },
+    });
+    expect(conflict.statusCode).toBe(400);
+    expect(conflict.json<{ error: string }>().error).toContain("different durable decision");
+
+    const promote = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/promote",
+      payload: { decisionPath: decision.path },
+    });
+    expect(promote.statusCode).toBe(201);
+    expect(promote.json<WikiReflectionPromotionRecord>()).toMatchObject({
+      decisionPath: decision.path,
+      promotedPath: expect.stringMatching(/^wiki\/notes\/reflection-/),
+      memory: { state: "verified", authority: "trusted" },
+    });
+  });
+
+  it("blocks promotion from a rejected reflection decision", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Repeated handoff failures require a documented owner.";
+    await writeFile(path.join(atelierRoot, "runs", "handoff-one.md"), `# One\n\n- Summary: ${pattern}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "handoff-two.md"), `# Two\n\n- Summary: ${pattern}\n`, "utf8");
+    const reflection = await server.inject({ method: "POST", url: "/wiki/reflections", payload: {} });
+    const candidate = reflection.json<WikiReflectionResponse>().candidates[0]!;
+    const rejected = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: candidate.id, decision: "rejected", note: "This pattern is incidental." },
+    });
+    const decision = rejected.json<WikiReflectionDecisionRecord>();
+    const promotion = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/promote",
+      payload: { decisionPath: decision.path },
+    });
+    expect(promotion.statusCode).toBe(400);
+    expect(promotion.json<{ error: string }>().error).toContain("Only an accepted reflection decision");
   });
 
   it("writes a wiki page through the safe write route", async () => {

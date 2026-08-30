@@ -1,5 +1,23 @@
 import { BookOpenText, Loader2, Save, Sparkles } from "lucide-react";
+import type { MemoryTrustMetadata } from "@atellier/shared";
 import { useWikiPanel } from "../hooks/useWikiPanel";
+
+function MemoryTrustBadge({ memory }: { memory: MemoryTrustMetadata }) {
+  const color = memory.authority === "trusted"
+    ? "border-teal/35 text-teal bg-teal/10"
+    : memory.authority === "evidence-only"
+      ? "border-purple/35 text-purple bg-purple/10"
+      : "border-orange/35 text-orange bg-orange/10";
+  return (
+    <span
+      className={`inline-flex items-center min-h-5 rounded px-1.5 text-[0.64rem] font-bold tracking-wide uppercase border ${color}`}
+      title={memory.reason}
+      aria-label={`Memory trust: ${memory.layer}, ${memory.state}, ${memory.authority}`}
+    >
+      {memory.layer} · {memory.state} · {memory.authority}
+    </span>
+  );
+}
 
 export function WikiPanel() {
   const {
@@ -16,11 +34,21 @@ export function WikiPanel() {
     setIngestSourceType,
     queryInput,
     querySourceType,
+    queryRetrievalPolicy,
     setQueryInput,
     setQuerySourceType,
+    setQueryRetrievalPolicy,
     queryMatches,
     relatedPages,
     contradictions,
+    reflectionCandidates,
+    scannedReflectionEpisodes,
+    isGeneratingReflections,
+    reflectionNotes,
+    setReflectionNotes,
+    reflectionDecisions,
+    isSavingReflectionDecision,
+    isPromotingReflection,
     isFetchingQuery,
     isIngesting,
     ingestResult,
@@ -64,6 +92,10 @@ export function WikiPanel() {
     selectIngestSummary,
     submitQuery,
     promoteQueryMatchToDraft,
+    generateReflectionCandidates,
+    prepareReflectionDraft,
+    decideReflection,
+    promoteAcceptedReflection,
     runLint,
     runDream,
     saveDreamReport,
@@ -82,6 +114,7 @@ export function WikiPanel() {
           <p className="text-[0.65rem] font-bold tracking-[0.12em] uppercase text-purple mb-1">Memory</p>
           <h2 className="text-[1.1rem] font-bold text-ink tracking-tight m-0">Wiki Log</h2>
         </div>
+
         <div className="inline-flex items-center gap-1.5 min-h-7 border border-[var(--border-card)] rounded-lg px-2.5 text-ink-muted bg-[var(--bg-card)] text-[0.78rem]">
           <BookOpenText size={18} />
           <span>{isReady ? "Ready" : "Checking"}</span>
@@ -222,6 +255,10 @@ export function WikiPanel() {
             <div className="mt-2" aria-live="polite">
               <p className="text-[0.74rem] text-ink-muted">Saved: {ingestResult.summaryPagePath}</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
+                <MemoryTrustBadge memory={ingestResult.rawMemory} />
+                <MemoryTrustBadge memory={ingestResult.summaryMemory} />
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={selectIngestSummary}
@@ -254,9 +291,12 @@ export function WikiPanel() {
             </div>
           ) : null}
           {selectedSummaryPage ? (
-            <pre className="mt-2 max-h-24 overflow-auto border border-[var(--border-card)] rounded-md p-2 text-[0.72rem] text-ink-muted bg-black/25 whitespace-pre-wrap">
-              {selectedSummaryPage.content}
-            </pre>
+            <div className="mt-2">
+              <MemoryTrustBadge memory={selectedSummaryPage.memory} />
+              <pre className="mt-1.5 max-h-24 overflow-auto border border-[var(--border-card)] rounded-md p-2 text-[0.72rem] text-ink-muted bg-black/25 whitespace-pre-wrap">
+                {selectedSummaryPage.content}
+              </pre>
+            </div>
           ) : null}
           {isFetchingSummaryPage ? (
             <p className="mt-2 text-[0.74rem] text-ink-faint">Loading summary preview...</p>
@@ -316,6 +356,17 @@ export function WikiPanel() {
             <option value="decision">decision</option>
             <option value="other">other</option>
           </select>
+          <label className="block text-[0.74rem] text-ink-muted mb-1 mt-2" htmlFor="wiki-query-retrieval-policy">Retrieval policy</label>
+          <select
+            id="wiki-query-retrieval-policy"
+            value={queryRetrievalPolicy}
+            onChange={(event) => setQueryRetrievalPolicy(event.target.value as typeof queryRetrievalPolicy)}
+            className="w-full min-h-8 border border-[var(--border-card)] rounded-md px-2 text-[0.8rem] bg-black/25 text-ink"
+          >
+            <option value="balanced">balanced</option>
+            <option value="evidence-first">evidence first</option>
+            <option value="trusted-only">trusted only</option>
+          </select>
           <button
             type="button"
             onClick={submitQuery}
@@ -329,6 +380,10 @@ export function WikiPanel() {
               <div key={`${match.path}-${match.snippet}`} className="mb-1">
                 <p className="text-[0.74rem] text-ink-muted m-0">
                   {match.path}: {match.snippet}
+                </p>
+                <MemoryTrustBadge memory={match.memory} />
+                <p className="mt-1 mb-0 text-[0.68rem] text-ink-faint" title={`Lexical ${match.retrieval.lexical} + trust ${match.retrieval.trustAdjustment}`}>
+                  Score {match.retrieval.total} · {match.retrieval.reason}
                 </p>
                 <button
                   type="button"
@@ -350,6 +405,7 @@ export function WikiPanel() {
                 {relatedPages.map((page) => (
                   <div key={page.path} className="text-[0.74rem] text-ink-muted">
                     <p className="m-0 text-ink">{page.path}</p>
+                    <MemoryTrustBadge memory={page.memory} />
                     <p className="m-0 text-ink-faint">{page.reason}</p>
                     <p className="m-0 text-ink-muted">{page.summary}</p>
                   </div>
@@ -371,6 +427,74 @@ export function WikiPanel() {
               </div>
             </div>
           ) : null}
+        </section>
+
+        <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
+          <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-2">Reflection Candidates</p>
+          <p className="text-[0.72rem] text-ink-faint mb-2">
+            Detect repeated episodic patterns. Candidates remain generated context until explicitly reviewed.
+          </p>
+          <button
+            type="button"
+            onClick={() => void generateReflectionCandidates()}
+            disabled={isGeneratingReflections}
+            className="border-purple/35 text-purple bg-purple/10 hover:bg-purple/20"
+          >
+            {isGeneratingReflections ? "Reflecting..." : "Generate candidates"}
+          </button>
+          {scannedReflectionEpisodes !== null ? (
+            <p className="mt-2 text-[0.7rem] text-ink-faint">Scanned {scannedReflectionEpisodes} episodic artifact(s).</p>
+          ) : null}
+          <div className="mt-2 grid gap-2" aria-live="polite" aria-label="Reflection candidates">
+            {reflectionCandidates.map((candidate) => (
+              <div key={candidate.id} className="border border-white/5 rounded-md p-2">
+                <p className="m-0 text-[0.74rem] text-ink">{candidate.pattern}</p>
+                <p className="mt-1 mb-0 text-[0.68rem] text-ink-faint">
+                  {candidate.occurrenceCount} episodes · {candidate.evidencePaths.join(", ")}
+                </p>
+                <div className="mt-1"><MemoryTrustBadge memory={candidate.memory} /></div>
+                <label className="block mt-2 text-[0.68rem] text-ink-faint" htmlFor={`reflection-note-${candidate.id}`}>Operator note</label>
+                <input
+                  id={`reflection-note-${candidate.id}`}
+                  value={reflectionNotes[candidate.id] ?? ""}
+                  onChange={(event) => setReflectionNotes((current) => ({ ...current, [candidate.id]: event.target.value }))}
+                  className="mt-1 w-full min-h-8 border border-[var(--border-card)] rounded-md px-2 text-[0.74rem] bg-black/25 text-ink"
+                />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!reflectionNotes[candidate.id]?.trim() || isSavingReflectionDecision}
+                    className="min-h-7 px-2.5 border border-teal/35 rounded-md text-[0.74rem] text-teal"
+                    onClick={() => void decideReflection(candidate.id, "accepted")}
+                  >Accept</button>
+                  <button
+                    type="button"
+                    disabled={!reflectionNotes[candidate.id]?.trim() || isSavingReflectionDecision}
+                    className="min-h-7 px-2.5 border border-orange/35 rounded-md text-[0.74rem] text-orange"
+                    onClick={() => void decideReflection(candidate.id, "rejected")}
+                  >Reject</button>
+                  {reflectionDecisions[candidate.id]?.decision === "accepted" ? (
+                    <button
+                      type="button"
+                      disabled={isPromotingReflection}
+                      className="min-h-7 px-2.5 border border-purple/35 rounded-md text-[0.74rem] text-purple"
+                      onClick={() => void promoteAcceptedReflection(candidate.id)}
+                    >Promote accepted</button>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="mt-2 min-h-7 px-2.5 border border-[var(--border-card)] rounded-md text-[0.74rem] text-ink-muted"
+                  onClick={() => prepareReflectionDraft(candidate.id)}
+                >
+                  Prepare review draft
+                </button>
+              </div>
+            ))}
+            {scannedReflectionEpisodes !== null && reflectionCandidates.length === 0 ? (
+              <p className="text-[0.72rem] text-ink-faint">No repeated patterns met the threshold.</p>
+            ) : null}
+          </div>
         </section>
 
         <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
