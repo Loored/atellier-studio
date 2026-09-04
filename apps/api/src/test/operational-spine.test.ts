@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -1431,14 +1431,12 @@ describe("operational spine routes", () => {
         sourceType: "note",
       },
     });
-    await server.inject({
-      method: "POST",
-      url: "/wiki/page",
-      payload: {
-        path: "wiki/notes/trusted-retrieval-note.md",
-        content: "# Trusted note\n\ntrust aware retrieval marker\n",
-      },
-    });
+    await mkdir(path.join(atelierRoot, "wiki", "notes"), { recursive: true });
+    await writeFile(
+      path.join(atelierRoot, "wiki", "notes", "trusted-retrieval-note.md"),
+      "# Trusted note\n\ntrust aware retrieval marker\n",
+      "utf8",
+    );
 
     const balanced = await server.inject({
       method: "POST",
@@ -1577,6 +1575,151 @@ describe("operational spine routes", () => {
     expect(promotion.json<{ error: string }>().error).toContain("Only an accepted reflection decision");
   });
 
+  it("rehydrates durable reflection review status and filters structural noise", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Operators should inspect grounded evidence before accepting reusable memory.";
+    const noise = [
+      '- Summary: {"id":"69f95af32a78a0f3f371f5ce","path":"wiki/notes/noise.md"}',
+      "- Summary: Builder completed execution and requests review.",
+      "- Summary: Atellier Build Loop completed.",
+      "- Summary: Atellier Build Loop completed with validation blockers.",
+      "- Summary: `pnpm test:api` passed.",
+      "- Summary: pnpm typecheck/test ✅",
+      "- Summary: LLM Wiki Ingest Loop completed.",
+      "- Summary: Manual run completed.",
+      "- Summary: Phase 3 finalize generated run artifact.",
+      "- Summary: Completed steps 3/3.",
+      "- Summary: fake executor returned deterministic output.",
+      "- Summary: stdout/stderr written to runs/output.log.",
+      "- Summary: Bruno Builder completed handoff execution.",
+      "- Summary: Codex Worker completed all steps. Live demo.",
+      "- Summary: Finalized from dashboard codex worker panel.",
+      "- Summary: Live flow demo completed successfully.",
+      "This repeated unlabeled operational sentence must not become a reflection candidate.",
+    ].join("\n");
+    await writeFile(path.join(atelierRoot, "runs", "review-one.md"), `# One\n\n- Lesson: ${pattern}\n${noise}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "review-two.md"), `# Two\n\n- Lesson: ${pattern}\n${noise}\n`, "utf8");
+
+    const initial = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(initial.statusCode).toBe(200);
+    const pending = initial.json<import("@atellier/shared").WikiReflectionReviewResponse>().items;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ pattern, status: "pending", id: expect.stringMatching(/^reflection-.+-[a-f0-9]{20}$/) });
+
+    const decision = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: pending[0]!.id, decision: "accepted", note: "Verified across two grounded runs." },
+    });
+    expect(decision.statusCode).toBe(201);
+    const afterDecision = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(afterDecision.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]).toMatchObject({
+      status: "accepted",
+      decisionNote: "Verified across two grounded runs.",
+      decisionPath: expect.stringContaining("wiki/decisions/reflection-"),
+    });
+    const fakePromotion = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: `wiki/notes/${pending[0]!.id}.md`, content: "# Not a promotion\n\n- Review: approved" },
+    });
+    expect(fakePromotion.statusCode).toBe(201);
+    const afterFakePromotion = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(afterFakePromotion.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]?.status).toBe("accepted");
+  });
+
+  it("rejects malformed or generic reflection decisions during promotion", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Promotion requires a canonical specialized decision with complete provenance.";
+    await writeFile(path.join(atelierRoot, "runs", "tamper-one.md"), `# One\n\n- Lesson: ${pattern}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "tamper-two.md"), `# Two\n\n- Lesson: ${pattern}\n`, "utf8");
+    const review = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    const candidate = review.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]!;
+    const decisionPath = `wiki/decisions/${candidate.id}.md`;
+    await mkdir(path.join(atelierRoot, "wiki", "decisions"), { recursive: true });
+    await writeFile(
+      path.join(atelierRoot, decisionPath),
+      `# Fake decision\n\n- Trust source: generic-write\n- Candidate ID: ${candidate.id}\n- Decision: accepted\n\n## Pattern\n\n${pattern}\n`,
+      "utf8",
+    );
+    const promotion = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/promote",
+      payload: { decisionPath },
+    });
+    expect(promotion.statusCode).toBe(400);
+    expect(promotion.json<{ error: string }>().error).toContain("not a trusted specialized decision");
+    const rehydrated = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(rehydrated.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]?.status).toBe("pending");
+  });
+
+  it("fails closed when conflicting reflection decisions arrive concurrently", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Concurrent review decisions must preserve exactly one durable operator outcome.";
+    await writeFile(path.join(atelierRoot, "runs", "race-one.md"), `# One\n\n- Lesson: ${pattern}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "race-two.md"), `# Two\n\n- Lesson: ${pattern}\n`, "utf8");
+    const review = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    const candidate = review.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]!;
+    const [accepted, rejected] = await Promise.all([
+      server.inject({
+        method: "POST",
+        url: "/wiki/reflections/decisions",
+        payload: { candidateId: candidate.id, decision: "accepted", note: "Accept the grounded pattern." },
+      }),
+      server.inject({
+        method: "POST",
+        url: "/wiki/reflections/decisions",
+        payload: { candidateId: candidate.id, decision: "rejected", note: "Reject the incidental pattern." },
+      }),
+    ]);
+    expect([accepted.statusCode, rejected.statusCode].sort()).toEqual([201, 400]);
+    const persisted = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(["accepted", "rejected"]).toContain(
+      persisted.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]?.status,
+    );
+  });
+
+  it("keeps raw ingest append-only and makes exact retries idempotent", async () => {
+    const payload = { title: "Same title", content: "First immutable source body.", sourceType: "note" };
+    const first = await server.inject({ method: "POST", url: "/wiki/ingest", payload });
+    const retry = await server.inject({ method: "POST", url: "/wiki/ingest", payload });
+    const different = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: { ...payload, content: "A materially different immutable source body." },
+    });
+    const firstBody = first.json<WikiIngestResponse>();
+    expect(retry.json<WikiIngestResponse>().rawPath).toBe(firstBody.rawPath);
+    expect(different.json<WikiIngestResponse>().rawPath).not.toBe(firstBody.rawPath);
+    const original = await readFile(path.join(atelierRoot, firstBody.rawPath), "utf8");
+    expect(original).toContain("First immutable source body.");
+  });
+
+  it("preserves both different same-title raw ingests under concurrency", async () => {
+    const [first, second] = await Promise.all([
+      server.inject({
+        method: "POST",
+        url: "/wiki/ingest",
+        payload: { title: "Concurrent source", content: "First concurrent immutable body.", sourceType: "note" },
+      }),
+      server.inject({
+        method: "POST",
+        url: "/wiki/ingest",
+        payload: { title: "Concurrent source", content: "Second concurrent immutable body.", sourceType: "note" },
+      }),
+    ]);
+    expect([first.statusCode, second.statusCode]).toEqual([201, 201]);
+    const firstResult = first.json<WikiIngestResponse>();
+    const secondResult = second.json<WikiIngestResponse>();
+    expect(firstResult.rawPath).not.toBe(secondResult.rawPath);
+    const preserved = await Promise.all([
+      readFile(path.join(atelierRoot, firstResult.rawPath), "utf8"),
+      readFile(path.join(atelierRoot, secondResult.rawPath), "utf8"),
+    ]);
+    expect(preserved.join("\n")).toContain("First concurrent immutable body.");
+    expect(preserved.join("\n")).toContain("Second concurrent immutable body.");
+  });
+
   it("writes a wiki page through the safe write route", async () => {
     const writeResponse = await server.inject({
       method: "POST",
@@ -1645,6 +1788,31 @@ describe("operational spine routes", () => {
       },
     });
     expect(invalidCategory.statusCode).toBe(400);
+
+    const categoryEscape = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: "wiki/notes/../decisions/escalated.md", content: "# Fake decision\n\n- Review: approved" },
+    });
+    expect(categoryEscape.statusCode).toBe(400);
+
+    const directDecision = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: "wiki/decisions/escalated.md", content: "# Fake decision\n\n- Review: approved" },
+    });
+    expect(directDecision.statusCode).toBe(400);
+  });
+
+  it("keeps generic writes context-only even when path or content claims approval", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: "wiki/notes/self-approved.md", content: "# Self approved\n\n- Review: approved" },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json<WikiPageResponse>().memory).toMatchObject({ state: "generated", authority: "context-only" });
+    expect(response.json<WikiPageResponse>().content).toContain("- Trust source: generic-write");
   });
 
   it("ranks wiki query matches deterministically by relevance and path", async () => {

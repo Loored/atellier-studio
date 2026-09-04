@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile, appendFile, readdir, stat, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   AGENT_ROLES,
@@ -22,6 +23,7 @@ import {
   type WikiReflectionDecisionRecord,
   type WikiReflectionPromotionInput,
   type WikiReflectionPromotionRecord,
+  type WikiReflectionReviewResponse,
   type WikiRelatedPage,
   type ReviewLearningRecord,
   type ReviewLearningSignalResolution,
@@ -122,21 +124,32 @@ export class WikiService {
     };
   }
 
-  async writePage(relativePath: string, content: string): Promise<WikiPageResponse> {
+  async writePage(
+    relativePath: string,
+    content: string,
+    options: { genericWrite?: boolean } = {},
+  ): Promise<WikiPageResponse> {
     await this.ensureWiki();
     const normalized = this.normalizeWritableWikiMarkdownPath(relativePath);
-    await this.writeAtelierPage(normalized, content);
+    if (options.genericWrite) {
+      const segment = normalized.split("/")[1] ?? "";
+      if (new Set(["decisions", "role-memory", "synthesis", "sources", "deliverables"]).has(segment)) {
+        throw new Error("Generic writes cannot target a trusted or workflow-owned wiki category.");
+      }
+    }
+    const persistedContent = options.genericWrite ? this.markGenericWrite(content) : content;
+    await this.writeAtelierPage(normalized, persistedContent);
     if (this.isDeliverableMarkdownPath(normalized)) {
       await this.refreshDeliverablesIndex();
     } else {
-      await this.upsertWikiIndexEntry(normalized, content);
+      await this.upsertWikiIndexEntry(normalized, persistedContent);
     }
 
     return {
       path: normalized,
-      content,
+      content: persistedContent,
       ready: true,
-      memory: classifyMemoryTrust(normalized, content),
+      memory: classifyMemoryTrust(normalized, persistedContent),
     };
   }
 
@@ -165,6 +178,63 @@ export class WikiService {
       path: this.logPath,
       entry,
     };
+  }
+
+  async writeContextReceiptArtifact(runId: string, content: string): Promise<string> {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId)) {
+      throw new Error("Context receipt run ID is invalid.");
+    }
+    const relativePath = `runs/context/${runId}-memory-context.md`;
+    const { resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    try {
+      await writeFile(resolved, content, { encoding: "utf8", flag: "wx" });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const existing = await readFile(resolved, "utf8");
+      if (existing !== content) {
+        throw new Error(`Context receipt already exists with different content: ${relativePath}`);
+      }
+    }
+    return relativePath;
+  }
+
+  async writeContextEvaluationArtifact(runId: string, content: string): Promise<string> {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId)) {
+      throw new Error("Context evaluation run ID is invalid.");
+    }
+    const relativePath = `runs/context/${runId}-memory-evaluation.md`;
+    const { resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    try {
+      await writeFile(resolved, content, { encoding: "utf8", flag: "wx" });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const existing = await readFile(resolved, "utf8");
+      if (existing !== content) {
+        throw new Error(`Context evaluation already exists with different content: ${relativePath}`);
+      }
+    }
+    return relativePath;
+  }
+
+  async writeAutomatedContextAssessmentArtifact(runId: string, content: string): Promise<string> {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId)) {
+      throw new Error("Automated context assessment run ID is invalid.");
+    }
+    const relativePath = `runs/context/${runId}-memory-auto-assessment.md`;
+    const { resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    try {
+      await writeFile(resolved, content, { encoding: "utf8", flag: "wx" });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const existing = await readFile(resolved, "utf8");
+      if (existing !== content) {
+        throw new Error(`Automated context assessment already exists with different content: ${relativePath}`);
+      }
+    }
+    return relativePath;
   }
 
   async appendRoleLearning(input: AppendRoleLearningInput): Promise<WikiPageResponse> {
@@ -448,12 +518,15 @@ export class WikiService {
     const datePrefix = timestamp.slice(0, 10);
     const slug = this.slugify(title);
     const sourceType = input.sourceType ?? "other";
-    const rawPath = `raw/ingest/${datePrefix}-${slug}.md`;
+    const ingestFingerprint = this.hashText(JSON.stringify({ title, content, sourceType, sourcePathHint: input.sourcePathHint?.trim() || null }));
+    const rawBasePath = `raw/ingest/${datePrefix}-${slug}.md`;
+    let rawPath = await this.selectAppendOnlyIngestPath(rawBasePath, ingestFingerprint);
     const rawBody = [
       `# ${title}`,
       "",
       `- Captured at: ${timestamp}`,
       `- Source type: ${sourceType}`,
+      `- Ingest fingerprint: ${ingestFingerprint}`,
       ...(input.sourcePathHint ? [`- Source hint: ${input.sourcePathHint}`] : []),
       "",
       "## Memory Trust",
@@ -467,9 +540,16 @@ export class WikiService {
       content,
       "",
     ].join("\n");
-    await this.writeAtelierPage(rawPath, rawBody);
+    try {
+      await this.writeImmutablePage(rawPath, rawBody, ingestFingerprint);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("different content")) throw error;
+      rawPath = `${rawBasePath.slice(0, -3)}-${ingestFingerprint}.md`;
+      await this.writeImmutablePage(rawPath, rawBody, ingestFingerprint);
+    }
 
-    const summaryPath = `wiki/sources/${datePrefix}-${slug}.md`;
+    const rawSuffix = rawPath === rawBasePath ? "" : `-${ingestFingerprint.slice(0, 12)}`;
+    const summaryPath = `wiki/sources/${datePrefix}-${slug}${rawSuffix}.md`;
     const summaryBody = [
       `# ${title}`,
       "",
@@ -491,7 +571,7 @@ export class WikiService {
       this.summarizeContent(content),
       "",
     ].join("\n");
-    await this.writeAtelierPage(summaryPath, summaryBody);
+    await this.writeIdempotentPage(summaryPath, summaryBody);
     await this.upsertSourceIndexEntry(summaryPath, sourceType, datePrefix);
 
     await this.appendLog({
@@ -516,7 +596,10 @@ export class WikiService {
     };
   }
 
-  async query(input: WikiQueryInput): Promise<WikiQueryResponse> {
+  async query(
+    input: WikiQueryInput,
+    options: { appendLog?: boolean } = {},
+  ): Promise<WikiQueryResponse> {
     await this.ensureWiki();
     const query = input.query.trim();
     if (!query) {
@@ -624,16 +707,18 @@ export class WikiService {
       .slice(0, limit)
       .map(({ path, snippet, memory, retrieval }) => ({ path, snippet, memory, retrieval }));
 
-    await this.appendLog({
-      eventType: "query",
-      title: `Wiki query: ${query}`,
-      summary: `Returned ${matches.length} matches`,
-      details: {
-        limit,
-        retrievalPolicy,
-        ...(sourceType ? { sourceType } : {}),
-      },
-    });
+    if (options.appendLog !== false) {
+      await this.appendLog({
+        eventType: "query",
+        title: `Wiki query: ${query}`,
+        summary: `Returned ${matches.length} matches`,
+        details: {
+          limit,
+          retrievalPolicy,
+          ...(sourceType ? { sourceType } : {}),
+        },
+      });
+    }
 
     return {
       query,
@@ -699,7 +784,7 @@ export class WikiService {
       const content = await readFile(filePath, "utf8");
       if (classifyMemoryTrust(relativePath, content).layer !== "episodic") continue;
       const patternsInEpisode = new Set<string>();
-      for (const line of content.split("\n")) {
+      for (const line of this.extractReflectionNarrativeLines(content)) {
         const pattern = this.normalizeReflectionPattern(line);
         if (!pattern || patternsInEpisode.has(pattern)) continue;
         patternsInEpisode.add(pattern);
@@ -714,9 +799,10 @@ export class WikiService {
       .sort((a, b) => b[1].paths.size - a[1].paths.size || a[0].localeCompare(b[0]))
       .slice(0, limit)
       .map(([normalized, group]) => {
-        const slug = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 52) || "repeated-pattern";
+        const slug = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "repeated-pattern";
+        const candidateId = `reflection-${slug}-${this.hashText(normalized).slice(0, 20)}`;
         const evidencePaths = [...group.paths].sort();
-        const suggestedPath = `wiki/reflections/reflection-${slug}.md`;
+        const suggestedPath = `wiki/reflections/${candidateId}.md`;
         const title = `Reflection candidate: ${group.pattern.slice(0, 80)}`;
         const draftMarkdown = [
           `# ${title}`,
@@ -742,7 +828,7 @@ export class WikiService {
           "",
         ].join("\n");
         return {
-          id: `reflection-${slug}`,
+          id: candidateId,
           title,
           pattern: group.pattern,
           occurrenceCount: evidencePaths.length,
@@ -761,6 +847,55 @@ export class WikiService {
     };
   }
 
+  async readReflectionReview(input: WikiReflectionInput = {}): Promise<WikiReflectionReviewResponse> {
+    const reflection = await this.reflect(input);
+    const items = await Promise.all(reflection.candidates.map(async (candidate) => {
+      const decisionPath = `wiki/decisions/${candidate.id}.md`;
+      try {
+        const decisionPage = await this.readPage(decisionPath);
+        const decision = this.extractMetadata(decisionPage.content, "Decision");
+        const recordedCandidateId = this.extractMetadata(decisionPage.content, "Candidate ID");
+        const recordedPattern = decisionPage.content.match(/## Pattern\s*\n+([\s\S]*?)(?:\n## |$)/i)?.[1]?.trim();
+        if (
+          (decision !== "accepted" && decision !== "rejected")
+          || recordedCandidateId !== candidate.id
+          || recordedPattern !== candidate.pattern
+          || decisionPage.memory.authority !== "trusted"
+        ) {
+          return { ...candidate, status: "pending" as const };
+        }
+        const decisionNote = this.extractMetadata(decisionPage.content, "Operator note") ?? undefined;
+        const decisionCreatedAt = this.extractMetadata(decisionPage.content, "Created") ?? undefined;
+        const promotedPath = `wiki/notes/${candidate.id}.md`;
+        let promoted = false;
+        try {
+          const promotedPage = await this.readPage(promotedPath);
+          const promotedDecisionPath = this.extractMetadata(promotedPage.content, "Decision path");
+          const promotedPattern = promotedPage.content.match(/## Accepted Pattern\s*\n+([\s\S]*?)(?:\n## |$)/i)?.[1]?.trim();
+          promoted = promotedPage.memory.state === "verified"
+            && promotedPage.memory.authority === "trusted"
+            && promotedDecisionPath === decisionPath
+            && promotedPattern === candidate.pattern
+            && candidate.evidencePaths.every((evidencePath) => promotedPage.memory.provenancePaths.includes(evidencePath));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+        return {
+          ...candidate,
+          status: promoted ? "promoted" as const : decision === "accepted" ? "accepted" as const : "rejected" as const,
+          decisionPath,
+          decisionNote,
+          decisionCreatedAt,
+          ...(promoted ? { promotedPath } : {}),
+        };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        return { ...candidate, status: "pending" as const };
+      }
+    }));
+    return { ...reflection, items };
+  }
+
   async recordReflectionDecision(input: WikiReflectionDecisionInput): Promise<WikiReflectionDecisionRecord> {
     const candidateId = input.candidateId.trim();
     const note = input.note.trim().replace(/\s+/g, " ");
@@ -768,24 +903,6 @@ export class WikiService {
     const candidate = (await this.reflect({ minOccurrences: 2, limit: 20 })).candidates.find((item) => item.id === candidateId);
     if (!candidate) throw new Error("Reflection candidate is no longer supported by current episodic evidence.");
     const decisionPath = `wiki/decisions/${candidateId}.md`;
-    try {
-      const existing = await this.readPage(decisionPath);
-      const existingDecision = this.extractMetadata(existing.content, "Decision");
-      const existingNote = this.extractMetadata(existing.content, "Operator note");
-      if (existingDecision !== input.decision || existingNote !== note) {
-        throw new Error("Reflection candidate already has a different durable decision.");
-      }
-      return {
-        candidateId,
-        decision: input.decision,
-        note,
-        path: decisionPath,
-        createdAt: this.extractMetadata(existing.content, "Created") || "unknown",
-      };
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("different durable decision")) throw error;
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
     const createdAt = new Date().toISOString();
     const content = [
       `# Reflection Decision - ${candidate.title}`,
@@ -804,7 +921,23 @@ export class WikiService {
       ...candidate.evidencePaths.map((evidencePath) => `- Evidence path: ${evidencePath}`),
       "",
     ].join("\n");
-    await this.writePage(decisionPath, content);
+    const created = await this.writeExclusivePage(decisionPath, content);
+    if (!created) {
+      const existing = await this.readPage(decisionPath);
+      const existingDecision = this.extractMetadata(existing.content, "Decision");
+      const existingNote = this.extractMetadata(existing.content, "Operator note");
+      if (existingDecision !== input.decision || existingNote !== note) {
+        throw new Error("Reflection candidate already has a different durable decision.");
+      }
+      return {
+        candidateId,
+        decision: input.decision,
+        note,
+        path: decisionPath,
+        createdAt: this.extractMetadata(existing.content, "Created") || "unknown",
+      };
+    }
+    await this.upsertWikiIndexEntry(decisionPath, content);
     await this.appendLog({
       eventType: "decision",
       title: `Reflection candidate ${input.decision}`,
@@ -820,6 +953,9 @@ export class WikiService {
       throw new Error("A valid reflection decision path is required.");
     }
     const decisionPage = await this.readPage(decisionPath);
+    if (decisionPage.memory.state !== "verified" || decisionPage.memory.authority !== "trusted") {
+      throw new Error("Reflection decision is not a trusted specialized decision record.");
+    }
     if (this.extractMetadata(decisionPage.content, "Decision") !== "accepted") {
       throw new Error("Only an accepted reflection decision can be promoted.");
     }
@@ -829,8 +965,19 @@ export class WikiService {
     }
     const pattern = decisionPage.content.match(/## Pattern\s*\n+([\s\S]*?)(?:\n## |$)/i)?.[1]?.trim();
     if (!pattern) throw new Error("Reflection decision is missing its reviewed pattern.");
+    const currentCandidate = (await this.reflect({ minOccurrences: 2, limit: 20 })).candidates.find((candidate) => candidate.id === candidateId);
+    if (!currentCandidate || currentCandidate.pattern !== pattern) {
+      throw new Error("Reflection decision is no longer supported by current episodic evidence.");
+    }
+    if (!this.extractMetadata(decisionPage.content, "Operator note") || !this.extractMetadata(decisionPage.content, "Created")) {
+      throw new Error("Reflection decision metadata is incomplete.");
+    }
+    const decisionEvidence = classifyMemoryTrust(decisionPath, decisionPage.content).provenancePaths;
+    if (!currentCandidate.evidencePaths.every((evidencePath) => decisionEvidence.includes(evidencePath))) {
+      throw new Error("Reflection decision evidence provenance is incomplete.");
+    }
     const promotedPath = `wiki/notes/${candidateId.replace(/^reflection-/, "reflection-")}.md`;
-    const evidencePaths = classifyMemoryTrust(decisionPath, decisionPage.content).provenancePaths;
+    const evidencePaths = decisionEvidence;
     const content = [
       `# Promoted Reflection - ${pattern.slice(0, 80)}`,
       "",
@@ -843,15 +990,14 @@ export class WikiService {
       pattern,
       "",
     ].join("\n");
-    try {
+    const created = await this.writeExclusivePage(promotedPath, content);
+    if (!created) {
       const existing = await this.readPage(promotedPath);
       if (existing.content !== content) throw new Error("Promoted reflection already exists with different content.");
       return { decisionPath, promotedPath, memory: existing.memory };
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("different content")) throw error;
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
-    const page = await this.writePage(promotedPath, content);
+    await this.upsertWikiIndexEntry(promotedPath, content);
+    const page = await this.readPage(promotedPath);
     await this.appendLog({
       eventType: "decision",
       title: "Accepted reflection promoted",
@@ -865,9 +1011,54 @@ export class WikiService {
     return line.trim().replace(/^[-*]\s+/, "").replace(/^(?:Summary|Blocker|Issue|Lesson):\s*/i, "").trim();
   }
 
+  private extractReflectionNarrativeLines(content: string): string[] {
+    const narrativeSections = /^(?:lessons?|findings?|insights?|risks?|blockers?|issues?|summary|retrospective|what we learned)$/i;
+    const lines: string[] = [];
+    let inNarrativeSection = false;
+    for (const rawLine of content.split("\n")) {
+      const heading = rawLine.match(/^#{2,6}\s+(.+?)\s*$/)?.[1]?.trim();
+      if (heading !== undefined) {
+        inNarrativeSection = narrativeSections.test(heading);
+        continue;
+      }
+      const labeled = rawLine.match(/^\s*[-*]?\s*(?:Lesson|Blocker|Issue|Summary):\s*(.+?)\s*$/i)?.[1];
+      if (labeled) {
+        lines.push(labeled);
+        continue;
+      }
+      if (!inNarrativeSection || !rawLine.trim()) continue;
+      lines.push(rawLine);
+    }
+    return lines;
+  }
+
   private normalizeReflectionPattern(line: string): string | null {
     const cleaned = this.cleanReflectionLine(line);
     if (cleaned.length < 20 || line.trim().startsWith("#")) return null;
+    if (line.trim().startsWith("```") || line.trim().startsWith("|") || /^[-:|\s]+$/.test(line)) return null;
+    if (/^\[[ x-]\]\s/i.test(cleaned) || cleaned.includes(" | ")) return null;
+    if (/[`✅❌⚠️]/u.test(cleaned)) return null;
+    if (/^[\[{].*[\]}][,;]?$/.test(cleaned) || /[{}\[\]"]/.test(cleaned)) return null;
+    if (/^(?:https?:\/\/|(?:wiki|raw|runs|tasks)\/|\.?\.?\/)[^\s]+$/i.test(cleaned)) return null;
+    if (/^(?:[-*]\s*)?(?:id|path|file|url|endpoint|command|payload|result|output|input|context|instruction|memory trust|evidence):/i.test(cleaned)) return null;
+    if (/^(?:none|null|undefined|n\/a|true|false|completed|pending|approved|rejected)$/i.test(cleaned)) return null;
+    if (/\bcompleted execution and requests review\b/i.test(cleaned)) return null;
+    if (/\batellier build loop completed\b/i.test(cleaned)) return null;
+    if (/\b(?:llm wiki ingest loop|manual run) completed\b/i.test(cleaned)) return null;
+    if (/\bcompleted (?:handoff )?execution\b/i.test(cleaned)) return null;
+    if (/\bcompleted all steps?\b/i.test(cleaned)) return null;
+    if (/\b(?:live flow )?demo completed(?: successfully)?\b/i.test(cleaned)) return null;
+    if (/\bfinali[sz]ed from (?:the )?dashboard\b/i.test(cleaned)) return null;
+    if (/\bcompleted with (?:[^.\n]{0,80}\s)?validation blockers?\b/i.test(cleaned)) return null;
+    if (/\b(?:phase\s+\d+\s+)?finali[sz]e\b/i.test(cleaned)) return null;
+    if (/\bgenerated (?:a )?run artifact\b/i.test(cleaned)) return null;
+    if (/\bcompleted steps?\s*:?\s*\d+\s*\/\s*\d+\b/i.test(cleaned)) return null;
+    if (/\bfake executor\b/i.test(cleaned)) return null;
+    if (/\b(?:stdout|stderr)\b/i.test(cleaned)) return null;
+    if (/\b(?:artifact|output|log|report|file) paths?\b/i.test(cleaned)) return null;
+    if (/\bpnpm\s+(?:--\S+\s+)*(?:test|typecheck|build|lint)\b/i.test(cleaned)) return null;
+    if (/^`[^`]+`\s+(?:passed|failed|succeeded|completed)\.?$/i.test(cleaned)) return null;
+    if (/^(?:tests?|typecheck|build|lint|validation)(?:\s+suite)?\s+(?:passed|failed|succeeded|completed)\.?$/i.test(cleaned)) return null;
     if (/^(?:Run ID|Task ID|Agent ID|Created|Updated|Status|Type|Review|Layer|State|Authority|Date|Branch):/i.test(cleaned)) return null;
     const normalized = cleaned
       .toLowerCase()
@@ -1086,6 +1277,62 @@ export class WikiService {
     }
   }
 
+  private markGenericWrite(content: string): string {
+    if (/^- Trust source:\s*generic-write\s*$/im.test(content)) return content;
+    const lines = content.split("\n");
+    const insertionIndex = lines[0]?.startsWith("#") ? 1 : 0;
+    lines.splice(insertionIndex, 0, "", "- Trust source: generic-write");
+    return lines.join("\n");
+  }
+
+  private hashText(value: string): string {
+    return createHash("sha256").update(value).digest("hex");
+  }
+
+  private async selectAppendOnlyIngestPath(basePath: string, fingerprint: string): Promise<string> {
+    const extension = ".md";
+    const stem = basePath.slice(0, -extension.length);
+    const candidates = [basePath, `${stem}-${fingerprint.slice(0, 12)}${extension}`];
+    for (const candidate of candidates) {
+      try {
+        const existing = await this.readPage(candidate);
+        if (this.extractMetadata(existing.content, "Ingest fingerprint") === fingerprint) return candidate;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return candidate;
+        throw error;
+      }
+    }
+    return `${stem}-${fingerprint}${extension}`;
+  }
+
+  private async writeImmutablePage(relativePath: string, content: string, fingerprint: string): Promise<void> {
+    const created = await this.writeExclusivePage(relativePath, content);
+    if (created) return;
+    const existing = await this.readPage(relativePath);
+    if (this.extractMetadata(existing.content, "Ingest fingerprint") !== fingerprint) {
+      throw new Error("Immutable raw ingest path already contains different content.");
+    }
+  }
+
+  private async writeIdempotentPage(relativePath: string, content: string): Promise<void> {
+    const created = await this.writeExclusivePage(relativePath, content);
+    if (created) return;
+    // A derived page may contain a different capture timestamp on an exact retry.
+    // Its path is bound to the immutable raw fingerprint, so preserving the first version is idempotent.
+  }
+
+  private async writeExclusivePage(relativePath: string, content: string): Promise<boolean> {
+    const { resolved } = this.resolveAtelierPath(relativePath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    try {
+      await writeFile(resolved, content, { encoding: "utf8", flag: "wx" });
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+      throw error;
+    }
+  }
+
   private async readWikiIndexEntries(): Promise<Array<{ path: string; summary: string; category: string }>> {
     const indexContent = await readFile(this.indexPath, "utf8");
     const lines = indexContent.split("\n");
@@ -1142,7 +1389,11 @@ export class WikiService {
 
   private normalizeWritableWikiMarkdownPath(relativePath: string): string {
     const normalized = relativePath.trim().replace(/\\/g, "/");
-    const canonical = normalized.startsWith("atelier/") ? normalized.slice("atelier/".length) : normalized;
+    const withoutPrefix = normalized.startsWith("atelier/") ? normalized.slice("atelier/".length) : normalized;
+    if (withoutPrefix.split("/").some((segment) => segment === "." || segment === "..")) {
+      throw new Error("Writable wiki path cannot contain traversal segments.");
+    }
+    const canonical = path.posix.normalize(withoutPrefix);
     if (!canonical.startsWith("wiki/")) {
       throw new Error("Writable wiki path must start with wiki/.");
     }

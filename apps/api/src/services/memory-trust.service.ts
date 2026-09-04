@@ -6,6 +6,16 @@ export function classifyMemoryTrust(relativePath: string, content: string): Memo
   const normalizedPath = relativePath.replace(/\\/g, "/").replace(/^atelier\//, "");
   const provenancePaths = extractProvenancePaths(content);
 
+  if (/^- Trust source:\s*generic-write\s*$/im.test(content)) {
+    return {
+      layer: normalizedPath.startsWith("wiki/deliverables/") || normalizedPath.startsWith("wiki/dreams/") ? "episodic" : "semantic",
+      state: "generated",
+      authority: "context-only",
+      provenancePaths,
+      reason: "Page was created through the generic write boundary and cannot grant itself trusted authority.",
+    };
+  }
+
   if (normalizedPath.startsWith("raw/")) {
     return {
       layer: "raw",

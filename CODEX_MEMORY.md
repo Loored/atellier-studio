@@ -100,11 +100,18 @@ Source summary: `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.
 
 Active plan: [`docs/roadmap.md`](docs/roadmap.md). P1-P4 from the 2026-05-06 platform-alignment plan are done. Knowledge Graph v2 shipped across PRs #29-#32; PR #35 then completed role memory, snapshot diff, curation signals, performance hardening, Office sub-tabs, and role-memory overlays/focus filters. Durable Local Runtime v1 shipped in PR #36.
 
-1. **Daily-use memory soak**: use the completed trust/retrieval/reflection loop on real project work and record false-positive reflection patterns before expanding automation.
+1. **Collect labeled Agent Memory Context Pack v1 receipts from real tasks**: inspect operator usefulness and per-source relevance labels by authority and role before changing the `evidence-first` policy, byte budgets, or authority boundary. Do not attempt a primary-vault promotion until real labeled evidence produces a reviewable candidate.
+
+Second real label: run `659cae65-b098-4e2c-84e3-31dd7c60e041` marked the direct brief relevant, the autonomously retrieved 14-day plan irrelevant despite an explicit exclusion, and curator memory irrelevant; overall usefulness was mixed. QA stopped after bounded repair because the checklist lacked an observable success signal.
 
 Do not spend the next cycle polishing pixel sprites, expanding the pixel office, auth, cloud deployment, multiplayer, Computer Use, Batch/Citations/Files API, or broad creative connectors.
 
 ## Recent Operational Notes
+
+### 2026-08-31 - Ollama profile routing
+
+- Local Ollama now has `qwen3.5:4b`, `qwen3.5:9b`, and `gpt-oss:20b` installed. Profile-specific routing selects `cheap`, `standard`, or `deep` respectively, with `OLLAMA_MODEL` retained only as a legacy fallback. Restart the API/worker after changing `OLLAMA_MODEL_PROFILE`.
+- Safe local defaults now map every profile to `qwen3.5:4b`. Requests use an 8192-token context and `reasoning_effort: none`; local execution timeout is 240 seconds. These settings avoid the Qwen hidden-reasoning output exhaustion observed during Context Receipt runs without increasing concurrency.
 
 ### 2026-08-25 - Autonomous Repair Loop v1
 
@@ -189,6 +196,46 @@ Do not spend the next cycle polishing pixel sprites, expanding the pixel office,
 - Rejected candidates cannot be promoted; role-memory promotion remains out of scope.
 - Run: `atelier/runs/2026-08-30-reflection-review-promotion.md`.
 - Isolated live validation passed on API 4001/Web 5175: candidate provenance, decision conflict HTTP 400, accepted promotion, trusted-only ranking, graph nodes/edges, UI placement, and zero browser console errors.
+
+### 2026-08-30 - Reflection trust hardening
+
+- Generic Wiki writes are durably marked generated/context-only and cannot target workflow-owned trusted categories; path traversal is rejected before resolution.
+- Raw ingest is append-only and content-addressed: exact retries reuse the source while different same-title inputs remain distinct, including concurrent requests.
+- Reflection candidates use hash-suffixed IDs and only explicit narrative labels/sections; JSON, commands, paths, lifecycle messages, and test/status boilerplate are excluded.
+- Reflection Review rehydrates durable pending/accepted/rejected/promoted state. Decisions and promotions use exclusive creation and validate canonical pattern, trust, and complete provenance.
+- Read-only audit of 1,532 real episodic artifacts returned zero candidates after hardening. This is the safe baseline; quality must be established with controlled positive fixtures before widening recall.
+- Run: `atelier/runs/2026-08-30-reflection-trust-hardening.md`.
+- Controlled soak passed: three Mongo concurrency tests used an isolated temporary database; six Ollama episodes produced exactly one supported repeated lesson, ignored duplicated JSON noise, and did not merge contradictory conclusions.
+- Two fresh `WikiService` instances rehydrated accepted then promoted state; `trusted-only` returned only the canonical decision and promoted note. The temporary vault was isolated from project memory.
+
+### 2026-08-30 - Agent Memory Context Pack v1
+
+- Parent orchestrations now freeze one bounded, hash-stable context receipt before executing child steps. It records direct and retrieved excerpts, SHA-256 hashes, byte/truncation data, trust/provenance, retrieval reason/score, budgets, and exclusions.
+- Direct task sources retain priority; generated linked context is explicitly non-authoritative, autonomous retrieval excludes context-only results, and trusted role-memory excerpts render only for the matching agent role.
+- The parent Run persists the receipt atomically under its worker lease. Retries and reclaimed executions reuse it; conflicting receipts fail closed. A readable artifact lives at `atelier/runs/context/<runId>-memory-context.md`.
+- The orchestration UI exposes a compact expandable receipt. Validation passed: 180 API tests, 29 web tests, workspace typecheck, and 4 isolated Mongo concurrency tests.
+- Run: `atelier/runs/2026-08-30-agent-memory-context-pack.md`.
+
+### 2026-08-30 - Context Receipt Evaluation v1
+
+- Terminal orchestrations now accept one immutable operator evaluation of their frozen context receipt: an overall usefulness label plus a required relevance label for every included source.
+- The evaluation is bound to receipt hash and role-scoped item identity, stored on the parent Run, appended to its run log, and mirrored into `atelier/runs/context/<runId>-memory-evaluation.md`. Exact retries are idempotent; conflicting relabeling fails closed.
+- This is measurement only: labels do not alter retrieval, budgets, source trust, or memory. The next gate is several labeled real task receipts reviewed by authority and role.
+- Run: `atelier/runs/2026-08-30-context-receipt-evaluation.md`.
+- First real local receipt: run `6a94ee8f6fbbda91fd282eec` froze `220905c1549c`; raw evidence was labeled relevant, direct generated summary uncertain, and unused curator memory irrelevant. The parent safely stopped needs-human after QA format retries, so this observation does not justify a retrieval change.
+
+### 2026-08-31 - QA semantic feedback classification
+
+- The first real context-receipt run exposed a control-flow issue: an explicit QA changes-requested response had actionable structured failures but incomplete criterion coverage, so it was incorrectly classified as a format failure.
+- `CHANGES REQUESTED` now enters the existing bounded semantic repair loop when at least one structured `FAIL` exists. `APPROVED` remains strict: it needs complete criterion coverage and no failures. Missing/non-actionable QA remains on bounded format retries.
+- Run: `atelier/runs/2026-08-31-qa-semantic-feedback-classification.md`.
+
+### 2026-08-31 - Historical orchestration recovery
+
+- Runs now offers `Open orchestration` for orchestration records; it switches to Dashboard and rehydrates the selected terminal run so its frozen Context Receipt evaluation remains available after refresh.
+- The action is read-only with respect to execution: it does not start or retry work, and no trust, retry, or memory authority policy changed.
+- Repeated semantic attempts render with persisted child run IDs to avoid duplicate React keys during recovery.
+- Run: `atelier/runs/2026-08-31-historical-orchestration-recovery.md`.
 
 ### 2026-08-25 - Knowledge deliverable grounding
 
@@ -481,6 +528,21 @@ Run the smallest relevant subset for documentation-only changes.
 - This environment did not have Poppler or Python PDF packages by default; `pypdf` was installed temporarily under `/private/tmp/codex-pdfdeps` for PDF extraction.
 
 ## Update Rule
+
+### 2026-09-01 - Automatic Context Receipt traceability
+
+- Terminal Context Receipt orchestrations now receive one idempotent, deterministic automatic assessment that checks for explicit frozen source paths in terminal output. It is stored separately as `automatedContextAssessment`, durable under `atelier/runs/context/*-memory-auto-assessment.md`, and shown as provisional in the Dashboard.
+- The automatic result (`supported`, `partial`, or `unverified`) measures traceability only. It must never overwrite or be combined with the human usefulness/relevance evaluation, and it never changes retrieval, authority, budgets, or promotion automatically.
+- A first backfill assessed ten real historical receipts: 0 supported, 1 partial, 9 unverified. This identifies absent explicit citations as the next measurable product improvement, not a verdict on retrieval quality.
+- Artifact-producing steps now receive a scoped `### Sources Used` contract. Automatic assessments count only these declared frozen source paths, never incidental prose references.
+- Aggregate automatic citation outcomes consider shared receipt sources only. Role-scoped memory remains recorded as evidence but cannot downgrade an artifact produced by a different role that could not use it.
+- Local Ollama QA may reply in Spanish. The validator recognizes Spanish verdict/checklist/evidence/findings labels as equivalent structured feedback; it still requires evidence for approval and retains bounded `needs-human` failure for malformed responses.
+- QA may also render a standalone `Veredicto` heading with its value on the next line; this is accepted as explicit feedback rather than a format failure.
+- An explicit QA verdict still cannot approve a run without checklist evidence. This produces `needs-human` immediately, with no redundant format retries.
+- PM acceptance criteria may use numbered Spanish headings (`Criterios de Aceptación`). They are extracted as the frozen QA contract, preventing an English-only parser fallback from creating artificial QA-coverage failures.
+- A ten-run real Context Receipt campaign yielded 7 supported, 1 partial, and 2 unverified automatic receipts. Citation traceability is now materially improved; the main remaining bottleneck is local QA outputs that omit complete per-criterion evidence, plus semantic repairs that do not fully close substantive QA feedback. The next focused slice is a mechanically checkable QA checklist handoff and targeted completion of only missing checklist entries.
+- Explicit QA verdicts with missing checklist entries now receive exactly one completion-only QA step. It names only the missing frozen criteria, merges returned evidence with the original report, and still fails closed to `needs-human` if the composed checklist is incomplete. This prevents needless full-report regeneration while preserving evidence-based approval.
+- Live local validation of the targeted completion path confirmed that Ollama may put nested evidence in a Markdown bullet (`- Evidence:`); the validator now accepts this form. The completion mechanism itself is functioning, but small-model QA instruction adherence remains the next constraint: malformed no-verdict replies still exhaust the bounded format path, while structured FAIL evidence correctly remains blocked.
 
 When a future change alters setup, scripts, architecture, operational behavior, or user preferences, update this file if it affects active memory. Put long chronology in `docs/history/implementation-log.md` and append an event to `atelier/wiki/log.md`.
 

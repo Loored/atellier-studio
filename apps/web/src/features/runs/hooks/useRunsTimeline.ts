@@ -304,6 +304,15 @@ export function useRunsTimeline() {
       }),
     unlinkRunDeliverable: handleUnlinkRunDeliverable,
     retryRun: (runId: string) => retryRun.mutate({ runId }),
+    openOrchestration: (runId: string) => {
+      window.dispatchEvent(new CustomEvent("navigation:view", { detail: "dashboard" }));
+      // Dashboard mounts the orchestration panel in response to navigation;
+      // dispatch after that mount so its historical-run listener can recover
+      // the terminal receipt reliably.
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("orchestration:open", { detail: runId }));
+      }, 0);
+    },
     captureRunMemory: (runId: string) =>
       captureRunMemory.mutate({
         runId,

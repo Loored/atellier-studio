@@ -3,6 +3,7 @@ export const EXECUTOR_MODES = ["mock", "openai", "anthropic", "groq", "ollama"] 
 export type ExecutorMode = (typeof EXECUTOR_MODES)[number];
 
 export type ModelProfile = "cheap" | "standard" | "deep";
+export const MODEL_PROFILES = ["cheap", "standard", "deep"] as const;
 
 export type HealthStatus = {
   status: "ok";

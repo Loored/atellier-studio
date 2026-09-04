@@ -9,6 +9,9 @@ import type {
   CreateRunInput,
   ResolveRunLearningSignalInput,
   ResolveRunLearningSignalResponse,
+  RecordContextReceiptEvaluationInput,
+  ContextReceiptEvaluationSummary,
+  AutomatedContextReceiptAssessmentSummary,
   Run,
   UpdateRunReviewInput,
 } from "@atellier/shared";
@@ -41,6 +44,20 @@ export function useActiveOrchestrationsApi() {
   });
 }
 
+export function useContextReceiptEvaluationSummaryApi() {
+  return useQueryInstance<ContextReceiptEvaluationSummary>({
+    queryKey: queryKeys.runs.contextEvaluationSummary,
+    queryFn: () => runsService.getContextEvaluationSummary(),
+  });
+}
+
+export function useAutomatedContextReceiptAssessmentSummaryApi() {
+  return useQueryInstance<AutomatedContextReceiptAssessmentSummary>({
+    queryKey: queryKeys.runs.contextAutoAssessmentSummary,
+    queryFn: () => runsService.getAutomatedContextAssessmentSummary(),
+  });
+}
+
 export function useRunEventsApi(runId: string | null, shouldPoll = true) {
   return useQueryInstance({
     queryKey: queryKeys.runs.events(runId ?? ""),
@@ -66,6 +83,7 @@ export function useCancelRunApi(options: UseMutationOptions<Run, Error, RunContr
         notifySuccess(run.status === "cancelled" ? "Run cancelled" : "Cancellation requested");
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.contextEvaluationSummary }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.events(run.id) }),
@@ -142,6 +160,7 @@ export function useAppendRunLogApi(options: UseAppendRunLogApiOptions = {}) {
       onSuccess: async (run) => {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.contextEvaluationSummary }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
         ]);
       },
@@ -205,6 +224,36 @@ export function useUpdateRunReviewApi(options: UseUpdateRunReviewApiOptions = {}
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
           queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+        ]);
+      },
+      onError: (error) => notifyError(error),
+    },
+  );
+}
+
+export type RecordContextEvaluationVariables = {
+  runId: string;
+  input: RecordContextReceiptEvaluationInput;
+};
+
+export function useRecordContextEvaluationApi(
+  options: UseMutationOptions<Run, Error, RecordContextEvaluationVariables> = {},
+) {
+  const queryClient = useQueryClient();
+  const { notifyError, notifySuccess } = useApiAlerts();
+  return useMutationInstance<Run, Error, RecordContextEvaluationVariables>(
+    {
+      mutationFn: ({ runId, input }) => runsService.recordContextEvaluation(runId, input),
+      ...options,
+    },
+    {
+      onSuccess: async (run) => {
+        notifySuccess("Context receipt evaluation saved");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.contextEvaluationSummary }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.runs.detail(run.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.orchestrations.status(run.id) }),
         ]);
       },
       onError: (error) => notifyError(error),

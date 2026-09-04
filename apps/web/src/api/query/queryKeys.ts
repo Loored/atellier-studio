@@ -24,6 +24,8 @@ export const queryKeys = {
     all: [QUERY_KEYS.RUNS] as const,
     detail: (runId: string) => [QUERY_KEYS.RUNS, runId] as const,
     activeOrchestrations: [QUERY_KEYS.RUNS, "active-orchestrations"] as const,
+    contextEvaluationSummary: [QUERY_KEYS.RUNS, "context-evaluation-summary"] as const,
+    contextAutoAssessmentSummary: [QUERY_KEYS.RUNS, "context-auto-assessment-summary"] as const,
     events: (runId: string) => [QUERY_KEYS.RUNS, runId, "events"] as const,
   },
   wiki: {
@@ -32,6 +34,7 @@ export const queryKeys = {
     page: (wikiPath: string) => [QUERY_KEYS.WIKI, "page", wikiPath] as const,
     query: (query: string, limit: number, sourceType: string, retrievalPolicy: string) =>
       [QUERY_KEYS.WIKI, "query", query, limit, sourceType, retrievalPolicy] as const,
+    reflectionReview: [QUERY_KEYS.WIKI, "reflections", "review"] as const,
   },
   orchestrations: {
     skills: [QUERY_KEYS.ORCHESTRATIONS, "skills"] as const,

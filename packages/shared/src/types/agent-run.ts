@@ -1,5 +1,5 @@
 import type { Agent, AgentRole } from "./agent";
-import type { ExecutorMode } from "./health";
+import type { ExecutorMode, ModelProfile } from "./health";
 import type { AgentMessage } from "./message";
 import type { Run } from "./run";
 
@@ -22,6 +22,7 @@ export type OrchestrationStepRef = {
   repairAttempt?: number;
   repairAttemptLimit?: number;
   repairKind?: "deterministic" | "semantic";
+  contextReceiptHash?: string;
 };
 
 export type AgentValidationSeverity = "info" | "warn" | "error";
@@ -48,6 +49,7 @@ export type RunAgentInput = {
   instruction: string;
   context?: string;
   executorModeOverride?: ExecutorMode;
+  modelProfileOverride?: ModelProfile;
   handoffAgentId?: string;
   handoffInstruction?: string;
   recordDeliverable?: boolean;

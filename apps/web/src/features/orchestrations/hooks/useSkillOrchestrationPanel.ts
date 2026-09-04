@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ORCHESTRATION_SKILL_IDS, type ExecutorMode, type OrchestrationSkillId } from "@atellier/shared";
+import {
+  ORCHESTRATION_SKILL_IDS,
+  type AgentRole,
+  type ContextReceiptEvaluationOutcome,
+  type ContextReceiptItemRelevance,
+  type ExecutorMode,
+  type ModelProfile,
+  type OrchestrationSkillId,
+} from "@atellier/shared";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 import {
   isOrchestrationStatusSettled,
@@ -10,8 +18,11 @@ import {
 } from "../../../api/hooks/orchestrations/useOrchestrationsApi";
 import {
   useActiveOrchestrationsApi,
+  useAutomatedContextReceiptAssessmentSummaryApi,
   useCancelRunApi,
+  useContextReceiptEvaluationSummaryApi,
   useRetryRunApi,
+  useRecordContextEvaluationApi,
   useRunEventsApi,
 } from "../../../api/hooks/runs/useRunsApi";
 import { useTasksApi } from "../../../api/hooks/tasks/useTasksApi";
@@ -33,8 +44,12 @@ export function useSkillOrchestrationPanel() {
   const [context, setContext] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [executorModeOverride, setExecutorModeOverride] = useState<ExecutorMode | "">("");
+  const [modelProfileOverride, setModelProfileOverride] = useState<ModelProfile | "">("");
   const [mode, setMode] = useState<Mode>("form");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [contextEvaluationOutcome, setContextEvaluationOutcome] = useState<ContextReceiptEvaluationOutcome>("useful");
+  const [contextEvaluationNote, setContextEvaluationNote] = useState("");
+  const [contextItemRelevance, setContextItemRelevance] = useState<Record<string, ContextReceiptItemRelevance>>({});
   const invalidatedRef = useRef(false);
   const dismissedRunIdRef = useRef<string | null>(null);
   const { data: healthStatus } = useHealthApi();
@@ -42,7 +57,10 @@ export function useSkillOrchestrationPanel() {
   const startSkillOrchestration = useStartSkillOrchestrationApi();
   const cancelRun = useCancelRunApi();
   const retryRun = useRetryRunApi();
+  const recordContextEvaluation = useRecordContextEvaluationApi();
   const { data: activeOrchestrationRuns = [] } = useActiveOrchestrationsApi();
+  const { data: contextEvaluationSummary } = useContextReceiptEvaluationSummaryApi();
+  const { data: automatedContextAssessmentSummary } = useAutomatedContextReceiptAssessmentSummaryApi();
   const { data: taskList = [] } = useTasksApi();
   const { data: liveStatus } = useOrchestrationStatusApi(activeRunId);
   const isTerminal = liveStatus
@@ -79,6 +97,18 @@ export function useSkillOrchestrationPanel() {
   }, [activeOrchestrationRuns, activeRunId]);
 
   useEffect(() => {
+    function handleOpenOrchestration(event: Event) {
+      const runId = (event as CustomEvent<string>).detail;
+      if (typeof runId !== "string" || runId.length === 0) return;
+      invalidatedRef.current = false;
+      setActiveRunId(runId);
+      setMode("live");
+    }
+    window.addEventListener("orchestration:open", handleOpenOrchestration);
+    return () => window.removeEventListener("orchestration:open", handleOpenOrchestration);
+  }, []);
+
+  useEffect(() => {
     if (!liveStatus || invalidatedRef.current) return;
     if (isOrchestrationStatusSettled(liveStatus)) {
       invalidatedRef.current = true;
@@ -92,6 +122,17 @@ export function useSkillOrchestrationPanel() {
       ]);
     }
   }, [liveStatus?.status, queryClient]);
+
+  useEffect(() => {
+    const receipt = liveStatus?.contextReceipt;
+    if (!receipt || liveStatus.contextEvaluation) return;
+    setContextItemRelevance(Object.fromEntries(receipt.items.map((item) => [
+      `${item.path}\u0000${item.applicableRole ?? ""}`,
+      "uncertain" as const,
+    ])));
+    setContextEvaluationOutcome("useful");
+    setContextEvaluationNote("");
+  }, [liveStatus?.contextReceipt?.stableHash, liveStatus?.contextEvaluation]);
 
   function handleStartOrchestration() {
     const trimmedGoal = goal.trim();
@@ -110,6 +151,7 @@ export function useSkillOrchestrationPanel() {
         context: context.trim() || undefined,
         ...(selectedTaskId ? { taskId: selectedTaskId } : {}),
         executorModeOverride: executorModeOverride || undefined,
+        modelProfileOverride: modelProfileOverride || undefined,
       },
       {
         onSuccess: (result) => {
@@ -121,6 +163,7 @@ export function useSkillOrchestrationPanel() {
           setContext("");
           setSelectedTaskId("");
           setExecutorModeOverride("");
+          setModelProfileOverride("");
         },
       },
     );
@@ -144,6 +187,29 @@ export function useSkillOrchestrationPanel() {
     retryRun.mutate({ runId: activeRunId });
   }
 
+  function setContextItemEvaluation(path: string, applicableRole: AgentRole | undefined, relevance: ContextReceiptItemRelevance) {
+    setContextItemRelevance((current) => ({
+      ...current,
+      [`${path}\u0000${applicableRole ?? ""}`]: relevance,
+    }));
+  }
+
+  function handleRecordContextEvaluation() {
+    if (!activeRunId || !liveStatus?.contextReceipt) return;
+    recordContextEvaluation.mutate({
+      runId: activeRunId,
+      input: {
+        outcome: contextEvaluationOutcome,
+        items: liveStatus.contextReceipt.items.map((item) => ({
+          path: item.path,
+          ...(item.applicableRole ? { applicableRole: item.applicableRole } : {}),
+          relevance: contextItemRelevance[`${item.path}\u0000${item.applicableRole ?? ""}`] ?? "uncertain",
+        })),
+        note: contextEvaluationNote.trim() || undefined,
+      },
+    });
+  }
+
   return {
     orchestrationSkillList,
     selectedSkill,
@@ -155,27 +221,39 @@ export function useSkillOrchestrationPanel() {
     linkedTask,
     mode,
     liveStatus,
+    contextEvaluationSummary,
+    automatedContextAssessmentSummary,
     isOrchestrationSettled: isSettled,
     runEvents: runEventsResponse?.events ?? [],
     isOpenAiExecution,
     executorModel,
     modelProfile,
     executorModeOverride,
+    modelProfileOverride,
+    setModelProfileOverride,
     availableExecutorModes,
     isFetchingOrchestrationSkills,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration: startSkillOrchestration.isPending,
     isCancellingRun: cancelRun.isPending,
     isRetryingRun: retryRun.isPending,
+    isRecordingContextEvaluation: recordContextEvaluation.isPending,
+    contextEvaluationOutcome,
+    contextEvaluationNote,
+    contextItemRelevance,
     orchestrationErrorMessage: startSkillOrchestration.error?.message,
     setSelectedSkillId,
     setGoal,
     setContext,
     setSelectedTaskId,
     setExecutorModeOverride,
+    setContextEvaluationOutcome,
+    setContextEvaluationNote,
+    setContextItemEvaluation,
     handleStartOrchestration,
     handleCancelRun,
     handleRetryRun,
+    handleRecordContextEvaluation,
     resetToForm,
   };
 }

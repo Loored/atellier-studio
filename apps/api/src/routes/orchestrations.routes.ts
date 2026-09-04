@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import {
   EXECUTOR_MODES,
+  MODEL_PROFILES,
   ORCHESTRATION_CONTEXT_MAX_LENGTH,
   ORCHESTRATION_GOAL_MAX_LENGTH,
   ORCHESTRATION_SKILL_IDS,
   type ExecutorMode,
+  type ModelProfile,
   type StartSkillOrchestrationInput,
   type StartSkillOrchestrationResponse,
 } from "@atellier/shared";
@@ -79,6 +81,10 @@ export async function orchestrationsRoutes(fastify: FastifyInstance, services: A
         `Executor mode '${executorModeOverride}' is not available in this API session.`,
       );
     }
+    const modelProfileOverrideRaw = optionalStringField(body, "modelProfileOverride");
+    if (modelProfileOverrideRaw && !isOneOf(modelProfileOverrideRaw, MODEL_PROFILES)) {
+      return badRequest(reply, "Model profile override is invalid.");
+    }
 
     const input: StartSkillOrchestrationInput = {
       skillId,
@@ -86,6 +92,7 @@ export async function orchestrationsRoutes(fastify: FastifyInstance, services: A
       context,
       taskId,
       executorModeOverride,
+      modelProfileOverride: modelProfileOverrideRaw as ModelProfile | undefined,
     };
 
     const result: StartSkillOrchestrationResponse = await services.durableRuntime.enqueueSkill(input);

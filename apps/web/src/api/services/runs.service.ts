@@ -9,6 +9,9 @@ import type {
   ListRunsInput,
   ResolveRunLearningSignalInput,
   ResolveRunLearningSignalResponse,
+  RecordContextReceiptEvaluationInput,
+  ContextReceiptEvaluationSummary,
+  AutomatedContextReceiptAssessmentSummary,
   Run,
   RunEventsResponse,
   UpdateRunReviewInput,
@@ -66,6 +69,21 @@ export const runsService = {
 
   async updateReview(runId: string, input: UpdateRunReviewInput): Promise<Run> {
     const response = await httpClient.patch<Run>(`/runs/${runId}/review`, input);
+    return response.data;
+  },
+
+  async recordContextEvaluation(runId: string, input: RecordContextReceiptEvaluationInput): Promise<Run> {
+    const response = await httpClient.post<Run>(`/runs/${runId}/context-evaluation`, input);
+    return response.data;
+  },
+
+  async getContextEvaluationSummary(): Promise<ContextReceiptEvaluationSummary> {
+    const response = await httpClient.get<ContextReceiptEvaluationSummary>("/runs/context-evaluation-summary");
+    return response.data;
+  },
+
+  async getAutomatedContextAssessmentSummary(): Promise<AutomatedContextReceiptAssessmentSummary> {
+    const response = await httpClient.get<AutomatedContextReceiptAssessmentSummary>("/runs/context-auto-assessment-summary");
     return response.data;
   },
 

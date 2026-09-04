@@ -61,6 +61,15 @@ export function AppShell() {
     previousWaitingIds.current = nextWaitingIds;
   }, [agents]);
 
+  useEffect(() => {
+    function handleNavigation(event: Event) {
+      const target = (event as CustomEvent<string>).detail;
+      if (target === "dashboard") setView("dashboard");
+    }
+    window.addEventListener("navigation:view", handleNavigation);
+    return () => window.removeEventListener("navigation:view", handleNavigation);
+  }, []);
+
   if (isMobile) {
     return <MobileView />;
   }

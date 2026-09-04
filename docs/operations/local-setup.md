@@ -106,10 +106,16 @@ AGENT_EXECUTOR_MODE=openai OPENAI_API_KEY=<YOUR_OPENAI_API_KEY> pnpm --filter @a
 
 Optional model and policy controls:
 
+For local Ollama execution, set `OLLAMA_MODEL_PROFILE` to select the profile model. The safe Mac default maps `cheap`, `standard`, and `deep` to `qwen3.5:4b`, avoiding VRAM pressure when orchestration steps overlap. Larger models can be opted into by changing the profile-specific variables. Those variables take precedence over the legacy `OLLAMA_MODEL` fallback. Role overrides remain available for specialist agents.
+
+`OLLAMA_CONTEXT_TOKENS=8192` is the local default for Context Receipt runs. It is sent with each Ollama request, so it does not require changing global Ollama server settings. Keep the setting at 8192 on the local Mac unless a measured run shows that a larger window is needed.
+
+Atellier sends `reasoning_effort: "none"` to Ollama for its bounded structured steps. This prevents Qwen's default hidden reasoning trace from consuming the limited output budget before it emits the actual plan, QA result, or wiki artifact.
+
 ```bash
 OPENAI_MODEL=gpt-4.1-mini
 AGENT_MAX_HANDOFF_DEPTH=1
-AGENT_EXECUTION_TIMEOUT_MS=120000
+AGENT_EXECUTION_TIMEOUT_MS=240000
 ```
 
 Keep the 120-second default for source-grounded local runs that must return a complete document; shorter limits can interrupt Ollama before the artifact is reviewable.

@@ -1,4 +1,4 @@
-import type { Agent, AgentRole } from "@atellier/shared";
+import type { Agent, AgentRole, ModelProfile } from "@atellier/shared";
 
 export type ExecuteAgentInstructionInput = {
   agent: Agent;
@@ -7,6 +7,7 @@ export type ExecuteAgentInstructionInput = {
   verifiedFiles?: string[];
   signal?: AbortSignal;
   maxOutputTokens?: number;
+  modelProfileOverride?: ModelProfile;
 };
 
 export type ExecuteAgentInstructionResult = {
@@ -27,6 +28,8 @@ export type OpenAiCompatibleExecutorConfig = {
   repoFileHints?: string[];
   /** Provider label used in error messages; defaults to "OpenAI-compatible". */
   providerLabel?: string;
+  /** Provider-specific fields added to the chat-completion request body. */
+  providerRequestBody?: Record<string, unknown>;
 };
 
 // Back-compat alias for callers that historically referenced the OpenAI-only shape.
@@ -47,6 +50,8 @@ export type OllamaAgentExecutorConfig = {
   baseUrl?: string;
   model: string;
   repoFileHints?: string[];
+  /** Ollama per-request context window; defaults to 8192 for Context Receipts. */
+  contextWindowTokens?: number;
 };
 
 export type AnthropicAgentExecutorConfig = {
@@ -297,6 +302,17 @@ export class RoleAwareAgentExecutorService implements AgentExecutorService {
   }
 }
 
+export class ProfileAwareAgentExecutorService implements AgentExecutorService {
+  constructor(
+    private readonly fallback: AgentExecutorService,
+    private readonly byProfile: Partial<Record<ModelProfile, AgentExecutorService>>,
+  ) {}
+
+  async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    return (this.byProfile[input.modelProfileOverride ?? "standard"] ?? this.fallback).execute(input);
+  }
+}
+
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
     if (input.signal?.aborted) {
@@ -411,6 +427,7 @@ export class OpenAiCompatibleAgentExecutorService implements AgentExecutorServic
           ],
           temperature: 0.4,
           max_tokens: input.maxOutputTokens ?? 1024,
+          ...this.config.providerRequestBody,
         }),
       });
     } catch (error) {
@@ -583,6 +600,12 @@ export class OllamaAgentExecutorService extends OpenAiCompatibleAgentExecutorSer
       model: config.model,
       repoFileHints: config.repoFileHints,
       providerLabel: "Ollama",
+      providerRequestBody: {
+        options: { num_ctx: config.contextWindowTokens ?? 8192 },
+        // Qwen 3.x models think by default. For Atellier's bounded structured
+        // agent steps, reserve the output budget for the final artifact.
+        reasoning_effort: "none",
+      },
     });
   }
 }

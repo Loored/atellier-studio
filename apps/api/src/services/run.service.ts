@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import {
   AGENT_ROLES,
   REVIEW_LEARNING_MAX_LENGTH,
@@ -8,6 +9,14 @@ import {
   REVIEW_LEARNING_SIGNAL_PATH_MAX_LENGTH,
   REVIEW_LEARNING_SIGNALS,
   type AppendRunLogInput,
+  type AgentMemoryContextReceipt,
+  type AutomatedContextReceiptAssessment,
+  type AutomatedContextReceiptAssessmentSummary,
+  type ContextReceiptEvaluation,
+  type ContextReceiptEvaluationBreakdown,
+  type ContextReceiptEvaluationCounts,
+  type ContextReceiptEvaluationSummary,
+  type RecordContextReceiptEvaluationInput,
   type CaptureRunMemoryInput,
   type CaptureRunMemoryResponse,
   type CurateRunLearningInput,
@@ -29,6 +38,7 @@ import {
   type TaskStatus,
 } from "@atellier/shared";
 import { RunModel } from "../db/models/Run";
+import { extractContextReceiptSourceCitations } from "./agent-response-validator";
 import { cleanUndefined, toIso, toJsonRecord, type StorageMode } from "./service-utils";
 import { WikiService } from "./wiki.service";
 import { EffectIdempotencyService } from "./effect-idempotency.service";
@@ -83,12 +93,288 @@ export class RunService {
       .slice(0, limit);
   }
 
+  async summarizeContextReceiptEvaluations(): Promise<ContextReceiptEvaluationSummary> {
+    const runs = this.storageMode === "mongo"
+      ? toJsonRecord<Run[]>(await RunModel.find({
+        contextReceipt: { $exists: true },
+        contextEvaluation: { $exists: true },
+      }).sort({ updatedAt: -1 }).limit(250))
+      : [...this.records.values()].filter((run) => run.contextReceipt && run.contextEvaluation);
+
+    const outcomes: ContextReceiptEvaluationSummary["outcomes"] = {
+      useful: 0,
+      mixed: 0,
+      "not-useful": 0,
+    };
+    const byAuthority = new Map<string, ContextReceiptEvaluationBreakdown>();
+    const byRole = new Map<string, ContextReceiptEvaluationBreakdown>();
+    const bySource = new Map<string, ContextReceiptEvaluationBreakdown>();
+
+    for (const run of runs) {
+      const receipt = run.contextReceipt!;
+      const evaluation = run.contextEvaluation!;
+      outcomes[evaluation.outcome] += 1;
+      const relevanceByItem = new Map(evaluation.items.map((item) => [
+        this.contextReceiptItemKey(item.path, item.applicableRole),
+        item.relevance,
+      ]));
+      for (const item of receipt.items) {
+        const relevance = relevanceByItem.get(this.contextReceiptItemKey(item.path, item.applicableRole));
+        if (!relevance) continue;
+        this.addContextEvaluationBreakdown(byAuthority, item.memory.authority, item.memory.authority, relevance);
+        const role = item.applicableRole ?? "shared";
+        this.addContextEvaluationBreakdown(byRole, role, role, relevance);
+        this.addContextEvaluationBreakdown(bySource, item.source, item.source, relevance);
+      }
+    }
+
+    return {
+      evaluatedReceipts: runs.length,
+      outcomes,
+      byAuthority: this.sortContextEvaluationBreakdowns(byAuthority),
+      byRole: this.sortContextEvaluationBreakdowns(byRole),
+      bySource: this.sortContextEvaluationBreakdowns(bySource),
+    };
+  }
+
+  async summarizeAutomatedContextReceiptAssessments(): Promise<AutomatedContextReceiptAssessmentSummary> {
+    const runs = this.storageMode === "mongo"
+      ? toJsonRecord<Run[]>(await RunModel.find({ automatedContextAssessment: { $exists: true } }).sort({ updatedAt: -1 }).limit(250))
+      : [...this.records.values()].filter((run) => run.automatedContextAssessment);
+    const outcomes: AutomatedContextReceiptAssessmentSummary["outcomes"] = {
+      supported: 0,
+      partial: 0,
+      unverified: 0,
+    };
+    for (const run of runs) outcomes[run.automatedContextAssessment!.outcome] += 1;
+    return { assessedReceipts: runs.length, outcomes };
+  }
+
   async getById(id: string): Promise<Run | null> {
     if (this.storageMode === "mongo") {
       const run = await RunModel.findById(id);
       return run ? toJsonRecord<Run>(run) : null;
     }
     return this.records.get(id) ?? null;
+  }
+
+  async ensureContextReceipt(
+    id: string,
+    receipt: AgentMemoryContextReceipt,
+    expectedLeaseOwner?: string,
+  ): Promise<AgentMemoryContextReceipt | null> {
+    const nowIso = new Date().toISOString();
+
+    if (this.storageMode === "mongo") {
+      const leaseQuery: Record<string, unknown> = {};
+      if (expectedLeaseOwner) {
+        leaseQuery.status = "running";
+        leaseQuery["execution.leaseOwner"] = expectedLeaseOwner;
+        leaseQuery["execution.leaseExpiresAt"] = { $gt: nowIso };
+      }
+      const stored = await RunModel.findOneAndUpdate(
+        {
+          _id: id,
+          contextReceipt: { $exists: false },
+          ...leaseQuery,
+        },
+        {
+          $set: {
+            contextReceipt: receipt,
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+      if (stored?.contextReceipt) {
+        return toJsonRecord<AgentMemoryContextReceipt>(stored.contextReceipt);
+      }
+
+      const existing = await RunModel.findOne({ _id: id, ...leaseQuery });
+      if (!existing) {
+        return null;
+      }
+      const existingReceipt = existing.contextReceipt
+        ? toJsonRecord<AgentMemoryContextReceipt>(existing.contextReceipt)
+        : undefined;
+      if (!existingReceipt) {
+        return null;
+      }
+      this.assertMatchingContextReceipt(existingReceipt, receipt);
+      return existingReceipt;
+    }
+
+    const current = this.records.get(id);
+    if (
+      !current
+      || (expectedLeaseOwner && (
+        current.status !== "running"
+        || current.execution?.leaseOwner !== expectedLeaseOwner
+        || !current.execution.leaseExpiresAt
+        || current.execution.leaseExpiresAt <= nowIso
+      ))
+    ) {
+      return null;
+    }
+    if (current.contextReceipt) {
+      this.assertMatchingContextReceipt(current.contextReceipt, receipt);
+      return structuredClone(current.contextReceipt);
+    }
+
+    const storedReceipt = structuredClone(receipt);
+    const next: Run = {
+      ...current,
+      contextReceipt: storedReceipt,
+      updatedAt: nowIso,
+    };
+    this.records.set(id, next);
+    return structuredClone(storedReceipt);
+  }
+
+  async recordContextReceiptEvaluation(
+    id: string,
+    input: RecordContextReceiptEvaluationInput,
+  ): Promise<Run | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    this.assertCanEvaluateContextReceipt(current);
+    const evaluation = this.buildContextReceiptEvaluation(current.contextReceipt!, input);
+    let stored: Run;
+    let created = false;
+
+    if (this.storageMode === "mongo") {
+      const updated = await RunModel.findOneAndUpdate(
+        {
+          _id: id,
+          type: "orchestration",
+          status: { $in: ["completed", "failed", "blocked"] },
+          contextReceipt: { $exists: true },
+          contextEvaluation: { $exists: false },
+        },
+        { $set: { contextEvaluation: evaluation, updatedAt: new Date() } },
+        { new: true },
+      );
+      if (updated) {
+        stored = toJsonRecord<Run>(updated);
+        created = true;
+      } else {
+        const existing = await this.getById(id);
+        if (!existing) return null;
+        this.assertCanEvaluateContextReceipt(existing);
+        if (!existing.contextEvaluation) {
+          throw new Error("Context receipt evaluation could not be persisted.");
+        }
+        this.assertMatchingContextEvaluation(existing.contextEvaluation, evaluation);
+        stored = existing;
+      }
+    } else if (current.contextEvaluation) {
+      this.assertMatchingContextEvaluation(current.contextEvaluation, evaluation);
+      stored = current;
+    } else {
+      stored = {
+        ...current,
+        contextEvaluation: structuredClone(evaluation),
+        updatedAt: toIso(new Date()),
+      };
+      this.records.set(id, stored);
+      created = true;
+    }
+
+    const artifactPath = await this.wikiService.writeContextEvaluationArtifact(
+      stored.id,
+      this.renderContextReceiptEvaluation(stored.contextReceipt!, stored.contextEvaluation!),
+    );
+    if (created) {
+      await this.appendLog(stored.id, {
+        level: "info",
+        message: `Context receipt ${stored.contextEvaluation!.receiptHash.slice(0, 12)} evaluated ${stored.contextEvaluation!.outcome} at ${artifactPath}.`,
+      });
+      return this.getById(stored.id);
+    }
+    return stored;
+  }
+
+  async assessContextReceiptAutomatically(id: string): Promise<Run | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    this.assertCanEvaluateContextReceipt(current);
+    const assessment = this.buildAutomatedContextReceiptAssessment(current);
+    let stored: Run;
+    let created = false;
+
+    if (this.storageMode === "mongo") {
+      const updated = await RunModel.findOneAndUpdate(
+        {
+          _id: id,
+          type: "orchestration",
+          status: { $in: ["completed", "failed", "blocked"] },
+          contextReceipt: { $exists: true },
+          automatedContextAssessment: { $exists: false },
+        },
+        { $set: { automatedContextAssessment: assessment, updatedAt: new Date() } },
+        { new: true },
+      );
+      if (updated) {
+        stored = toJsonRecord<Run>(updated);
+        created = true;
+      } else {
+        const existing = await this.getById(id);
+        if (!existing) return null;
+        this.assertCanEvaluateContextReceipt(existing);
+        if (!existing.automatedContextAssessment) {
+          throw new Error("Automated context assessment could not be persisted.");
+        }
+        this.assertMatchingAutomatedContextAssessment(existing.automatedContextAssessment, assessment);
+        stored = existing;
+      }
+    } else if (current.automatedContextAssessment) {
+      this.assertMatchingAutomatedContextAssessment(current.automatedContextAssessment, assessment);
+      stored = current;
+    } else {
+      stored = {
+        ...current,
+        automatedContextAssessment: structuredClone(assessment),
+        updatedAt: toIso(new Date()),
+      };
+      this.records.set(id, stored);
+      created = true;
+    }
+
+    const artifactPath = await this.wikiService.writeAutomatedContextAssessmentArtifact(
+      stored.id,
+      this.renderAutomatedContextReceiptAssessment(stored.contextReceipt!, stored.automatedContextAssessment!),
+    );
+    if (created) {
+      await this.appendLog(stored.id, {
+        level: "info",
+        message: `Automated context assessment ${stored.automatedContextAssessment!.outcome} at ${artifactPath}; provisional and not used for retrieval policy.`,
+      });
+      return this.getById(stored.id);
+    }
+    return stored;
+  }
+
+  async assessUnassessedContextReceipts(limit = 10): Promise<{ assessedRunIds: string[] }> {
+    const boundedLimit = Math.min(Math.max(limit, 1), 25);
+    const candidates = this.storageMode === "mongo"
+      ? toJsonRecord<Run[]>(await RunModel.find({
+        type: "orchestration",
+        status: { $in: ["completed", "failed", "blocked"] },
+        contextReceipt: { $exists: true },
+        automatedContextAssessment: { $exists: false },
+      }).sort({ updatedAt: -1 }).limit(boundedLimit))
+      : [...this.records.values()]
+        .filter((run) => run.type === "orchestration")
+        .filter((run) => ["completed", "failed", "blocked"].includes(run.status))
+        .filter((run) => run.contextReceipt && !run.automatedContextAssessment)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, boundedLimit);
+    const assessedRunIds: string[] = [];
+    for (const candidate of candidates) {
+      const assessed = await this.assessContextReceiptAutomatically(candidate.id);
+      if (assessed?.automatedContextAssessment) assessedRunIds.push(assessed.id);
+    }
+    return { assessedRunIds };
   }
 
   async listByOrchestrationRunId(orchestrationRunId: string): Promise<Run[]> {
@@ -1328,6 +1614,200 @@ export class RunService {
     } catch {
       return JSON.stringify({ unstringifiable: true }, null, 2);
     }
+  }
+
+  private assertMatchingContextReceipt(
+    existing: AgentMemoryContextReceipt,
+    requested: AgentMemoryContextReceipt,
+  ): void {
+    const existingStableFields = { ...existing, createdAt: undefined };
+    const requestedStableFields = { ...requested, createdAt: undefined };
+    if (
+      existing.stableHash !== requested.stableHash
+      || !isDeepStrictEqual(existingStableFields, requestedStableFields)
+    ) {
+      throw new Error("Run already has a different agent memory context receipt.");
+    }
+  }
+
+  private assertCanEvaluateContextReceipt(run: Run): void {
+    if (run.type !== "orchestration" || !["completed", "failed", "blocked"].includes(run.status)) {
+      throw new Error("Only terminal orchestration runs can receive a context receipt evaluation.");
+    }
+    if (!run.contextReceipt) {
+      throw new Error("This orchestration has no frozen context receipt to evaluate.");
+    }
+  }
+
+  private buildContextReceiptEvaluation(
+    receipt: AgentMemoryContextReceipt,
+    input: RecordContextReceiptEvaluationInput,
+  ): ContextReceiptEvaluation {
+    const normalizedNote = input.note?.trim();
+    const expectedKeys = receipt.items
+      .map((item) => this.contextReceiptItemKey(item.path, item.applicableRole))
+      .sort();
+    const suppliedKeys = input.items
+      .map((item) => this.contextReceiptItemKey(item.path, item.applicableRole))
+      .sort();
+    if (new Set(suppliedKeys).size !== suppliedKeys.length || !isDeepStrictEqual(suppliedKeys, expectedKeys)) {
+      throw new Error("Context receipt evaluation must label every included item exactly once.");
+    }
+    return {
+      schemaVersion: 1,
+      receiptHash: receipt.stableHash,
+      outcome: input.outcome,
+      items: input.items
+        .map((item) => ({
+          path: item.path,
+          ...(item.applicableRole ? { applicableRole: item.applicableRole } : {}),
+          relevance: item.relevance,
+        }))
+        .sort((left, right) => this.contextReceiptItemKey(left.path, left.applicableRole)
+          .localeCompare(this.contextReceiptItemKey(right.path, right.applicableRole))),
+      ...(normalizedNote ? { note: normalizedNote } : {}),
+      assessedAt: toIso(new Date()),
+    };
+  }
+
+  private assertMatchingContextEvaluation(
+    existing: ContextReceiptEvaluation,
+    requested: ContextReceiptEvaluation,
+  ): void {
+    const existingStableFields = { ...existing, assessedAt: undefined };
+    const requestedStableFields = { ...requested, assessedAt: undefined };
+    if (!isDeepStrictEqual(existingStableFields, requestedStableFields)) {
+      throw new Error("Context receipt evaluation is already recorded with different labels.");
+    }
+  }
+
+  private buildAutomatedContextReceiptAssessment(run: Run): AutomatedContextReceiptAssessment {
+    const receipt = run.contextReceipt!;
+    const declaredSources = new Set(
+      extractContextReceiptSourceCitations(this.readTerminalArtifactContent(run.output))
+        .map((source) => source.toLowerCase()),
+    );
+    const items = receipt.items.map((item) => ({
+      path: item.path,
+      ...(item.applicableRole ? { applicableRole: item.applicableRole } : {}),
+      referenced: declaredSources.has(item.path.toLowerCase()),
+    }));
+    // A terminal artifact can only cite receipt sources available to the role
+    // that produced it. Role-scoped memory for a different step remains
+    // visible as evidence, but cannot downgrade an otherwise grounded artifact.
+    const assessableItems = items.filter((item) => !item.applicableRole);
+    const referencedCount = assessableItems.filter((item) => item.referenced).length;
+    const outcome = assessableItems.length > 0 && referencedCount === assessableItems.length
+      ? "supported"
+      : referencedCount > 0
+        ? "partial"
+        : "unverified";
+    return {
+      schemaVersion: 1,
+      receiptHash: receipt.stableHash,
+      method: "terminal-output-path-reference",
+      outcome,
+      items,
+      assessedAt: toIso(new Date()),
+    };
+  }
+
+  private assertMatchingAutomatedContextAssessment(
+    existing: AutomatedContextReceiptAssessment,
+    requested: AutomatedContextReceiptAssessment,
+  ): void {
+    const existingStableFields = { ...existing, assessedAt: undefined };
+    const requestedStableFields = { ...requested, assessedAt: undefined };
+    if (!isDeepStrictEqual(existingStableFields, requestedStableFields)) {
+      throw new Error("Automated context assessment is already recorded with different evidence.");
+    }
+  }
+
+  private readTerminalArtifactContent(output: unknown): string {
+    const artifactContent = (output as { artifact?: { content?: unknown } } | undefined)?.artifact?.content;
+    return typeof artifactContent === "string" ? artifactContent : this.stringifyUnknown(output);
+  }
+
+  private contextReceiptItemKey(pathValue: string, role?: string): string {
+    return `${pathValue}\u0000${role ?? ""}`;
+  }
+
+  private addContextEvaluationBreakdown(
+    target: Map<string, ContextReceiptEvaluationBreakdown>,
+    key: string,
+    label: string,
+    relevance: keyof ContextReceiptEvaluationCounts,
+  ): void {
+    const current = target.get(key) ?? {
+      key,
+      label,
+      evaluatedItems: 0,
+      relevance: { relevant: 0, uncertain: 0, irrelevant: 0 },
+    };
+    current.evaluatedItems += 1;
+    current.relevance[relevance] += 1;
+    target.set(key, current);
+  }
+
+  private sortContextEvaluationBreakdowns(
+    source: Map<string, ContextReceiptEvaluationBreakdown>,
+  ): ContextReceiptEvaluationBreakdown[] {
+    return [...source.values()].sort((left, right) =>
+      right.evaluatedItems - left.evaluatedItems || left.label.localeCompare(right.label),
+    );
+  }
+
+  private renderContextReceiptEvaluation(
+    receipt: AgentMemoryContextReceipt,
+    evaluation: ContextReceiptEvaluation,
+  ): string {
+    return [
+      "# Agent Memory Context Evaluation",
+      "",
+      `- Receipt hash: ${evaluation.receiptHash}`,
+      `- Outcome: ${evaluation.outcome}`,
+      `- Assessed at: ${evaluation.assessedAt}`,
+      "",
+      "## Source labels",
+      "",
+      ...(evaluation.items.length
+        ? evaluation.items.map((item) => `- ${item.path}${item.applicableRole ? ` (${item.applicableRole})` : ""}: ${item.relevance}`)
+        : ["- No included sources to label."]),
+      "",
+      "## Operator note",
+      "",
+      evaluation.note ?? "_No note provided._",
+      "",
+      "## Receipt boundary",
+      "",
+      `This evaluation applies only to the frozen receipt ${receipt.stableHash}. It does not change retrieval policy, memory authority, or source content.`,
+      "",
+    ].join("\n");
+  }
+
+  private renderAutomatedContextReceiptAssessment(
+    receipt: AgentMemoryContextReceipt,
+    assessment: AutomatedContextReceiptAssessment,
+  ): string {
+    return [
+      "# Automated Agent Memory Context Assessment",
+      "",
+      `- Receipt hash: ${assessment.receiptHash}`,
+      `- Method: ${assessment.method}`,
+      `- Outcome: ${assessment.outcome}`,
+      `- Assessed at: ${assessment.assessedAt}`,
+      "",
+      "## Source-reference evidence",
+      "",
+      ...(assessment.items.length
+        ? assessment.items.map((item) => `- ${item.path}${item.applicableRole ? ` (${item.applicableRole})` : ""}: ${item.referenced ? "referenced in terminal output" : "not explicitly referenced"}`)
+        : ["- No included sources to assess."]),
+      "",
+      "## Boundary",
+      "",
+      `This deterministic check applies only to frozen receipt ${receipt.stableHash}. It measures paths explicitly declared under a Sources Used section in terminal output; it is provisional, is not an operator usefulness judgment, and does not change retrieval policy, memory authority, or source content.`,
+      "",
+    ].join("\n");
   }
 
   private slugify(value: string): string {

@@ -1,7 +1,7 @@
 # Roadmap
 
-**Last updated:** 2026-08-28 — Memory trust contract implemented on `codex/memory-trust-contract`.
-**Active plan:** Validate memory trust, retrieval, reflection, decisions, and promotion against the real local workflow before selecting another feature slice.
+**Last updated:** 2026-08-31 — QA semantic-feedback classification hardened on `codex/reflection-trust-hardening`.
+**Active plan:** Evaluate the frozen memory-context receipt against labeled real tasks before changing retrieval authority, budgets, or promotion policy.
 
 ## Strategic stance
 
@@ -174,6 +174,16 @@ Deterministic artifact failures now trigger up to three automatic Builder correc
 - ✅ Produce deterministic, inspectable reflection candidates from repeated episodic artifacts without persisting or promoting them.
 - ✅ Record idempotent accepted/rejected reflection decisions and permit guarded semantic promotion only from accepted decisions.
 - ✅ Validate the complete flow against an isolated live local vault: conflict guard, accepted promotion, trusted-only retrieval, graph provenance, and browser UI.
+- ✅ Harden generic-write trust boundaries, writable-path canonicalization, and append-only raw ingest under concurrency.
+- ✅ Make Reflection Review durable across refresh/restart, collision-resistant, concurrency-safe, and restricted to explicit narrative signals.
+- ✅ Pass controlled deterministic, Mongo concurrency, Ollama signal-quality, restart recovery, and trusted-only memory-soak gates in isolated storage.
+- ✅ Freeze a bounded Agent Memory Context Pack once per orchestration, with direct-source priority, evidence-first autonomous retrieval, role-scoped trusted memory, and a persisted hash-stable parent receipt reused by recovery.
+- ✅ Expose the receipt and its provenance in a human-readable run artifact and compact orchestration UI panel; validate atomic Mongo persistence under an active worker lease.
+- ✅ Add immutable terminal receipt evaluations with one usefulness label, complete per-source relevance labels, a parent-run/log/artifact trail, and no automatic policy change.
+- First real label: run `6a94ee8f6fbbda91fd282eec` marked raw evidence relevant, direct generated summary uncertain, and unused curator memory irrelevant; QA format exhaustion, rather than receipt trust, was the limiting factor.
+- Next: collect several more labeled real task receipts and inspect relevance by source authority and role before proposing any bounded memory retrieval budget or policy adjustment. Do not promote primary-vault memory until labeled real evidence produces a reviewable candidate.
+- Operational guard: an explicit QA `CHANGES REQUESTED` with at least one structured failure now enters the existing bounded semantic repair loop even if another checklist line is missing. Approval still requires complete passing coverage; missing or non-actionable QA uses only bounded format retries.
+- ✅ Make terminal orchestration Context Receipt evaluations recoverable from the Runs view after refresh via a safe Dashboard handoff.
 
 ## Later — Tailwind / Pixel polish
 

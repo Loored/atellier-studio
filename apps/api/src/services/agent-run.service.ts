@@ -111,6 +111,7 @@ export class AgentRunService {
         instruction: input.instruction,
         context: input.context,
         executorMode: selectedExecutorMode,
+        ...(input.modelProfileOverride && { modelProfile: input.modelProfileOverride }),
         verifiedRepoFiles: verifiedFiles,
         ...(input.orchestrationStep && {
           orchestrationRunId: input.orchestrationStep.orchestrationRunId,
@@ -122,6 +123,7 @@ export class AgentRunService {
           orchestrationRepairAttempt: input.orchestrationStep.repairAttempt,
           orchestrationRepairAttemptLimit: input.orchestrationStep.repairAttemptLimit,
           orchestrationRepairKind: input.orchestrationStep.repairKind,
+          orchestrationContextReceiptHash: input.orchestrationStep.contextReceiptHash,
         }),
       },
     });
@@ -160,6 +162,7 @@ export class AgentRunService {
         verifiedFiles,
         signal,
         maxOutputTokens: options.maxOutputTokens,
+        modelProfileOverride: input.modelProfileOverride,
       });
       assertExecutionActive(signal);
 

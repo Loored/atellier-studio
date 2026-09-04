@@ -3,6 +3,11 @@ import type {
   ResolveReviewLearningSignalInput,
   ReviewLearningRecord,
 } from "./review-learning";
+import type {
+  AgentMemoryContextReceipt,
+  AutomatedContextReceiptAssessment,
+  ContextReceiptEvaluation,
+} from "./agent-memory-context";
 
 export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint", "orchestration"] as const;
 
@@ -83,6 +88,9 @@ export type Run = {
   reviewStatus?: RunReviewStatus;
   deliverablePath?: string;
   memory?: RunMemoryCapture;
+  contextReceipt?: AgentMemoryContextReceipt;
+  contextEvaluation?: ContextReceiptEvaluation;
+  automatedContextAssessment?: AutomatedContextReceiptAssessment;
   input?: unknown;
   output?: unknown;
   execution?: RunExecution;

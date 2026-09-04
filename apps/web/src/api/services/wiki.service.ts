@@ -11,6 +11,7 @@ import type {
   WikiDreamDecisionRecord,
   WikiDreamDecisionRecordInput,
   WikiReflectionInput,
+  WikiReflectionReviewResponse,
   WikiReflectionResponse,
   WikiReflectionDecisionInput,
   WikiReflectionDecisionRecord,
@@ -64,6 +65,11 @@ export const wikiService = {
 
   async reflect(input: WikiReflectionInput = {}): Promise<WikiReflectionResponse> {
     const response = await httpClient.post<WikiReflectionResponse>("/wiki/reflections", input);
+    return response.data;
+  },
+
+  async readReflectionReview(): Promise<WikiReflectionReviewResponse> {
+    const response = await httpClient.get<WikiReflectionReviewResponse>("/wiki/reflections/review");
     return response.data;
   },
 

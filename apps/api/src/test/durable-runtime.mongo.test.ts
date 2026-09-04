@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { AgentMemoryContextReceipt } from "@atellier/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { connectMongo, disconnectMongo } from "../db/mongo";
 import { RunModel } from "../db/models/Run";
@@ -22,6 +23,23 @@ type QueueHarness = {
   queue: ExecutionQueueService;
   runs: RunService;
 };
+
+function buildContextReceipt(stableHash = "mongo-context-hash"): AgentMemoryContextReceipt {
+  return {
+    schemaVersion: 1,
+    query: "Use durable trusted context",
+    policy: "trusted-only",
+    budgets: {
+      totalBytes: 8_000,
+      perItemBytes: 2_000,
+      maxRetrievalItems: 3,
+    },
+    createdAt: "2026-08-30T12:00:00.000Z",
+    items: [],
+    excluded: [],
+    stableHash,
+  };
+}
 
 function isolatedMongoUri(baseUri: string): string {
   const uri = new URL(baseUri);
@@ -217,5 +235,47 @@ describeMongo("durable runtime Mongo concurrency", () => {
       type: "log",
       message: "Intentional duplicate sequence.",
     })).rejects.toHaveProperty("code", 11000);
+  });
+
+  it("atomically persists one context receipt under an active worker lease", async () => {
+    const workerA = createHarness();
+    const workerB = createHarness();
+    const queued = await createQueuedRun(workerA);
+    const claimed = await workerA.queue.claim("worker-a");
+    expect(claimed).not.toBeNull();
+    const receipt = buildContextReceipt();
+
+    const writes = await Promise.all([
+      workerA.runs.ensureContextReceipt(queued.id, receipt, "worker-a"),
+      workerB.runs.ensureContextReceipt(queued.id, receipt, "worker-a"),
+    ]);
+    expect(writes).toEqual([receipt, receipt]);
+    expect((await workerA.runs.getById(queued.id))?.contextReceipt).toEqual(receipt);
+
+    await expect(workerB.runs.ensureContextReceipt(
+      queued.id,
+      buildContextReceipt("different-context-hash"),
+      "worker-a",
+    )).rejects.toThrow("Run already has a different agent memory context receipt.");
+    await expect(workerB.runs.ensureContextReceipt(queued.id, receipt, "worker-b"))
+      .resolves.toBeNull();
+  });
+
+  it("atomically persists one immutable context evaluation", async () => {
+    const workerA = createHarness();
+    const workerB = createHarness();
+    const completed = await workerA.runs.create({ type: "orchestration", status: "completed" });
+    await workerA.runs.ensureContextReceipt(completed.id, buildContextReceipt());
+    const input = { outcome: "useful" as const, items: [] };
+
+    const evaluations = await Promise.all([
+      workerA.runs.recordContextReceiptEvaluation(completed.id, input),
+      workerB.runs.recordContextReceiptEvaluation(completed.id, input),
+    ]);
+    expect(evaluations.map((run) => run?.contextEvaluation?.outcome)).toEqual(["useful", "useful"]);
+    await expect(workerA.runs.recordContextReceiptEvaluation(completed.id, {
+      outcome: "not-useful",
+      items: [],
+    })).rejects.toThrow("Context receipt evaluation is already recorded with different labels.");
   });
 });
