@@ -24,6 +24,9 @@ function createRepairScenarioExecutor(
   qaMalformedAttempts = 0,
   malformedQaRechecksFromAttempt?: number,
   repeatQaFeedback = false,
+  incompleteChangesRequestedChecklist = false,
+  qaExplicitVerdictWithoutChecklist = false,
+  qaChecklistCompletionSucceeds = false,
 ): AgentExecutorService {
   let qaAttempts = 0;
   return {
@@ -37,7 +40,12 @@ function createRepairScenarioExecutor(
             "## Approach",
             "Draft the artifact, validate it, and repair exact blockers.",
             "## Acceptance Criteria",
-            "Day 1, Day 2, and Day 3 are explicit and QA approves.",
+            incompleteChangesRequestedChecklist
+              ? [
+                  "Day 1, Day 2, and Day 3 are explicit.",
+                  "The human approval boundary is named.",
+                ].join("\n")
+              : "Day 1, Day 2, and Day 3 are explicit and QA approves.",
             "## Handoff",
             "Builder may proceed.",
           ].join("\n"),
@@ -103,6 +111,14 @@ function createRepairScenarioExecutor(
       }
       if (input.agent.role === "qa") {
         qaAttempts += 1;
+        if (/Step:\s*QA checklist completion/i.test(input.instruction)) {
+          return {
+            needsHuman: false,
+            response: qaChecklistCompletionSucceeds
+              ? "- [PASS] The human approval boundary is named. — Evidence: The plan explicitly retains approval for a human reviewer."
+              : "I cannot provide the missing checklist evidence.",
+          };
+        }
         const qaRecheckAttempt = Number(input.instruction.match(/Step:\s*QA recheck (\d+)/i)?.[1] ?? 0);
         if (
           qaAttempts <= qaMalformedAttempts
@@ -111,6 +127,19 @@ function createRepairScenarioExecutor(
           return {
             needsHuman: false,
             response: "The response should contain a verdict, findings, and a recommendation.",
+          };
+        }
+        if (qaExplicitVerdictWithoutChecklist) {
+          return {
+            needsHuman: false,
+            response: [
+              "## Veredicto",
+              "**APROBADO**",
+              "## Hallazgos",
+              "La nota parece completa.",
+              "## Recomendación",
+              "Aprobar para revisión humana.",
+            ].join("\n"),
           };
         }
         const isRecheck = /Step:\s*QA recheck/i.test(input.instruction);
@@ -126,7 +155,10 @@ function createRepairScenarioExecutor(
           response: [
             `Verdict: ${requestsChanges ? "CHANGES REQUESTED" : "APPROVED"}`,
             "Acceptance Checklist:",
-            `- [${requestsChanges ? "FAIL" : "PASS"}] Day 1, Day 2, and Day 3 are explicit and QA approves. — Evidence: ${requestsChanges ? "Approval boundary remains unclear." : "All three days and boundaries are explicit."}`,
+            `- [${requestsChanges ? "FAIL" : "PASS"}] ${incompleteChangesRequestedChecklist ? "Day 1, Day 2, and Day 3 are explicit." : "Day 1, Day 2, and Day 3 are explicit and QA approves."} — Evidence: ${requestsChanges ? "Approval boundary remains unclear." : "All three days and boundaries are explicit."}`,
+            ...(!requestsChanges && incompleteChangesRequestedChecklist && !qaChecklistCompletionSucceeds
+              ? ["- [PASS] The human approval boundary is named. — Evidence: The plan explicitly retains approval for a human reviewer."]
+              : []),
             "Findings:",
             requestsChanges
               ? (repeatQaFeedback
@@ -253,6 +285,13 @@ describe("daily-use operational loop", () => {
       status: "completed",
     });
     expect(status.steps.every((step) => step.status === "completed")).toBe(true);
+    expect(status.contextReceipt).toMatchObject({
+      policy: "evidence-first",
+      items: expect.arrayContaining([
+        expect.objectContaining({ path: ingest.rawPath, memory: expect.objectContaining({ authority: "evidence-only" }) }),
+        expect.objectContaining({ path: ingest.summaryPagePath, memory: expect.objectContaining({ authority: "context-only" }) }),
+      ]),
+    });
 
     const completedRun = await services.runs.getById(started.runId);
     expect(completedRun).toMatchObject({
@@ -261,6 +300,7 @@ describe("daily-use operational loop", () => {
       reviewStatus: "pending",
     });
     expect(completedRun?.deliverablePath).toContain(`wiki/deliverables/${started.runId}-`);
+    expect(completedRun?.contextReceipt?.stableHash).toBe(status.contextReceipt?.stableHash);
     expect((await services.tasks.getById(task.id))?.status).toBe("review");
     expect(completedRun?.output).toMatchObject({
       readiness: "ready-for-human-review",
@@ -286,13 +326,17 @@ describe("daily-use operational loop", () => {
     expect(firstContext).toContain(ingest.rawPath);
     expect(firstContext).toContain(ingest.summaryPagePath);
     expect(firstContext).toContain("Build the smallest useful linked workflow and preserve its source chain.");
-    expect(firstContext).toContain(`--- BEGIN VERIFIED SOURCE: ${ingest.rawPath} ---`);
+    expect(firstContext).toContain(`[EVIDENCE] ${ingest.rawPath}`);
+    expect(firstContext).toContain(`[NON-AUTHORITATIVE CONTEXT] ${ingest.summaryPagePath}`);
+    expect(firstContext).toContain(status.contextReceipt?.stableHash ?? "");
     const builderRun = childRuns.find((run) =>
       (run.input as { orchestrationStepId?: string } | undefined)?.orchestrationStepId === "build",
     );
     expect((builderRun?.input as { verifiedRepoFiles?: string[] } | undefined)?.verifiedRepoFiles).toEqual(
       expect.arrayContaining([ingest.rawPath, ingest.summaryPagePath]),
     );
+    expect((builderRun?.input as { orchestrationContextReceiptHash?: string } | undefined)?.orchestrationContextReceiptHash)
+      .toBe(status.contextReceipt?.stableHash);
     expect((builderRun?.output as { validation?: { passed?: boolean } } | undefined)?.validation?.passed).toBe(true);
 
     const deliverable = await services.wiki.readPage(completedRun?.deliverablePath ?? "");
@@ -615,6 +659,39 @@ describe("daily-use operational loop", () => {
     ]);
   });
 
+  it("uses an incomplete changes-requested checklist as semantic repair feedback", async () => {
+    await server.close();
+    services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+      agentExecutor: createRepairScenarioExecutor(true, true, false, undefined, 0, undefined, false, true),
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+    const started = (await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: { goal: "Create a complete 3-day operating plan." },
+    })).json<StartSkillOrchestrationResponse>();
+
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+    const completedRun = await services.runs.getById(started.runId);
+    expect(completedRun?.output).toMatchObject({
+      readiness: "ready-for-human-review",
+      semanticRepair: { attemptsUsed: 1, resolved: true },
+      validation: { passed: true },
+    });
+    expect((completedRun?.output as { qaRetry?: { attemptsUsed?: number; resolved?: boolean } }).qaRetry)
+      .toMatchObject({ attemptsUsed: 0, resolved: true });
+    const stepIds = (await services.runs.listByOrchestrationRunId(started.runId)).map((run) =>
+      (run.input as { orchestrationStepId?: string }).orchestrationStepId,
+    );
+    expect(stepIds).toEqual([
+      "scope", "build", "repair-1", "runtime", "qa",
+      "semantic-repair-1", "qa-recheck-1", "memory",
+    ]);
+  });
+
   it("needs human input without consuming semantic repairs when QA format retries exhaust", async () => {
     await server.close();
     services = await createAppServices({
@@ -656,6 +733,69 @@ describe("daily-use operational loop", () => {
       url: `/runs/${started.runId}/review`,
       payload: { reviewStatus: "approved" },
     })).statusCode).toBe(409);
+  });
+
+  it("stops for human review when targeted QA checklist completion remains unusable", async () => {
+    await server.close();
+    services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+      agentExecutor: createRepairScenarioExecutor(true, false, false, undefined, 0, undefined, false, false, true),
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+    const started = (await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: { goal: "Create a complete 3-day operating plan." },
+    })).json<StartSkillOrchestrationResponse>();
+
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+    const completedRun = await services.runs.getById(started.runId);
+    expect(completedRun?.output).toMatchObject({
+      readiness: "needs-human",
+      qaRetry: {
+        attemptsUsed: 1,
+        exhausted: false,
+        blockerMessages: ["QA returned an explicit verdict without complete checklist evidence after one targeted completion; human review is required."],
+      },
+    });
+    const stepIds = (await services.runs.listByOrchestrationRunId(started.runId)).map((run) =>
+      (run.input as { orchestrationStepId?: string }).orchestrationStepId,
+    );
+    expect(stepIds).toContain("qa-checklist-completion-1");
+    expect(stepIds).not.toContain("qa-format-retry-1");
+    expect(stepIds).not.toContain("semantic-repair-1");
+  });
+
+  it("completes only the missing QA checklist criterion before approving the run", async () => {
+    await server.close();
+    services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+      agentExecutor: createRepairScenarioExecutor(true, false, false, undefined, 0, undefined, false, true, false, true),
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+    const started = (await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: { goal: "Create a complete 3-day operating plan." },
+    })).json<StartSkillOrchestrationResponse>();
+
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+    const completedRun = await services.runs.getById(started.runId);
+    expect(completedRun?.output).toMatchObject({
+      readiness: "ready-for-human-review",
+      qaRetry: { attemptsUsed: 1, resolved: true, exhausted: false, finalStepId: "qa-checklist-completion-1" },
+      qaChecklist: { complete: true },
+      validation: { passed: true },
+    });
+    const completionRun = (await services.runs.listByOrchestrationRunId(started.runId)).find((run) =>
+      (run.input as { orchestrationStepId?: string }).orchestrationStepId === "qa-checklist-completion-1",
+    );
+    expect((completionRun?.output as { response?: string }).response).toContain("Day 1, Day 2, and Day 3 are explicit.");
+    expect((completionRun?.output as { response?: string }).response).toContain("The human approval boundary is named.");
   });
 
   it("retries a malformed QA recheck without consuming another semantic repair", async () => {

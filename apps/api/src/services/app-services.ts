@@ -1,6 +1,7 @@
 import {
   createAgentExecutorService,
   OllamaAgentExecutorService,
+  ProfileAwareAgentExecutorService,
   RoleAwareAgentExecutorService,
   type AgentExecutorMode,
   type AgentExecutorService,
@@ -72,13 +73,15 @@ export type CreateAppServicesOptions = {
   ollamaBaseUrl?: string;
   ollamaModel?: string;
   ollamaModelProfile?: ModelProfile;
+  ollamaContextTokens?: number;
+  ollamaModelByProfile?: Partial<Record<ModelProfile, string>>;
   /**
    * Optional per-agent-role Ollama model overrides. When present, agents with
    * the matching role use a dedicated Ollama executor pinned to this model;
    * unspecified roles fall back to the global executor.
    *
-   * Use case: pin Builder/Toto Runtime to qwen2.5-coder:7b while keeping
-   * llama3.1:8b for PM/QA/wiki-curator. Only Ollama supports per-role
+   * Use case: pin Builder/Toto Runtime to a specialist model while keeping
+   * profile-based routing for the remaining roles. Only Ollama supports per-role
    * overrides in v1 (the cost-free local provider is the right place to
    * experiment with specialized models).
    */
@@ -173,6 +176,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
       ? {
           baseUrl: options.ollamaBaseUrl,
           model: options.ollamaModel,
+          contextWindowTokens: options.ollamaContextTokens,
         }
       : undefined,
     repoFileHints,
@@ -189,13 +193,26 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     perRole[role as AgentRole] = new OllamaAgentExecutorService({
       baseUrl: options.ollamaBaseUrl,
       model,
+      contextWindowTokens: options.ollamaContextTokens,
       repoFileHints,
     });
   }
+  const profileExecutors: Partial<Record<ModelProfile, AgentExecutorService>> = {};
+  for (const [profile, model] of Object.entries(options.ollamaModelByProfile ?? {})) {
+    if (model) profileExecutors[profile as ModelProfile] = new OllamaAgentExecutorService({
+      baseUrl: options.ollamaBaseUrl,
+      model,
+      repoFileHints,
+      contextWindowTokens: options.ollamaContextTokens,
+    });
+  }
+  const profileAwareFallback = Object.keys(profileExecutors).length > 0
+    ? new ProfileAwareAgentExecutorService(fallbackExecutor, profileExecutors)
+    : fallbackExecutor;
   const executor: AgentExecutorService =
     Object.keys(perRole).length > 0 && executorMode === "ollama"
-      ? new RoleAwareAgentExecutorService(fallbackExecutor, perRole)
-      : fallbackExecutor;
+      ? new RoleAwareAgentExecutorService(profileAwareFallback, perRole)
+      : profileAwareFallback;
   const executorByMode: Partial<Record<ExecutorMode, AgentExecutorService>> = {
     mock: createAgentExecutorService({ mode: "mock", repoFileHints }),
   };
@@ -235,13 +252,16 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
       ollama: {
         baseUrl: options.ollamaBaseUrl,
         model: options.ollamaModel,
+        contextWindowTokens: options.ollamaContextTokens,
       },
       repoFileHints,
     });
-    executorByMode.ollama =
-      Object.keys(perRole).length > 0
-        ? new RoleAwareAgentExecutorService(ollamaDefaultExecutor, perRole)
-        : ollamaDefaultExecutor;
+    const ollamaProfileExecutor = Object.keys(profileExecutors).length > 0
+      ? new ProfileAwareAgentExecutorService(ollamaDefaultExecutor, profileExecutors)
+      : ollamaDefaultExecutor;
+    executorByMode.ollama = Object.keys(perRole).length > 0
+      ? new RoleAwareAgentExecutorService(ollamaProfileExecutor, perRole)
+      : ollamaProfileExecutor;
   }
 
   // Ensure the active mode uses the exact runtime wiring (including role-aware

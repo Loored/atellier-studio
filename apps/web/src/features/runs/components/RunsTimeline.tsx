@@ -1,4 +1,4 @@
-import { Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
+import { Activity, Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
 import { RUN_REVIEW_STATUSES } from "@atellier/shared";
 import { RUN_LOG_MESSAGE_MAX_LENGTH } from "@atellier/shared";
 import { ValidationSummary } from "../../../components/ValidationSummary";
@@ -35,6 +35,7 @@ export function RunsTimeline() {
     promoteRunDeliverable,
     unlinkRunDeliverable,
     retryRun,
+    openOrchestration,
   } = useRunsTimeline();
 
   return (
@@ -270,6 +271,18 @@ export function RunsTimeline() {
                   </button>
                   </div>
                 </div>
+              ) : null}
+
+              {run.type === "orchestration" ? (
+                <button
+                  type="button"
+                  className="mt-2 justify-self-start border-purple/30 text-purple bg-purple/[0.08] hover:bg-purple/[0.16]"
+                  onClick={() => openOrchestration(run.id)}
+                  title="Open orchestration details and memory context"
+                >
+                  <Activity size={15} />
+                  <span>Open orchestration</span>
+                </button>
               ) : null}
             </li>
           );

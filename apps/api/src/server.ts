@@ -33,6 +33,7 @@ export type BuildServerOptions = {
   | "ollamaBaseUrl"
   | "ollamaModel"
   | "ollamaModelProfile"
+  | "ollamaModelByProfile"
   | "ollamaModelByRole"
   | "maxHandoffDepth"
   | "executionTimeoutMs"

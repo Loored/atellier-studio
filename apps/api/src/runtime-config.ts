@@ -16,6 +16,29 @@ function parseModelProfile(raw: string | undefined): ModelProfile {
   return raw === "cheap" ? "cheap" : raw === "deep" ? "deep" : "standard";
 }
 
+function readOllamaContextTokens(): number {
+  const configured = Number(process.env.OLLAMA_CONTEXT_TOKENS ?? 8192);
+  return Number.isFinite(configured) && configured >= 2048 ? Math.floor(configured) : 8192;
+}
+
+function resolveOllamaModel(profile: ModelProfile): string | undefined {
+  const profileEnv: Record<ModelProfile, string> = {
+    cheap: "OLLAMA_MODEL_CHEAP",
+    standard: "OLLAMA_MODEL_STANDARD",
+    deep: "OLLAMA_MODEL_DEEP",
+  };
+  return process.env[profileEnv[profile]]?.trim() || process.env.OLLAMA_MODEL?.trim();
+}
+
+function readOllamaProfileModels(): Partial<Record<ModelProfile, string>> {
+  const models: Partial<Record<ModelProfile, string>> = {};
+  for (const profile of ["cheap", "standard", "deep"] as ModelProfile[]) {
+    const value = process.env[`OLLAMA_MODEL_${profile.toUpperCase()}`]?.trim();
+    if (value) models[profile] = value;
+  }
+  return models;
+}
+
 function resolveExecutorMode(): AgentExecutorMode {
   const explicit = process.env.AGENT_EXECUTOR_MODE;
   if (["mock", "openai", "anthropic", "groq", "ollama"].includes(explicit ?? "")) {
@@ -52,6 +75,7 @@ function readCodexWorkerAllowedDirectories(): string[] | undefined {
 export function readRuntimeConfig(): RuntimeEnvironmentConfig {
   const storageMode: StorageMode = process.env.API_STORAGE === "memory" ? "memory" : "mongo";
   const agentExecutorMode = resolveExecutorMode();
+  const ollamaModelProfile = parseModelProfile(process.env.OLLAMA_MODEL_PROFILE);
   return {
     port: Number(process.env.API_PORT ?? 4000),
     host: process.env.API_HOST ?? "127.0.0.1",
@@ -72,8 +96,10 @@ export function readRuntimeConfig(): RuntimeEnvironmentConfig {
       groqModel: process.env.GROQ_MODEL,
       groqModelProfile: parseModelProfile(process.env.GROQ_MODEL_PROFILE),
       ollamaBaseUrl: process.env.OLLAMA_BASE_URL,
-      ollamaModel: process.env.OLLAMA_MODEL,
-      ollamaModelProfile: parseModelProfile(process.env.OLLAMA_MODEL_PROFILE),
+      ollamaModel: resolveOllamaModel(ollamaModelProfile),
+      ollamaModelProfile,
+      ollamaContextTokens: readOllamaContextTokens(),
+      ollamaModelByProfile: readOllamaProfileModels(),
       ollamaModelByRole: readOllamaRoleOverrides(),
       maxHandoffDepth: Number(process.env.AGENT_MAX_HANDOFF_DEPTH ?? 1),
       executionTimeoutMs: Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? 120_000),

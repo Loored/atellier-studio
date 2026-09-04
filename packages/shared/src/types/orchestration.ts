@@ -1,6 +1,11 @@
 import type { AgentRole } from "./agent";
-import type { ExecutorMode } from "./health";
+import type { ExecutorMode, ModelProfile } from "./health";
 import type { Run, RunExecution, RunStatus } from "./run";
+import type {
+  AgentMemoryContextReceipt,
+  AutomatedContextReceiptAssessment,
+  ContextReceiptEvaluation,
+} from "./agent-memory-context";
 
 export const ORCHESTRATION_SKILL_IDS = [
   "atellier-build-loop",
@@ -43,6 +48,7 @@ export type StartSkillOrchestrationInput = {
   context?: string;
   taskId?: string;
   executorModeOverride?: ExecutorMode;
+  modelProfileOverride?: ModelProfile;
 };
 
 export type SkillOrchestrationStepResult = {
@@ -129,6 +135,9 @@ export type OrchestrationStatusResult = {
   steps: OrchestrationStepStatusEntry[];
   activeStep: OrchestrationStepStatusEntry | null;
   nextStep: OrchestrationStepStatusEntry | null;
+  contextReceipt?: AgentMemoryContextReceipt;
+  contextEvaluation?: ContextReceiptEvaluation;
+  automatedContextAssessment?: AutomatedContextReceiptAssessment;
   repair?: OrchestrationRepairSummary;
   qaRetry?: OrchestrationRepairSummary;
   qaChecklist?: OrchestrationQaChecklistSummary;

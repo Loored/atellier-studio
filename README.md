@@ -31,7 +31,9 @@ Implemented:
 - Review-to-memory learning: an explicit `POST /runs/:id/curate-learning` promotes one approved lesson into durable role Markdown and optional Wiki lint/graph signals
 - Curation signal resolution: Review records explicit resolved/dismissed decisions, keeps durable role-memory history, and removes closed findings from active Wiki lint
 - MCP server package (`apps/mcp-server`) exposes the local REST API as stdio tools for Claude Code / Cowork
-- Multi-provider agent executors: mock, OpenAI, Anthropic, Groq, and Ollama with Ollama role overrides
+- Multi-provider agent executors: mock, OpenAI, Anthropic, Groq, and Ollama with profile-based local routing. The safe local default maps all profiles to lightweight `qwen3.5:4b`; larger models remain opt-in through profile environment variables.
+- Orchestration runs can override the Ollama model profile per request; the chosen profile is persisted and visible in the run input.
+- When no override is supplied, orchestration uses conservative deterministic profile classification and defaults ambiguous work to `standard`.
 - Codex Worker control-plane: create / plan / approve-step / execute-next / cancel / retry-step / finalize, with persisted per-step evidence artifacts
 - Knowledge Graph v2: force-directed live canvas (react-force-graph-2d) clustered by wiki/raw/runtime/meta layers, inspector with markdown render + run timeline, ⌘K search with keyboard nav, URL-synced filters/density/selection, sesión viva polling, time-travel slider with snapshot ticks, hover tooltip, layer breakdown, Office↔Graph navigation, mobile tab, in-memory snapshot ring buffer at `/knowledge/graph/snapshots`
 - Agent grounding validation: builder/QA responses are checked against verified repo files; review approval is blocked on validation errors
@@ -159,7 +161,7 @@ Optional execution policy controls:
 
 ```bash
 AGENT_MAX_HANDOFF_DEPTH=1
-AGENT_EXECUTION_TIMEOUT_MS=120000
+AGENT_EXECUTION_TIMEOUT_MS=240000
 ```
 
 The 120-second default leaves enough room for source-grounded local models to return complete knowledge artifacts instead of timing out mid-document.

@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import {
   AGENT_ROLES,
+  CONTEXT_RECEIPT_EVALUATION_NOTE_MAX_LENGTH,
+  CONTEXT_RECEIPT_EVALUATION_OUTCOMES,
+  CONTEXT_RECEIPT_ITEM_RELEVANCE,
   REVIEW_LEARNING_MAX_LENGTH,
   REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH,
   REVIEW_LEARNING_RESOLUTION_OUTCOMES,
@@ -17,6 +20,7 @@ import {
   type CurateRunLearningInput,
   type CreateRunInput,
   type ResolveRunLearningSignalInput,
+  type RecordContextReceiptEvaluationInput,
   type RunStatus,
   type UpdateRunReviewInput,
 } from "@atellier/shared";
@@ -53,6 +57,23 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
       statuses: statuses as RunStatus[] | undefined,
       limit: parsedLimit,
     });
+  });
+
+  fastify.get("/runs/context-evaluation-summary", async () =>
+    services.runs.summarizeContextReceiptEvaluations(),
+  );
+
+  fastify.get("/runs/context-auto-assessment-summary", async () =>
+    services.runs.summarizeAutomatedContextReceiptAssessments(),
+  );
+
+  fastify.post("/runs/context-auto-assessments/backfill", async (request, reply) => {
+    const body = bodyRecord(request.body) ?? {};
+    const limit = body.limit === undefined ? 10 : Number(body.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 25) {
+      return badRequest(reply, "Assessment backfill limit must be an integer from 1 to 25.");
+    }
+    return services.runs.assessUnassessedContextReceipts(limit);
   });
 
   fastify.get("/runs/:id", async (request, reply) => {
@@ -271,6 +292,52 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
       return run ?? notFound(reply, "Run not found.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update run review status.";
+      return reply.code(409).send({ error: message });
+    }
+  });
+
+  fastify.post("/runs/:id/context-evaluation", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidObjectId(id)) {
+      return badRequest(reply, "Run id is invalid.");
+    }
+    const body = bodyRecord(request.body);
+    if (!body) {
+      return badRequest(reply, "Request body must be an object.");
+    }
+    if (!isOneOf(body.outcome, CONTEXT_RECEIPT_EVALUATION_OUTCOMES)) {
+      return badRequest(reply, "Context receipt evaluation outcome is invalid.");
+    }
+    if (!Array.isArray(body.items)) {
+      return badRequest(reply, "Context receipt evaluation items are required.");
+    }
+    const items = body.items.map((item) => {
+      const record = bodyRecord(item);
+      const path = record ? stringField(record, "path") : undefined;
+      const relevance = record ? stringField(record, "relevance") : undefined;
+      const applicableRole = record ? optionalStringField(record, "applicableRole") : undefined;
+      if (!path || !relevance || !isOneOf(relevance, CONTEXT_RECEIPT_ITEM_RELEVANCE)
+        || (applicableRole && !isOneOf(applicableRole, AGENT_ROLES))) {
+        return null;
+      }
+      return { path, relevance, ...(applicableRole ? { applicableRole } : {}) };
+    });
+    if (items.some((item) => !item)) {
+      return badRequest(reply, "Context receipt evaluation items are invalid.");
+    }
+    const note = optionalStringField(body, "note");
+    if (note && note.length > CONTEXT_RECEIPT_EVALUATION_NOTE_MAX_LENGTH) {
+      return badRequest(reply, `Context receipt evaluation note must be ${CONTEXT_RECEIPT_EVALUATION_NOTE_MAX_LENGTH} characters or fewer.`);
+    }
+    try {
+      const run = await services.runs.recordContextReceiptEvaluation(id, {
+        outcome: body.outcome,
+        items: items as RecordContextReceiptEvaluationInput["items"],
+        note,
+      });
+      return run ?? notFound(reply, "Run not found.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to record context receipt evaluation.";
       return reply.code(409).send({ error: message });
     }
   });

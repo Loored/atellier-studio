@@ -174,6 +174,24 @@ export type WikiReflectionPromotionRecord = {
   memory: MemoryTrustMetadata;
 };
 
+export const WIKI_REFLECTION_REVIEW_STATUSES = ["pending", "accepted", "rejected", "promoted"] as const;
+export type WikiReflectionReviewStatus = (typeof WIKI_REFLECTION_REVIEW_STATUSES)[number];
+
+export type WikiReflectionReviewItem = WikiReflectionCandidate & {
+  status: WikiReflectionReviewStatus;
+  decisionPath?: string;
+  decisionNote?: string;
+  decisionCreatedAt?: string;
+  promotedPath?: string;
+};
+
+export type WikiReflectionReviewResponse = {
+  items: WikiReflectionReviewItem[];
+  scannedEpisodes: number;
+  minOccurrences: number;
+  generatedAt: string;
+};
+
 export type WikiLintIssue = {
   code: "missing_page" | "broken_link" | "stale_index_entry" | "curation_signal";
   path: string;

@@ -17,6 +17,7 @@ import type {
   WikiReflectionDecisionRecord,
   WikiReflectionPromotionInput,
   WikiReflectionPromotionRecord,
+  WikiReflectionReviewResponse,
 } from "@atellier/shared";
 import { useApiAlerts } from "../../alerts/useApiAlerts";
 import { queryKeys } from "../../query/queryKeys";
@@ -128,18 +129,38 @@ export function useWikiLintApi(options: UseWikiLintApiOptions = {}) {
 export type UseWikiReflectionsApiOptions = UseMutationOptions<WikiReflectionResponse, Error, WikiReflectionInput>;
 
 export function useWikiReflectionsApi(options: UseWikiReflectionsApiOptions = {}) {
+  const queryClient = useQueryClient();
   const { notifyError } = useApiAlerts();
   return useMutationInstance<WikiReflectionResponse, Error, WikiReflectionInput>(
     { mutationFn: (input) => wikiService.reflect(input), ...options },
-    { onError: (error) => notifyError(error) },
+    {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.wiki.reflectionReview });
+      },
+      onError: (error) => notifyError(error),
+    },
   );
 }
 
+export function useWikiReflectionReviewApi() {
+  return useQueryInstance<WikiReflectionReviewResponse>({
+    queryKey: queryKeys.wiki.reflectionReview,
+    queryFn: wikiService.readReflectionReview,
+  });
+}
+
 export function useWikiReflectionDecisionApi() {
+  const queryClient = useQueryClient();
   const { notifyError, notifySuccess } = useApiAlerts();
   return useMutationInstance<WikiReflectionDecisionRecord, Error, WikiReflectionDecisionInput>(
     { mutationFn: (input) => wikiService.decideReflection(input) },
-    { onSuccess: () => notifySuccess("Reflection decision saved"), onError: (error) => notifyError(error) },
+    {
+      onSuccess: async () => {
+        notifySuccess("Reflection decision saved");
+        await queryClient.invalidateQueries({ queryKey: queryKeys.wiki.reflectionReview });
+      },
+      onError: (error) => notifyError(error),
+    },
   );
 }
 
@@ -154,6 +175,7 @@ export function useWikiReflectionPromotionApi() {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.index }),
           queryClient.invalidateQueries({ queryKey: queryKeys.wiki.log }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.wiki.reflectionReview }),
         ]);
       },
       onError: (error) => notifyError(error),

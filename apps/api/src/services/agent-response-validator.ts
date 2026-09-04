@@ -18,7 +18,7 @@ const SECTION_PATTERNS: Record<AgentValidationProfile, string[]> = {
   "artifact-builder": ["summary", "requested artifact", "risk assessment", "blockers", "qa handoff"],
   runtime: ["checks to run", "expected pass/fail signals", "blockers", "qa handoff"],
   orchestration: [],
-  pm: ["scope", "approach", "acceptance criteria", "handoff"],
+  pm: ["scope", "approach", "handoff"],
   qa: ["verdict", "findings", "recommendation"],
   designer: ["component references", "layout", "interaction model", "builder notes"],
   "wiki-curator": ["pages created", "pages updated", "log entry", "contradictions"],
@@ -138,7 +138,7 @@ export function validateAgentResponse(input: ValidationInput): AgentValidationRe
     }
   }
 
-  if (profile === "pm" && !/acceptance criteria/i.test(response)) {
+  if (profile === "pm" && extractAcceptanceCriteria(response).length === 0) {
     issues.push({
       code: "pm.missing_acceptance_criteria",
       severity: "error",
@@ -206,6 +206,11 @@ export function extractRequestedArtifact(response: string): string | null {
   return artifact || null;
 }
 
+/** Returns only paths deliberately declared in an artifact's Sources Used section. */
+export function extractContextReceiptSourceCitations(response: string): string[] {
+  return extractSectionFiles(response, "sources used");
+}
+
 export function mergeRequestedArtifactResponses(baseResponse: string, repairResponse: string): string {
   const baseArtifact = extractRequestedArtifact(baseResponse);
   const repairArtifact = extractRequestedArtifact(repairResponse);
@@ -236,16 +241,21 @@ export function mergeSemanticRequestedArtifactResponses(baseResponse: string, re
 
 export function extractQaVerdict(response: string): "approved" | "changes-requested" | null {
   const markdownNeutralResponse = response.replace(/\*\*|__/g, "");
-  const match = /\bverdict\s*:\s*(approved|changes requested)\b/i.exec(markdownNeutralResponse);
+  const match = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:verdict|veredicto)\s*:?[ \t]*(?:\n\s*)?(approved|changes requested|aprobado|cambios solicitados)\b/im.exec(markdownNeutralResponse);
   if (!match?.[1]) {
     return null;
   }
 
-  return match[1].toLowerCase() === "approved" ? "approved" : "changes-requested";
+  const value = match[1].toLowerCase();
+  return value === "approved" || value === "aprobado" ? "approved" : "changes-requested";
 }
 
 export function extractAcceptanceCriteria(response: string): string[] {
-  return extractBulletSection(response, "acceptance criteria");
+  return extractBulletSectionForAliases(response, [
+    "acceptance criteria",
+    "criterios de aceptación",
+    "criterios de aceptacion",
+  ]);
 }
 
 export function extractQaChecklist(response: string): Array<{
@@ -253,7 +263,11 @@ export function extractQaChecklist(response: string): Array<{
   status: "pass" | "fail";
   evidence: string;
 }> {
-  const lines = extractSectionLines(response, "acceptance checklist");
+  const lines = extractSectionLinesForAliases(response, [
+    "acceptance checklist",
+    "lista de verificación de aceptación",
+    "lista de verificacion de aceptacion",
+  ]);
   const items: Array<{ criterion: string; status: "pass" | "fail"; evidence: string }> = [];
   let pendingCriterion: string | null = null;
   for (let index = 0; index < lines.length; index += 1) {
@@ -263,12 +277,12 @@ export function extractQaChecklist(response: string): Array<{
       pendingCriterion = numberedCriterion[1].trim();
       continue;
     }
-    const match = /^[-*]\s*\[(pass|fail)\]\s*(.*?)(?:\s*(?:—|-)?\s*evidence\s*:\s*(.+))?$/i.exec(line);
+    const match = /^[-*]\s*\[(pass|fail)\]\s*(.*?)(?:\s*(?:—|-)?\s*(?:evidence|evidencia)\s*:\s*(.+))?$/i.exec(line);
     if (!match?.[1]) continue;
     const criterion = match[2]?.trim() || pendingCriterion;
     if (!criterion) continue;
     const inlineEvidence = match[3]?.trim();
-    const followingEvidence = lines[index + 1]?.replace(/\*\*|__/g, "").trim().match(/^evidence\s*:\s*(.+)$/i)?.[1]?.trim();
+    const followingEvidence = lines[index + 1]?.replace(/\*\*|__/g, "").trim().match(/^(?:[-*]\s*)?(?:evidence|evidencia)\s*:\s*(.+)$/i)?.[1]?.trim();
     const evidence = inlineEvidence || followingEvidence;
     if (!evidence) continue;
     items.push({
@@ -282,7 +296,7 @@ export function extractQaChecklist(response: string): Array<{
 }
 
 export function extractQaFeedbackSignature(response: string): string | null {
-  const findings = extractSectionLines(response, "findings")
+  const findings = extractSectionLinesForAliases(response, ["findings", "hallazgos"])
     .join(" ")
     .replace(/^[-*]\s*/gm, "")
     .toLowerCase()
@@ -307,11 +321,24 @@ export function qaChecklistCoversCriteria(
   items: Array<{ criterion: string }>,
   criteria: string[],
 ): boolean {
-  const expectedCriteria = criteria.length > 0
-    ? criteria
-    : ["The requested artifact satisfies the explicit goal and is ready for human review."];
+  const expectedCriteria = expectedQaCriteria(criteria);
   const actualCriteria = new Set(items.map((item) => normalizeCriterion(item.criterion)));
   return expectedCriteria.every((criterion) => actualCriteria.has(normalizeCriterion(criterion)));
+}
+
+export function findMissingQaCriteria(
+  items: Array<{ criterion: string }>,
+  criteria: string[],
+): string[] {
+  const actualCriteria = new Set(items.map((item) => normalizeCriterion(item.criterion)));
+  return expectedQaCriteria(criteria)
+    .filter((criterion) => !actualCriteria.has(normalizeCriterion(criterion)));
+}
+
+function expectedQaCriteria(criteria: string[]): string[] {
+  return criteria.length > 0
+    ? criteria
+    : ["The requested artifact satisfies the explicit goal and is ready for human review."];
 }
 
 function normalizeCriterion(criterion: string): string {
@@ -323,7 +350,11 @@ function normalizeCriterion(criterion: string): string {
 }
 
 function extractBulletSection(response: string, sectionName: string): string[] {
-  const lines = extractSectionLines(response, sectionName);
+  return extractBulletSectionForAliases(response, [sectionName]);
+}
+
+function extractBulletSectionForAliases(response: string, sectionNames: string[]): string[] {
+  const lines = extractSectionLinesForAliases(response, sectionNames);
   const bulletLines = lines.filter((line) => /^[-*]\s+/.test(line));
   const numberedLines = lines.filter((line) => /^\s*\d+[.)]\s+/.test(line));
   const selected = bulletLines.length > 0 ? bulletLines : numberedLines.length > 0 ? numberedLines : lines;
@@ -333,23 +364,33 @@ function extractBulletSection(response: string, sectionName: string): string[] {
 }
 
 function extractSectionLines(response: string, sectionName: string): string[] {
+  return extractSectionLinesForAliases(response, [sectionName]);
+}
+
+function extractSectionLinesForAliases(response: string, sectionNames: string[]): string[] {
   const lines = response.split(/\r?\n/);
-  const heading = new RegExp(`^(?:#{1,6}\\s*)?${escapeRegExp(sectionName)}\\s*:?\\s*$`, "i");
+  const heading = new RegExp(`^(?:#{1,6}\\s*)?(?:\\d+[.)]\\s*)?(?:${sectionNames.map(escapeRegExp).join("|")})\\s*:?\\s*$`, "i");
   const markdownNeutral = (line: string) => line.replace(/\*\*|__/g, "").trim();
   const headingNeutral = (line: string) => markdownNeutral(line)
     .replace(/^[-*]\s*/, "")
     .replace(/^\d+[.)]\s*/, "");
-  const startIndex = lines.findIndex((line) => heading.test(headingNeutral(line)));
-  if (startIndex < 0) return [];
   const section: string[] = [];
-  for (let index = startIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
+  let collecting = false;
+  for (const line of lines) {
     const neutralLine = markdownNeutral(line);
     const neutralHeading = headingNeutral(line);
+    if (heading.test(neutralHeading)) {
+      collecting = true;
+      continue;
+    }
+    if (!collecting) continue;
     if (neutralLine && (
       /^#{1,6}\s+/.test(neutralLine)
       || /^[A-Za-z][A-Za-z\s/-]+\s*:\s*$/.test(neutralHeading)
-    )) break;
+    )) {
+      collecting = false;
+      continue;
+    }
     if (line.trim()) section.push(line.trim());
   }
   return section;

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   extractAcceptanceCriteria,
+  extractContextReceiptSourceCitations,
   extractQaChecklist,
+  findMissingQaCriteria,
   extractQaFeedbackSignature,
   extractQaVerdict,
   extractRequestedArtifact,
@@ -13,6 +15,24 @@ import {
 } from "../services/agent-response-validator";
 
 describe("agent response validator", () => {
+  it("extracts only explicit Sources Used declarations", () => {
+    const response = [
+      "## Requested Artifact",
+      "A path in prose such as raw/not-a-citation.md does not count.",
+      "",
+      "### Sources Used",
+      "- raw/brief.md",
+      "- wiki/role-memory/builder.md",
+      "",
+      "## Risk Assessment",
+      "- None.",
+    ].join("\n");
+    expect(extractContextReceiptSourceCitations(response)).toEqual([
+      "raw/brief.md",
+      "wiki/role-memory/builder.md",
+    ]);
+  });
+
   it("extracts acceptance evidence and detects materially repeated QA findings", () => {
     expect(extractAcceptanceCriteria([
       "* **Acceptance Criteria**:",
@@ -75,6 +95,22 @@ describe("agent response validator", () => {
     ]);
   });
 
+  it("accepts a nested evidence line that remains a Markdown bullet", () => {
+    expect(extractQaChecklist([
+      "Acceptance Checklist:",
+      "- [PASS] The human approval boundary is named.",
+      "  - Evidence: A human reviewer is explicitly named.",
+      "Findings:",
+      "None.",
+    ].join("\n"))).toEqual([
+      {
+        criterion: "The human approval boundary is named.",
+        status: "pass",
+        evidence: "A human reviewer is explicitly named.",
+      },
+    ]);
+  });
+
   it("requires the checklist to cover the actual scope criteria", () => {
     const criteria = ["Artifact is complete.", "Human boundary is explicit."];
     expect(qaChecklistCoversCriteria([
@@ -85,6 +121,24 @@ describe("agent response validator", () => {
       { criterion: "Artifact is complete" },
       { criterion: "A different criterion" },
     ], criteria)).toBe(false);
+    expect(findMissingQaCriteria([
+      { criterion: "Artifact is complete" },
+    ], criteria)).toEqual(["Human boundary is explicit."]);
+  });
+
+  it("combines checklist entries emitted in a targeted completion response", () => {
+    const checklist = extractQaChecklist([
+      "Verdict: APPROVED",
+      "Acceptance Checklist:",
+      "- [PASS] Artifact is complete. — Evidence: The full artifact is present.",
+      "",
+      "Acceptance Checklist:",
+      "- [PASS] Human boundary is explicit. — Evidence: A reviewer is named.",
+      "Findings:",
+      "None.",
+    ].join("\n"));
+
+    expect(qaChecklistCoversCriteria(checklist, ["Artifact is complete.", "Human boundary is explicit."])).toBe(true);
   });
 
   it("extracts criteria under a numbered PM section heading", () => {
@@ -305,6 +359,54 @@ describe("agent response validator", () => {
     expect(extractQaVerdict(response)).toBe("approved");
     expect(validation.passed).toBe(true);
     expect(validation.issues).toHaveLength(0);
+  });
+
+  it("accepts a Spanish QA verdict and evidence checklist from the local model", () => {
+    const response = [
+      "## Veredicto: CAMBIOS SOLICITADOS",
+      "",
+      "## Lista de verificación de aceptación",
+      "- [PASS] La nota contiene tres comprobaciones. — Evidencia: Se enumeran tres comprobaciones.",
+      "- [FAIL] La decisión humana está nombrada. — Evidencia: Falta un responsable.",
+      "",
+      "## Hallazgos",
+      "- Falta nombrar al responsable de la aprobación.",
+      "",
+      "## Recomendación",
+      "- Añadir el responsable y volver a validar.",
+    ].join("\n");
+
+    expect(extractQaVerdict(response)).toBe("changes-requested");
+    expect(extractQaChecklist(response)).toEqual([
+      expect.objectContaining({ criterion: "La nota contiene tres comprobaciones.", status: "pass" }),
+      expect.objectContaining({ criterion: "La decisión humana está nombrada.", status: "fail" }),
+    ]);
+    expect(extractQaFeedbackSignature(response)).toContain("falta nombrar al responsable");
+  });
+
+  it("accepts a standalone Spanish verdict heading followed by its status", () => {
+    const response = [
+      "## Veredicto",
+      "**CAMBIOS SOLICITADOS** (CHANGES REQUESTED)",
+    ].join("\n");
+
+    expect(extractQaVerdict(response)).toBe("changes-requested");
+  });
+
+  it("extracts numbered Spanish PM acceptance criteria", () => {
+    const response = [
+      "## 3. Criterios de Aceptación",
+      "1. La fuente queda citada.",
+      "2. La decisión humana queda explícita.",
+    ].join("\n");
+
+    expect(extractAcceptanceCriteria(response)).toEqual([
+      "La fuente queda citada.",
+      "La decisión humana queda explícita.",
+    ]);
+    expect(validateAgentResponse({ role: "pm", response }).issues).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "pm.missing_acceptance_criteria" }),
+    ]));
   });
 
   it("rejects a numbered daily plan that collapses required days into a range", () => {

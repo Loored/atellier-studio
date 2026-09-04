@@ -20,6 +20,7 @@ export const orchestrationsService = {
         context: input.context,
         taskId: input.taskId,
         executorModeOverride: input.executorModeOverride,
+        modelProfileOverride: input.modelProfileOverride,
       },
     );
     return response.data;

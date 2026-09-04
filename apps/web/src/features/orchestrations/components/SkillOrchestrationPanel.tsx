@@ -54,26 +54,38 @@ export function SkillOrchestrationPanel() {
     linkedTask,
     mode,
     liveStatus,
+    contextEvaluationSummary,
+    automatedContextAssessmentSummary,
     isOrchestrationSettled,
     runEvents,
     isOpenAiExecution,
     executorModel,
     modelProfile,
     executorModeOverride,
+    modelProfileOverride,
+    setModelProfileOverride,
     availableExecutorModes,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration,
     isCancellingRun,
     isRetryingRun,
+    isRecordingContextEvaluation,
+    contextEvaluationOutcome,
+    contextEvaluationNote,
+    contextItemRelevance,
     orchestrationErrorMessage,
     setSelectedSkillId,
     setGoal,
     setContext,
     setSelectedTaskId,
     setExecutorModeOverride,
+    setContextEvaluationOutcome,
+    setContextEvaluationNote,
+    setContextItemEvaluation,
     handleStartOrchestration,
     handleCancelRun,
     handleRetryRun,
+    handleRecordContextEvaluation,
     resetToForm,
   } = useSkillOrchestrationPanel();
 
@@ -147,6 +159,30 @@ export function SkillOrchestrationPanel() {
         </div>
       </div>
 
+      {contextEvaluationSummary?.evaluatedReceipts ? (
+        <details className="mb-3 rounded-lg border border-teal/20 bg-teal/[0.035] px-2.5 py-2">
+          <summary className="cursor-pointer text-[0.74rem] font-bold text-teal">
+            Context evidence · {contextEvaluationSummary.evaluatedReceipts} evaluated receipt(s)
+          </summary>
+          <p className="mb-2 mt-2 text-[0.68rem] text-ink-muted">
+            Useful {contextEvaluationSummary.outcomes.useful} · Mixed {contextEvaluationSummary.outcomes.mixed} · Not useful {contextEvaluationSummary.outcomes["not-useful"]}
+          </p>
+          <div className="grid gap-1 text-[0.67rem] text-ink-faint">
+            {contextEvaluationSummary.byAuthority.map((entry) => (
+              <div key={entry.key}>
+                <span className="font-bold text-ink-muted">{entry.label}</span> · {entry.relevance.relevant} relevant / {entry.relevance.uncertain} uncertain / {entry.relevance.irrelevant} irrelevant
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {automatedContextAssessmentSummary?.assessedReceipts ? (
+        <p className="mb-3 text-[0.68rem] text-ink-muted">
+          Auto evidence checks · {automatedContextAssessmentSummary.assessedReceipts} receipt(s): {automatedContextAssessmentSummary.outcomes.supported} supported · {automatedContextAssessmentSummary.outcomes.partial} partial · {automatedContextAssessmentSummary.outcomes.unverified} unverified. Provisional only.
+        </p>
+      ) : null}
+
       {mode === "live" ? (
         <div>
           {/* Live meta bar */}
@@ -175,6 +211,76 @@ export function SkillOrchestrationPanel() {
                 attempt {liveStatus.execution.attempt}/{liveStatus.execution.maxAttempts}
               </span>
             </div>
+          )}
+
+          {liveStatus?.contextReceipt && (
+            <details className="mb-3 rounded-lg border border-teal/20 bg-teal/[0.035] px-2.5 py-2" aria-label="Memory context receipt">
+              <summary className="cursor-pointer text-[0.74rem] font-bold text-teal">
+                Memory context · {liveStatus.contextReceipt.policy} · {liveStatus.contextReceipt.stableHash.slice(0, 12)}
+              </summary>
+              <p className="mb-1 mt-2 text-[0.68rem] text-ink-muted">
+                {liveStatus.contextReceipt.items.length} item(s) · {liveStatus.contextReceipt.budgets.totalBytes.toLocaleString()} byte budget · frozen for retries
+              </p>
+              <div className="grid gap-1">
+                {liveStatus.contextReceipt.items.map((item) => (
+                  <div key={`${item.path}-${item.applicableRole ?? "shared"}`} className="text-[0.67rem] text-ink-faint overflow-wrap-anywhere">
+                    <span className="font-bold text-ink-muted">{item.memory.authority}</span> · {item.path}
+                    {item.truncated ? " · truncated" : ""}
+                    {item.retrieval ? ` · score ${item.retrieval.total}` : " · direct"}
+                  </div>
+                ))}
+                {liveStatus.contextReceipt.excluded.length > 0 ? (
+                  <p className="m-0 text-[0.67rem] text-orange">{liveStatus.contextReceipt.excluded.length} path(s) excluded</p>
+                ) : null}
+              </div>
+              {liveStatus.contextEvaluation ? (
+                <p className="mb-0 mt-2 text-[0.68rem] text-teal">
+                  Evaluation: {liveStatus.contextEvaluation.outcome} · {liveStatus.contextEvaluation.assessedAt}
+                </p>
+              ) : null}
+              {liveStatus.automatedContextAssessment ? (
+                <p className="mb-0 mt-2 text-[0.68rem] text-ink-muted">
+                  Automatic evidence check: {liveStatus.automatedContextAssessment.outcome} · provisional · {liveStatus.automatedContextAssessment.assessedAt}
+                </p>
+              ) : null}
+              {!liveStatus.contextEvaluation && isTerminal ? (
+                <fieldset className="mt-3 grid gap-2 border-t border-teal/15 pt-2" aria-label="Context receipt evaluation">
+                  <legend className="text-[0.7rem] font-bold text-ink-muted">Label this receipt for future evaluation</legend>
+                  <label className="grid gap-1 text-[0.68rem] text-ink-muted">
+                    Overall usefulness
+                    <select value={contextEvaluationOutcome} onChange={(event) => setContextEvaluationOutcome(event.target.value as typeof contextEvaluationOutcome)}>
+                      <option value="useful">Useful</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="not-useful">Not useful</option>
+                    </select>
+                  </label>
+                  {liveStatus.contextReceipt.items.map((item) => {
+                    const key = `${item.path}\u0000${item.applicableRole ?? ""}`;
+                    return (
+                      <label key={key} className="grid gap-1 text-[0.67rem] text-ink-faint overflow-wrap-anywhere">
+                        {item.path}{item.applicableRole ? ` (${item.applicableRole})` : ""}
+                        <select
+                          aria-label={`Relevance for ${item.path}`}
+                          value={contextItemRelevance[key] ?? "uncertain"}
+                          onChange={(event) => setContextItemEvaluation(item.path, item.applicableRole, event.target.value as "relevant" | "uncertain" | "irrelevant")}
+                        >
+                          <option value="relevant">Relevant</option>
+                          <option value="uncertain">Uncertain</option>
+                          <option value="irrelevant">Irrelevant</option>
+                        </select>
+                      </label>
+                    );
+                  })}
+                  <label className="grid gap-1 text-[0.68rem] text-ink-muted">
+                    Optional note
+                    <textarea value={contextEvaluationNote} maxLength={1000} rows={2} onChange={(event) => setContextEvaluationNote(event.target.value)} />
+                  </label>
+                  <button type="button" className="secondary-button self-start" onClick={handleRecordContextEvaluation} disabled={isRecordingContextEvaluation}>
+                    {isRecordingContextEvaluation ? "Saving…" : "Save evaluation"}
+                  </button>
+                </fieldset>
+              ) : null}
+            </details>
           )}
 
           {liveStatus?.repair && liveStatus.repair.attemptsUsed > 0 && (
@@ -302,7 +408,7 @@ export function SkillOrchestrationPanel() {
             {liveStatus
               ? liveStatus.steps.map((step, i) => (
                   <li
-                    key={step.stepId}
+                    key={`${step.stepId}-${step.runId ?? i}`}
                     className={cn(
                       "grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5 transition-[border-color,background-color,box-shadow]",
                       step.status === "running" ? "orchestration-step-active" : "",
@@ -417,6 +523,17 @@ export function SkillOrchestrationPanel() {
               {availableExecutorModes.map((mode) => (
                 <option key={mode} value={mode}>{mode}</option>
               ))}
+            </select>
+            <select
+              aria-label="Orchestration model profile override"
+              value={modelProfileOverride}
+              onChange={(e) => setModelProfileOverride((e.target.value as "" | "cheap" | "standard" | "deep") ?? "")}
+              disabled={isStartingOrchestration}
+            >
+              <option value="">Perfil por entorno (default)</option>
+              <option value="cheap">cheap · qwen3.5:4b</option>
+              <option value="standard">standard · qwen3.5:9b</option>
+              <option value="deep">deep · gpt-oss:20b</option>
             </select>
             <button
               type="button"

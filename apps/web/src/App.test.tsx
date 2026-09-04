@@ -21,12 +21,15 @@ const captureRunMemoryMock = vi.hoisted(() => vi.fn());
 const curateRunLearningMock = vi.hoisted(() => vi.fn());
 const resolveRunLearningSignalMock = vi.hoisted(() => vi.fn());
 const retryRunMock = vi.hoisted(() => vi.fn());
+const recordContextEvaluationMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
 const getOrchestrationStatusMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
 const reflectWikiMock = vi.hoisted(() => vi.fn());
+const readReflectionReviewMock = vi.hoisted(() => vi.fn());
+const showReflectionReviewMock = vi.hoisted(() => ({ value: false }));
 const decideReflectionMock = vi.hoisted(() => vi.fn());
 const promoteReflectionMock = vi.hoisted(() => vi.fn());
 const appendWikiLogMock = vi.hoisted(() => vi.fn());
@@ -105,6 +108,7 @@ vi.mock("./api/services/runs.service", () => ({
     curateLearning: curateRunLearningMock,
     resolveLearningSignal: resolveRunLearningSignalMock,
     retry: retryRunMock,
+    recordContextEvaluation: recordContextEvaluationMock,
   },
 }));
 
@@ -196,6 +200,7 @@ vi.mock("./api/services/wiki.service", () => ({
     query: queryWikiMock,
     lint: lintWikiMock,
     reflect: reflectWikiMock,
+    readReflectionReview: readReflectionReviewMock,
     decideReflection: decideReflectionMock,
     promoteReflection: promoteReflectionMock,
     writePage: writeWikiPageMock,
@@ -257,6 +262,7 @@ describe("App", () => {
       value: vi.fn(() => true),
     });
     vi.clearAllMocks();
+    showReflectionReviewMock.value = false;
     queryClient.clear();
     listRunsMock.mockResolvedValue([
       {
@@ -543,6 +549,39 @@ describe("App", () => {
       minOccurrences: 2,
       generatedAt: "2026-08-30T00:00:00.000Z",
     });
+    readReflectionReviewMock.mockImplementation(async () => ({
+      items: showReflectionReviewMock.value ? [{
+        id: "reflection-repeated-validation-blocker",
+        title: "Reflection candidate: Repeated validation blocker",
+        pattern: "Repeated validation blocker needs explicit evidence.",
+        occurrenceCount: 2,
+        evidencePaths: ["runs/run-1.md", "runs/run-2.md"],
+        suggestedPath: "wiki/reflections/reflection-repeated-validation-blocker.md",
+        draftMarkdown: "# Reflection candidate\n\n## Review Decision\n\n- Status: proposed\n",
+        memory: {
+          layer: "semantic",
+          state: "generated",
+          authority: "context-only",
+          provenancePaths: [],
+          reason: "Reflection candidates are generated proposals pending an explicit operator decision.",
+        },
+        status: promoteReflectionMock.mock.calls.length > 0
+          ? "promoted"
+          : decideReflectionMock.mock.calls.length > 0
+            ? "accepted"
+            : "pending",
+        decisionPath: decideReflectionMock.mock.calls.length > 0
+          ? "wiki/decisions/reflection-repeated-validation-blocker.md"
+          : undefined,
+        decisionNote: decideReflectionMock.mock.calls.length > 0 ? "Keep this reusable rule." : undefined,
+        promotedPath: promoteReflectionMock.mock.calls.length > 0
+          ? "wiki/notes/reflection-repeated-validation-blocker.md"
+          : undefined,
+      }] : [],
+      scannedEpisodes: 4,
+      minOccurrences: 2,
+      generatedAt: "2026-08-30T00:00:00.000Z",
+    }));
     decideReflectionMock.mockResolvedValue({
       candidateId: "reflection-repeated-validation-blocker",
       decision: "accepted",
@@ -1096,6 +1135,31 @@ describe("App", () => {
         complete: true,
         items: [{ criterion: "Artifact is complete", status: "pass", evidence: "All requested days are present." }],
       },
+      contextReceipt: {
+        schemaVersion: 1,
+        query: "Build orchestration",
+        policy: "evidence-first",
+        budgets: { totalBytes: 16000, perItemBytes: 4000, maxRetrievalItems: 6 },
+        createdAt: "2026-08-30T10:00:00.000Z",
+        stableHash: "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890",
+        items: [{
+          source: "direct",
+          path: "raw/brief.md",
+          memory: {
+            layer: "raw",
+            state: "immutable-source",
+            authority: "evidence-only",
+            provenancePaths: ["raw/brief.md"],
+            reason: "Immutable source evidence.",
+          },
+          contentSha256: "content-hash",
+          originalBytes: 20,
+          includedBytes: 20,
+          truncated: false,
+          excerpt: "Brief evidence",
+        }],
+        excluded: [{ path: "wiki/notes/draft.md", reason: "context-only" }],
+      },
     });
     render(<App />);
 
@@ -1126,6 +1190,23 @@ describe("App", () => {
     expect(scoped.getByText(/Last valid artifact: semantic-repair-2 · Last QA: qa-recheck-2/i)).toBeInTheDocument();
     expect(scoped.getByText("QA acceptance checklist")).toBeInTheDocument();
     expect(scoped.getByText(/Artifact is complete — All requested days are present/i)).toBeInTheDocument();
+    const receipt = scoped.getByRole("group", { name: "Memory context receipt" });
+    expect(receipt).toHaveTextContent("Memory context · evidence-first · a1b2c3d4e5f6");
+    await user.click(within(receipt).getByText(/Memory context/i));
+    expect(receipt).toHaveTextContent("raw/brief.md");
+    expect(receipt).toHaveTextContent("1 path(s) excluded");
+    expect(within(receipt).getByRole("group", { name: "Context receipt evaluation" })).toBeInTheDocument();
+    expect(within(receipt).getByLabelText("Relevance for raw/brief.md")).toHaveValue("uncertain");
+    await user.selectOptions(within(receipt).getByLabelText("Relevance for raw/brief.md"), "relevant");
+    recordContextEvaluationMock.mockResolvedValue({ id: "run-4" });
+    await user.click(within(receipt).getByRole("button", { name: "Save evaluation" }));
+    await waitFor(() => {
+      expect(recordContextEvaluationMock).toHaveBeenCalledWith("run-4", {
+        outcome: "useful",
+        items: [{ path: "raw/brief.md", relevance: "relevant" }],
+        note: undefined,
+      });
+    });
   });
 
   it("shows preserved orchestration artifacts and semantic evidence in Review", async () => {
@@ -1190,6 +1271,7 @@ describe("App", () => {
   });
 
   it("runs wiki ingest and query actions from the wiki panel", async () => {
+    showReflectionReviewMock.value = true;
     const user = userEvent.setup();
     render(<App />);
 
@@ -1242,11 +1324,8 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Generate candidates" }));
     await waitFor(() => expect(reflectWikiMock).toHaveBeenCalledWith({ minOccurrences: 2, limit: 5 }));
     expect(await screen.findByText("Repeated validation blocker needs explicit evidence.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Prepare review draft" }));
-    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toBe(
-      "wiki/reflections/reflection-repeated-validation-blocker.md",
-    );
-    expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("Status: proposed");
+    expect(screen.getByLabelText("Reflection status: pending")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prepare review draft" })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("Operator note"), "Keep this reusable rule.");
     await user.click(screen.getByRole("button", { name: "Accept" }));
     await waitFor(() => expect(decideReflectionMock).toHaveBeenCalledWith({
@@ -1254,13 +1333,17 @@ describe("App", () => {
       decision: "accepted",
       note: "Keep this reusable rule.",
     }));
+    expect(await screen.findByLabelText("Reflection status: accepted")).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "Promote accepted" }));
     await waitFor(() => expect(promoteReflectionMock).toHaveBeenCalledWith({
       decisionPath: "wiki/decisions/reflection-repeated-validation-blocker.md",
     }));
 
     await user.click(screen.getByRole("button", { name: /promote to draft/i }));
-    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toContain("wiki/decisions/query-");
+    expect(screen.getAllByLabelText(/Memory trust: semantic, generated, context-only/i).length).toBeGreaterThan(0);
+    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toContain("wiki/notes/query-decision-");
+    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).not.toContain("wiki/decisions/");
+    expect(screen.getByText(/Saveable review draft.*semantic intent stays in the Markdown/i)).toBeInTheDocument();
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Source");
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Draft Provenance");
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("Suggested page type: decision");
@@ -1270,6 +1353,7 @@ describe("App", () => {
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Review Notes");
 
     await user.clear(screen.getByLabelText("Wiki path"));
+    expect(screen.getByText(/automatic provenance detached/i)).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Markdown content"));
     await user.type(screen.getByLabelText("Wiki path"), "wiki/notes/wiki-brain-v2.md");
     await user.type(screen.getByLabelText("Markdown content"), "# Wiki Brain v2\n\n- Safe write route active.");
@@ -1281,39 +1365,7 @@ describe("App", () => {
         content: "# Wiki Brain v2\n\n- Safe write route active.",
       });
     });
-    await waitFor(() => {
-      expect(appendWikiLogMock).toHaveBeenCalledWith({
-        eventType: "wiki_write",
-        title: "Promoted wiki query result to draft",
-        summary: "Created draft from wiki/notes/wiki-brain-v2.md",
-        details: {
-          sourcePath: "wiki/sources/2026-05-05-client-meeting-notes.md",
-          query: "raw sources",
-          relatedPages: 1,
-          contradictions: 1,
-      },
-    });
-    listKnowledgeSnapshotsMock.mockResolvedValue({ snapshots: [] });
-    listKnowledgeAnnotationsMock.mockResolvedValue({ annotations: [] });
-    listKnowledgeFilterPresetsMock.mockResolvedValue({ presets: [] });
-    saveKnowledgeAnnotationMock.mockResolvedValue({
-      nodeId: "run:run-1",
-      note: "sample",
-      tags: ["sample"],
-      updatedAt: "2026-05-13T00:00:00.000Z",
-    });
-    createKnowledgeFilterPresetMock.mockResolvedValue({
-      id: "preset-1",
-      name: "Preset",
-      nodeTypeFilter: "all",
-      qualityFilter: "all",
-      activeLayers: ["wiki", "raw", "runtime", "meta"],
-      dreamDecisionFilter: "all",
-      densityMode: "auto",
-      createdAt: "2026-05-13T00:00:00.000Z",
-      updatedAt: "2026-05-13T00:00:00.000Z",
-    });
-  });
+    expect(appendWikiLogMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: /run wiki lint/i }));
     expect(await screen.findByText(/Fix the Raw path reference or restore the missing raw source\./i)).toBeInTheDocument();

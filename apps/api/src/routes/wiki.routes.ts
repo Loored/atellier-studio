@@ -64,7 +64,7 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
     }
     const input: WikiWritePageInput = { path: wikiPath, content };
     try {
-      const page = await services.wiki.writePage(input.path, input.content);
+      const page = await services.wiki.writePage(input.path, input.content, { genericWrite: true });
       await services.wiki.appendLog({
         eventType: "wiki_write",
         title: "Wiki page updated",
@@ -188,6 +188,16 @@ export async function wikiRoutes(fastify: FastifyInstance, services: AppServices
       limit: typeof body.limit === "number" ? Math.floor(body.limit) : undefined,
     };
     return reply.code(200).send(await services.wiki.reflect(input));
+  });
+
+  fastify.get("/wiki/reflections/review", async (request, reply) => {
+    const query = request.query as { minOccurrences?: string; limit?: string };
+    const minOccurrences = query.minOccurrences ? Number.parseInt(query.minOccurrences, 10) : undefined;
+    const limit = query.limit ? Number.parseInt(query.limit, 10) : undefined;
+    return reply.code(200).send(await services.wiki.readReflectionReview({
+      minOccurrences: Number.isFinite(minOccurrences) ? minOccurrences : undefined,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    }));
   });
 
   fastify.post("/wiki/reflections/decisions", async (request, reply) => {

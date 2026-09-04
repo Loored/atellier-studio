@@ -44,11 +44,11 @@ export function WikiPanel() {
     reflectionCandidates,
     scannedReflectionEpisodes,
     isGeneratingReflections,
+    isFetchingReflectionReview,
     reflectionNotes,
     setReflectionNotes,
-    reflectionDecisions,
-    isSavingReflectionDecision,
-    isPromotingReflection,
+    activeReflectionDecisionId,
+    activeReflectionPromotionId,
     isFetchingQuery,
     isIngesting,
     ingestResult,
@@ -85,6 +85,8 @@ export function WikiPanel() {
     writeContent,
     setWritePath,
     setWriteContent,
+    isGeneratedWriteDraft,
+    isDraftProvenanceDetached,
     isWritingWikiPage,
     writeResult,
     submitIngest,
@@ -93,7 +95,6 @@ export function WikiPanel() {
     submitQuery,
     promoteQueryMatchToDraft,
     generateReflectionCandidates,
-    prepareReflectionDraft,
     decideReflection,
     promoteAcceptedReflection,
     runLint,
@@ -305,6 +306,29 @@ export function WikiPanel() {
 
         <section className="border border-[var(--border-card)] rounded-lg p-3 bg-white/[0.02]">
           <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-purple mb-2">Write Page</p>
+          {isGeneratedWriteDraft ? (
+            <div className="mb-2" aria-live="polite">
+              <MemoryTrustBadge memory={{
+                layer: "semantic",
+                state: "generated",
+                authority: "context-only",
+                provenancePaths: [],
+                reason: isDraftProvenanceDetached
+                  ? "Generated draft edited by the operator; automatic source provenance was detached."
+                  : "Generated draft; review before saving as durable memory.",
+              }} />
+              {isDraftProvenanceDetached ? (
+                <p className="mt-1 mb-0 text-[0.68rem] text-orange">
+                  Draft edited · automatic provenance detached
+                </p>
+              ) : null}
+              {!isDraftProvenanceDetached ? (
+                <p className="mt-1 mb-0 text-[0.68rem] text-ink-faint">
+                  Saveable review draft · semantic intent stays in the Markdown until explicit curation
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <label className="block text-[0.74rem] text-ink-muted mb-1" htmlFor="wiki-write-path">Wiki path</label>
           <input
             id="wiki-write-path"
@@ -442,12 +466,21 @@ export function WikiPanel() {
           >
             {isGeneratingReflections ? "Reflecting..." : "Generate candidates"}
           </button>
+          {isFetchingReflectionReview ? (
+            <p className="mt-2 text-[0.7rem] text-ink-faint">Refreshing durable review queue...</p>
+          ) : null}
           {scannedReflectionEpisodes !== null ? (
             <p className="mt-2 text-[0.7rem] text-ink-faint">Scanned {scannedReflectionEpisodes} episodic artifact(s).</p>
           ) : null}
           <div className="mt-2 grid gap-2" aria-live="polite" aria-label="Reflection candidates">
             {reflectionCandidates.map((candidate) => (
               <div key={candidate.id} className="border border-white/5 rounded-md p-2">
+                <span
+                  className="inline-flex mb-1 min-h-5 items-center rounded border border-[var(--border-card)] px-1.5 text-[0.64rem] font-bold uppercase tracking-wide text-ink-muted"
+                  aria-label={`Reflection status: ${candidate.status}`}
+                >
+                  {candidate.status}
+                </span>
                 <p className="m-0 text-[0.74rem] text-ink">{candidate.pattern}</p>
                 <p className="mt-1 mb-0 text-[0.68rem] text-ink-faint">
                   {candidate.occurrenceCount} episodes · {candidate.evidencePaths.join(", ")}
@@ -456,39 +489,35 @@ export function WikiPanel() {
                 <label className="block mt-2 text-[0.68rem] text-ink-faint" htmlFor={`reflection-note-${candidate.id}`}>Operator note</label>
                 <input
                   id={`reflection-note-${candidate.id}`}
-                  value={reflectionNotes[candidate.id] ?? ""}
+                  value={reflectionNotes[candidate.id] ?? candidate.decisionNote ?? ""}
                   onChange={(event) => setReflectionNotes((current) => ({ ...current, [candidate.id]: event.target.value }))}
+                  disabled={candidate.status !== "pending"}
                   className="mt-1 w-full min-h-8 border border-[var(--border-card)] rounded-md px-2 text-[0.74rem] bg-black/25 text-ink"
                 />
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    disabled={!reflectionNotes[candidate.id]?.trim() || isSavingReflectionDecision}
+                    disabled={candidate.status !== "pending" || !(reflectionNotes[candidate.id] ?? candidate.decisionNote)?.trim() || activeReflectionDecisionId !== null}
                     className="min-h-7 px-2.5 border border-teal/35 rounded-md text-[0.74rem] text-teal"
                     onClick={() => void decideReflection(candidate.id, "accepted")}
                   >Accept</button>
                   <button
                     type="button"
-                    disabled={!reflectionNotes[candidate.id]?.trim() || isSavingReflectionDecision}
+                    disabled={candidate.status !== "pending" || !(reflectionNotes[candidate.id] ?? candidate.decisionNote)?.trim() || activeReflectionDecisionId !== null}
                     className="min-h-7 px-2.5 border border-orange/35 rounded-md text-[0.74rem] text-orange"
                     onClick={() => void decideReflection(candidate.id, "rejected")}
                   >Reject</button>
-                  {reflectionDecisions[candidate.id]?.decision === "accepted" ? (
+                  {candidate.status === "accepted" ? (
                     <button
                       type="button"
-                      disabled={isPromotingReflection}
+                      disabled={activeReflectionPromotionId !== null}
                       className="min-h-7 px-2.5 border border-purple/35 rounded-md text-[0.74rem] text-purple"
                       onClick={() => void promoteAcceptedReflection(candidate.id)}
                     >Promote accepted</button>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  className="mt-2 min-h-7 px-2.5 border border-[var(--border-card)] rounded-md text-[0.74rem] text-ink-muted"
-                  onClick={() => prepareReflectionDraft(candidate.id)}
-                >
-                  Prepare review draft
-                </button>
+                {candidate.decisionPath ? <p className="mt-2 mb-0 text-[0.68rem] text-ink-faint">Decision: {candidate.decisionPath}</p> : null}
+                {candidate.promotedPath ? <p className="mt-1 mb-0 text-[0.68rem] text-teal">Promoted: {candidate.promotedPath}</p> : null}
               </div>
             ))}
             {scannedReflectionEpisodes !== null && reflectionCandidates.length === 0 ? (

@@ -11,3 +11,4 @@ export * from "./types/codex-worker";
 export * from "./types/knowledge-graph";
 export * from "./types/effect-execution";
 export * from "./types/review-learning";
+export * from "./types/agent-memory-context";
