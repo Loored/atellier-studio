@@ -1,5 +1,6 @@
 import type {
   CodexWorkerFinalizeEvidence,
+  CodexWorkerExecutionAdapter,
   CodexWorkerMode,
   CodexWorkerProfile,
   CodexWorkerStep,
@@ -12,6 +13,7 @@ type CodexWorkerView = {
   profile: CodexWorkerProfile;
   goal: string;
   steps: CodexWorkerStep[];
+  executionAdapter: CodexWorkerExecutionAdapter;
 };
 
 export const codexWorkerService = {
@@ -39,12 +41,20 @@ export const codexWorkerService = {
     const response = await httpClient.post(`/codex/runs/${runId}/execute-next`);
     return response.data;
   },
+  async retryStep(runId: string, stepId: string) {
+    const response = await httpClient.post(`/codex/runs/${runId}/retry-step`, { stepId });
+    return response.data;
+  },
   async cancel(runId: string) {
     const response = await httpClient.post(`/codex/runs/${runId}/cancel`);
     return response.data;
   },
-  async finalize(runId: string, summary?: string) {
-    const response = await httpClient.post(`/codex/runs/${runId}/finalize`, { summary });
+  async finalize(runId: string, input?: { summary?: string; changedFiles?: string[]; testEvidence?: string[] }) {
+    const response = await httpClient.post(`/codex/runs/${runId}/finalize`, {
+      summary: input?.summary,
+      changedFiles: input?.changedFiles,
+      testEvidence: input?.testEvidence,
+    });
     return response.data;
   },
 };

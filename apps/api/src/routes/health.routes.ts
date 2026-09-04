@@ -30,6 +30,7 @@ export async function healthRoutes(
     const waitingAgents = agents.filter((agent) => agent.status === "needs-human").length;
     const memory = process.memoryUsage();
     const mongoState = MONGO_STATE_LABELS[mongoose.connection.readyState] ?? "unknown";
+    const codexExecutionAdapter = services.codexWorkers.getExecutionAdapter();
 
     return {
       status: "ok",
@@ -38,6 +39,12 @@ export async function healthRoutes(
       executorMode: options.agentExecutorMode,
       executorModel: options.executorModel,
       modelProfile: options.modelProfile,
+      availableExecutorModes: services.executor.availableModes,
+      codexWorker: {
+        executionAdapter: codexExecutionAdapter.mode,
+        label: codexExecutionAdapter.label,
+        realExecutionEnabled: codexExecutionAdapter.mode === "real",
+      },
       ...(options.executorRoleOverrides
         ? { executorRoleOverrides: options.executorRoleOverrides }
         : {}),

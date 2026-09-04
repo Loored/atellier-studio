@@ -61,8 +61,14 @@ describe("OllamaAgentExecutorService", () => {
     expect(headers.Authorization).toBeUndefined();
     expect(headers["Content-Type"]).toBe("application/json");
 
-    const body = JSON.parse(init.body as string) as { model: string };
+    const body = JSON.parse(init.body as string) as {
+      model: string;
+      options?: { num_ctx?: number };
+      reasoning_effort?: string;
+    };
     expect(body.model).toBe("llama3.2");
+    expect(body.options?.num_ctx).toBe(8192);
+    expect(body.reasoning_effort).toBe("none");
   });
 
   it("honors a custom baseUrl and trims trailing slashes", async () => {
@@ -83,6 +89,36 @@ describe("OllamaAgentExecutorService", () => {
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://my-host:9999/v1/chat/completions");
+  });
+
+  it("honors a per-execution output token budget", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }),
+    );
+    const executor = new OllamaAgentExecutorService({ model: "llama3.2" });
+
+    await executor.execute({
+      agent: fixtureAgent,
+      instruction: "Produce a long artifact.",
+      maxOutputTokens: 2048,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { max_tokens: number };
+    expect(body.max_tokens).toBe(2048);
+  });
+
+  it("uses the configured Ollama context window", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }),
+    );
+    const executor = new OllamaAgentExecutorService({ model: "qwen3.5:4b", contextWindowTokens: 12288 });
+
+    await executor.execute({ agent: fixtureAgent, instruction: "Use the frozen receipt." });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { options?: { num_ctx?: number } };
+    expect(body.options?.num_ctx).toBe(12288);
   });
 
   it("throws an Ollama-labeled error on a non-2xx response", async () => {

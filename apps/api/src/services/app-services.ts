@@ -1,11 +1,12 @@
 import {
   createAgentExecutorService,
   OllamaAgentExecutorService,
+  ProfileAwareAgentExecutorService,
   RoleAwareAgentExecutorService,
   type AgentExecutorMode,
   type AgentExecutorService,
 } from "./agent-executor.service";
-import type { AgentRole, ModelProfile } from "@atellier/shared";
+import type { AgentRole, ExecutorMode, ModelProfile } from "@atellier/shared";
 import { AgentRunService } from "./agent-run.service";
 import path from "node:path";
 import { AgentService } from "./agent.service";
@@ -16,7 +17,22 @@ import { TaskService } from "./task.service";
 import { WikiService } from "./wiki.service";
 import { type StorageMode } from "./service-utils";
 import { CodexWorkerService } from "./codex-worker.service";
+import {
+  FakeCodexWorkerExecutor,
+  RealCodexWorkerExecutor,
+} from "./codex-worker-executor.service";
 import { readdir } from "node:fs/promises";
+import { KnowledgeGraphService } from "./knowledge-graph.service";
+import { seedDemoData } from "./seed.service";
+import { KnowledgeLiveService } from "./knowledge-live.service";
+import { RunEventService } from "./run-event.service";
+import { ExecutionQueueService } from "./execution-queue.service";
+import {
+  DurableRuntimeService,
+  type DurableWorkerDiagnosticSink,
+} from "./durable-runtime.service";
+import { createEffectIdempotencyRepository } from "./effect-idempotency.repository";
+import { EffectIdempotencyService } from "./effect-idempotency.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -24,15 +40,27 @@ export type AppServices = {
   messages: MessageService;
   tasks: TaskService;
   runs: RunService;
+  runEvents: RunEventService;
+  executionQueue: ExecutionQueueService;
+  durableRuntime: DurableRuntimeService;
+  effectIdempotency: EffectIdempotencyService;
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
+  knowledgeGraph: KnowledgeGraphService;
+  knowledgeLive: KnowledgeLiveService;
+  executor: {
+    activeMode: AgentExecutorMode;
+    availableModes: ExecutorMode[];
+  };
 };
 
 export type CreateAppServicesOptions = {
   storageMode?: StorageMode;
   atelierRoot?: string;
   agentExecutorMode?: AgentExecutorMode;
+  /** Test/local harness override for deterministic executor scenarios. */
+  agentExecutor?: AgentExecutorService;
   openaiApiKey?: string;
   openaiModel?: string;
   openaiModelProfile?: ModelProfile;
@@ -45,19 +73,38 @@ export type CreateAppServicesOptions = {
   ollamaBaseUrl?: string;
   ollamaModel?: string;
   ollamaModelProfile?: ModelProfile;
+  ollamaContextTokens?: number;
+  ollamaModelByProfile?: Partial<Record<ModelProfile, string>>;
   /**
    * Optional per-agent-role Ollama model overrides. When present, agents with
    * the matching role use a dedicated Ollama executor pinned to this model;
    * unspecified roles fall back to the global executor.
    *
-   * Use case: pin Builder/Toto Runtime to qwen2.5-coder:7b while keeping
-   * llama3.1:8b for PM/QA/wiki-curator. Only Ollama supports per-role
+   * Use case: pin Builder/Toto Runtime to a specialist model while keeping
+   * profile-based routing for the remaining roles. Only Ollama supports per-role
    * overrides in v1 (the cost-free local provider is the right place to
    * experiment with specialized models).
    */
   ollamaModelByRole?: Partial<Record<AgentRole, string>>;
   maxHandoffDepth?: number;
   executionTimeoutMs?: number;
+  /**
+   * When true, populates the in-memory storage with a small set of agents,
+   * tasks, and runs so the dashboard and Knowledge Graph have realistic
+   * content out of the box. Ignored when storageMode is "mongo".
+   */
+  seedDemoData?: boolean;
+  /** Runs the durable worker in-process. Intended for tests and memory-mode development only. */
+  inlineDurableRuntime?: boolean;
+  runtimeLeaseMs?: number;
+  runtimePollMs?: number;
+  runtimeWorkerId?: string;
+  runtimeDiagnosticSink?: DurableWorkerDiagnosticSink;
+  /** Explicit opt-in. Real Codex execution remains disabled unless this is true. */
+  codexWorkerRealEnabled?: boolean;
+  codexWorkerTimeoutMs?: number;
+  codexWorkerMaxOutputBytes?: number;
+  codexWorkerAllowedWorkingDirectories?: string[];
 };
 
 export function resolveAtellierRoot(input?: string): string {
@@ -93,7 +140,11 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
   const repoRootResolved = path.resolve(atelierRootResolved, "..");
   const wiki = new WikiService(atelierRootResolved);
   const agents = new AgentService(storageMode);
-  const runs = new RunService(storageMode, wiki);
+  const tasks = new TaskService(storageMode);
+  const effectIdempotency = new EffectIdempotencyService(
+    createEffectIdempotencyRepository(storageMode),
+  );
+  const runs = new RunService(storageMode, wiki, tasks, effectIdempotency);
   const messages = new MessageService(storageMode);
   const repoFileHints = [
     ...(await listVerifiedRepoFiles(repoRootResolved, "apps/web/src/features/wiki")),
@@ -101,7 +152,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
   ];
   const executorMode: AgentExecutorMode = options.agentExecutorMode
     ?? (options.openaiApiKey ? "openai" : "mock");
-  const fallbackExecutor = createAgentExecutorService({
+  const fallbackExecutor = options.agentExecutor ?? createAgentExecutorService({
     mode: executorMode,
     openai: options.openaiApiKey
       ? {
@@ -125,6 +176,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
       ? {
           baseUrl: options.ollamaBaseUrl,
           model: options.ollamaModel,
+          contextWindowTokens: options.ollamaContextTokens,
         }
       : undefined,
     repoFileHints,
@@ -141,27 +193,138 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     perRole[role as AgentRole] = new OllamaAgentExecutorService({
       baseUrl: options.ollamaBaseUrl,
       model,
+      contextWindowTokens: options.ollamaContextTokens,
       repoFileHints,
     });
   }
+  const profileExecutors: Partial<Record<ModelProfile, AgentExecutorService>> = {};
+  for (const [profile, model] of Object.entries(options.ollamaModelByProfile ?? {})) {
+    if (model) profileExecutors[profile as ModelProfile] = new OllamaAgentExecutorService({
+      baseUrl: options.ollamaBaseUrl,
+      model,
+      repoFileHints,
+      contextWindowTokens: options.ollamaContextTokens,
+    });
+  }
+  const profileAwareFallback = Object.keys(profileExecutors).length > 0
+    ? new ProfileAwareAgentExecutorService(fallbackExecutor, profileExecutors)
+    : fallbackExecutor;
   const executor: AgentExecutorService =
     Object.keys(perRole).length > 0 && executorMode === "ollama"
-      ? new RoleAwareAgentExecutorService(fallbackExecutor, perRole)
-      : fallbackExecutor;
-  const agentRuns = new AgentRunService(agents, runs, messages, executor, {
+      ? new RoleAwareAgentExecutorService(profileAwareFallback, perRole)
+      : profileAwareFallback;
+  const executorByMode: Partial<Record<ExecutorMode, AgentExecutorService>> = {
+    mock: createAgentExecutorService({ mode: "mock", repoFileHints }),
+  };
+  if (options.openaiApiKey) {
+    executorByMode.openai = createAgentExecutorService({
+      mode: "openai",
+      openai: {
+        apiKey: options.openaiApiKey,
+        model: options.openaiModel ?? "gpt-4.1-mini",
+      },
+      repoFileHints,
+    });
+  }
+  if (options.anthropicApiKey) {
+    executorByMode.anthropic = createAgentExecutorService({
+      mode: "anthropic",
+      anthropic: {
+        apiKey: options.anthropicApiKey,
+        model: options.anthropicModel ?? "claude-opus-4-7",
+      },
+      repoFileHints,
+    });
+  }
+  if (options.groqApiKey) {
+    executorByMode.groq = createAgentExecutorService({
+      mode: "groq",
+      groq: {
+        apiKey: options.groqApiKey,
+        model: options.groqModel ?? "llama-3.3-70b-versatile",
+      },
+      repoFileHints,
+    });
+  }
+  if (options.ollamaModel) {
+    const ollamaDefaultExecutor = createAgentExecutorService({
+      mode: "ollama",
+      ollama: {
+        baseUrl: options.ollamaBaseUrl,
+        model: options.ollamaModel,
+        contextWindowTokens: options.ollamaContextTokens,
+      },
+      repoFileHints,
+    });
+    const ollamaProfileExecutor = Object.keys(profileExecutors).length > 0
+      ? new ProfileAwareAgentExecutorService(ollamaDefaultExecutor, profileExecutors)
+      : ollamaDefaultExecutor;
+    executorByMode.ollama = Object.keys(perRole).length > 0
+      ? new RoleAwareAgentExecutorService(ollamaProfileExecutor, perRole)
+      : ollamaProfileExecutor;
+  }
+
+  // Ensure the active mode uses the exact runtime wiring (including role-aware
+  // wrapper) that was already selected above.
+  executorByMode[executorMode] = executor;
+
+  const agentRuns = new AgentRunService(agents, runs, messages, executorMode, executorByMode, {
     maxHandoffDepth: options.maxHandoffDepth,
     executionTimeoutMs: options.executionTimeoutMs,
     verifiedRepoFiles: repoFileHints,
   });
 
-  return {
+  const skillOrchestrations = new SkillOrchestrationService(agents, agentRuns, runs, wiki, tasks);
+  const runEvents = new RunEventService(storageMode, runs);
+  const executionQueue = new ExecutionQueueService(runs, runEvents, {
+    leaseMs: options.runtimeLeaseMs,
+    retryBaseDelayMs: storageMode === "memory" ? 0 : undefined,
+  });
+  const codexWorkerExecutor = options.codexWorkerRealEnabled
+    ? new RealCodexWorkerExecutor({
+        repositoryRoot: repoRootResolved,
+        allowedWorkingDirectories: options.codexWorkerAllowedWorkingDirectories,
+        timeoutMs: options.codexWorkerTimeoutMs,
+        maxOutputBytes: options.codexWorkerMaxOutputBytes,
+      })
+    : new FakeCodexWorkerExecutor();
+  const durableRuntime = new DurableRuntimeService(executionQueue, skillOrchestrations, {
+    inline: options.inlineDurableRuntime ?? storageMode === "memory",
+    onDiagnostic: options.runtimeDiagnosticSink,
+    pollMs: options.runtimePollMs,
+    workerId: options.runtimeWorkerId,
+  });
+
+  const services: AppServices = {
     agents,
     agentRuns,
     messages,
-    tasks: new TaskService(storageMode),
+    tasks,
     runs,
-    skillOrchestrations: new SkillOrchestrationService(agents, agentRuns, runs),
+    runEvents,
+    executionQueue,
+    durableRuntime,
+    effectIdempotency,
+    skillOrchestrations,
     wiki,
-    codexWorkers: new CodexWorkerService(runs, wiki, atelierRootResolved),
+    codexWorkers: new CodexWorkerService(
+      runs,
+      wiki,
+      atelierRootResolved,
+      codexWorkerExecutor,
+      effectIdempotency,
+    ),
+    knowledgeGraph: new KnowledgeGraphService(agents, tasks, runs, wiki, atelierRootResolved),
+    knowledgeLive: new KnowledgeLiveService(),
+    executor: {
+      activeMode: executorMode,
+      availableModes: Object.keys(executorByMode) as ExecutorMode[],
+    },
   };
+
+  if (storageMode === "memory" && options.seedDemoData) {
+    await seedDemoData({ agents, tasks, runs });
+  }
+
+  return services;
 }

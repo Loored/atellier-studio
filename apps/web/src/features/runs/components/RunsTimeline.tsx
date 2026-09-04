@@ -1,4 +1,4 @@
-import { Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
+import { Activity, Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
 import { RUN_REVIEW_STATUSES } from "@atellier/shared";
 import { RUN_LOG_MESSAGE_MAX_LENGTH } from "@atellier/shared";
 import { ValidationSummary } from "../../../components/ValidationSummary";
@@ -11,6 +11,8 @@ export function RunsTimeline() {
     runLogMessages,
     agentFilter,
     reviewFilter,
+    searchQuery,
+    reviewStatusCounts,
     isOpenAiExecution,
     executorModel,
     modelProfile,
@@ -20,9 +22,11 @@ export function RunsTimeline() {
     isUpdatingRunReview,
     isPromotingRunDeliverable,
     isUnlinkingRunDeliverable,
+    isRetryingRun,
     isLoadingRunsWithoutCache,
     setAgentFilter,
     setReviewFilter,
+    setSearchQuery,
     setRunLogMessage,
     handleAppendRunLog,
     startManualRun,
@@ -30,6 +34,8 @@ export function RunsTimeline() {
     setRunReview,
     promoteRunDeliverable,
     unlinkRunDeliverable,
+    retryRun,
+    openOrchestration,
   } = useRunsTimeline();
 
   return (
@@ -63,6 +69,25 @@ export function RunsTimeline() {
               <option key={status} value={status}>{status}</option>
             ))}
           </select>
+        </div>
+        <div className="mt-2">
+          <input
+            aria-label="Run search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search runs"
+          />
+        </div>
+        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+          <span className="inline-flex items-center justify-between rounded-md border border-[var(--border-card)] px-2 py-1 text-[0.72rem] text-ink-muted">
+            pending <strong className="text-ink">{reviewStatusCounts.pending}</strong>
+          </span>
+          <span className="inline-flex items-center justify-between rounded-md border border-[var(--border-card)] px-2 py-1 text-[0.72rem] text-ink-muted">
+            approved <strong className="text-ink">{reviewStatusCounts.approved}</strong>
+          </span>
+          <span className="inline-flex items-center justify-between rounded-md border border-[var(--border-card)] px-2 py-1 text-[0.72rem] text-ink-muted">
+            changes <strong className="text-ink">{reviewStatusCounts["changes-requested"]}</strong>
+          </span>
         </div>
         {isOpenAiExecution ? (
           <p className="mt-2 m-0 border border-orange/30 rounded-lg px-2.5 py-2 text-[0.74rem] text-orange bg-orange/10">
@@ -98,6 +123,7 @@ export function RunsTimeline() {
           const pendingLogMessage = runLogMessages[run.id]?.trim() ?? "";
           const latestLog = run.logs.at(-1);
           const isRunning = run.status === "running";
+          const canRetry = run.type === "orchestration" && ["failed", "blocked"].includes(run.status);
           const validation = readRunValidation(run);
 
           return (
@@ -161,16 +187,30 @@ export function RunsTimeline() {
                       <span>Log</span>
                     </button>
                   </form>
-                  <button
-                    className="icon-only-button"
-                    type="button"
-                    onClick={() => completeRun(run.id)}
-                    disabled={isCompletingRun}
-                    title="Complete run"
-                    aria-label={`Complete ${run.type} run`}
-                  >
-                    <Check size={16} />
-                  </button>
+                  <div className="inline-flex items-center gap-1.5">
+                    {canRetry ? (
+                      <button
+                        className="icon-only-button"
+                        type="button"
+                        onClick={() => retryRun(run.id)}
+                        disabled={isRetryingRun}
+                        title="Retry orchestration and preserve completed steps"
+                        aria-label="Retry orchestration run"
+                      >
+                        {isRetryingRun ? <Loader2 size={16} className="spin" /> : <RotateCcw size={16} />}
+                      </button>
+                    ) : null}
+                    <button
+                      className="icon-only-button"
+                      type="button"
+                      onClick={() => completeRun(run.id)}
+                      disabled={isCompletingRun}
+                      title="Complete run"
+                      aria-label={`Complete ${run.type} run`}
+                    >
+                      <Check size={16} />
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -232,6 +272,18 @@ export function RunsTimeline() {
                   </div>
                 </div>
               ) : null}
+
+              {run.type === "orchestration" ? (
+                <button
+                  type="button"
+                  className="mt-2 justify-self-start border-purple/30 text-purple bg-purple/[0.08] hover:bg-purple/[0.16]"
+                  onClick={() => openOrchestration(run.id)}
+                  title="Open orchestration details and memory context"
+                >
+                  <Activity size={15} />
+                  <span>Open orchestration</span>
+                </button>
+              ) : null}
             </li>
           );
         })}
@@ -247,6 +299,7 @@ function readRunValidation(run: {
     | {
         validation?: {
           role?: string;
+          profile?: string;
           passed?: boolean;
           issues?: Array<{ code?: string; message?: string; severity?: string }>;
           verifiedRepoFiles?: string[];

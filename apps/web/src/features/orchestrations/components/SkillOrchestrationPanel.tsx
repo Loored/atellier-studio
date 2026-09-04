@@ -1,5 +1,5 @@
-import { Check, Loader2, Play, Route, RotateCcw, Workflow, X } from "lucide-react";
-import type { OrchestrationSkillId, OrchestrationStepStatusEntry } from "@atellier/shared";
+import { Ban, Check, Loader2, Play, Route, RotateCcw, Workflow, X } from "lucide-react";
+import type { ExecutorMode, OrchestrationSkillId, OrchestrationStepStatusEntry } from "@atellier/shared";
 import { cn } from "../../../lib/cn";
 import { useSkillOrchestrationPanel } from "../hooks/useSkillOrchestrationPanel";
 
@@ -18,7 +18,7 @@ function StepIndicator({ step, index }: { step: OrchestrationStepStatusEntry; in
       </span>
     );
   }
-  if (step.status === "failed") {
+  if (["failed", "blocked", "cancelled"].includes(step.status)) {
     return (
       <span className="inline-flex items-center justify-center w-[22px] min-w-[22px] h-[22px] rounded-full text-[0.68rem] font-extrabold text-orange bg-orange/15">
         <X size={11} strokeWidth={3} />
@@ -34,9 +34,12 @@ function StepIndicator({ step, index }: { step: OrchestrationStepStatusEntry; in
 
 const STEP_CLASS: Record<OrchestrationStepStatusEntry["status"] | "pending", string> = {
   pending:   "border-[var(--border-card)] bg-white/[0.02]",
+  queued:    "border-[var(--border-card)] bg-white/[0.02]",
   running:   "border-teal/30 bg-teal/[0.04] shadow-[0_0_12px_rgba(16,242,170,0.06)]",
   completed: "border-green-400/[0.22] bg-green-400/[0.03]",
   failed:    "border-orange/[0.28] bg-orange/[0.04]",
+  blocked:   "border-orange/[0.28] bg-orange/[0.04]",
+  cancelled: "border-[var(--border-card)] bg-white/[0.02] opacity-70",
 };
 
 export function SkillOrchestrationPanel() {
@@ -46,29 +49,59 @@ export function SkillOrchestrationPanel() {
     selectedSkillId,
     goal,
     context,
+    selectedTaskId,
+    availableTaskList,
+    linkedTask,
     mode,
     liveStatus,
+    contextEvaluationSummary,
+    automatedContextAssessmentSummary,
+    isOrchestrationSettled,
+    runEvents,
     isOpenAiExecution,
     executorModel,
     modelProfile,
+    executorModeOverride,
+    modelProfileOverride,
+    setModelProfileOverride,
+    availableExecutorModes,
     isLoadingOrchestrationSkillsWithoutCache,
     isStartingOrchestration,
+    isCancellingRun,
+    isRetryingRun,
+    isRecordingContextEvaluation,
+    contextEvaluationOutcome,
+    contextEvaluationNote,
+    contextItemRelevance,
     orchestrationErrorMessage,
     setSelectedSkillId,
     setGoal,
     setContext,
+    setSelectedTaskId,
+    setExecutorModeOverride,
+    setContextEvaluationOutcome,
+    setContextEvaluationNote,
+    setContextItemEvaluation,
     handleStartOrchestration,
+    handleCancelRun,
+    handleRetryRun,
+    handleRecordContextEvaluation,
     resetToForm,
   } = useSkillOrchestrationPanel();
 
   const orchStatus = liveStatus?.status;
-  const isTerminal = orchStatus === "completed" || orchStatus === "failed";
+  const isTerminal = orchStatus
+    ? ["completed", "failed", "blocked", "cancelled"].includes(orchStatus)
+    : false;
   const doneCount = liveStatus?.steps.filter((s) => s.status === "completed").length ?? 0;
   const totalCount = liveStatus?.steps.length ?? selectedSkill?.steps.length ?? 0;
 
-  const statusBadgeClass = orchStatus === "completed"
+  const displayStatus = orchStatus === "completed" && !isOrchestrationSettled
+    ? "finalizing"
+    : orchStatus;
+  const statusBadgeClass = displayStatus === "completed"
     ? "status-badge status-badge-completed"
-    : orchStatus === "failed"
+    : displayStatus && ["failed", "blocked", "cancelled"].includes(displayStatus)
       ? "status-badge status-badge-failed"
       : "status-badge status-badge-running";
 
@@ -83,15 +116,40 @@ export function SkillOrchestrationPanel() {
         <div className="inline-flex items-center gap-2">
           {mode === "live" ? (
             <>
-              {orchStatus && <span className={statusBadgeClass}>{orchStatus}</span>}
-              <button
-                type="button"
-                className="icon-only-button"
-                onClick={resetToForm}
-                title="Nueva orquestación"
-              >
-                <RotateCcw size={14} />
-              </button>
+              {displayStatus && <span className={statusBadgeClass}>{displayStatus}</span>}
+              {!isTerminal ? (
+                <button
+                  type="button"
+                  className="icon-only-button"
+                  onClick={handleCancelRun}
+                  disabled={isCancellingRun || Boolean(liveStatus?.execution?.cancelRequestedAt)}
+                  title="Cancelar al terminar el paso actual"
+                >
+                  {isCancellingRun ? <Loader2 size={14} className="spin" /> : <Ban size={14} />}
+                </button>
+              ) : (
+                <>
+                  {(orchStatus === "failed" || orchStatus === "blocked") && (
+                    <button
+                      type="button"
+                      className="icon-only-button"
+                      onClick={handleRetryRun}
+                      disabled={isRetryingRun}
+                      title="Reintentar conservando pasos completados"
+                    >
+                      {isRetryingRun ? <Loader2 size={14} className="spin" /> : <RotateCcw size={14} />}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="icon-only-button"
+                    onClick={resetToForm}
+                    title="Nueva orquestación"
+                  >
+                    <Play size={14} />
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <span className="inline-flex items-center min-h-6 border border-[var(--border-card)] rounded-full px-2.5 text-ink-muted bg-white/[0.03] text-[0.72rem] font-bold whitespace-nowrap">
@@ -101,13 +159,44 @@ export function SkillOrchestrationPanel() {
         </div>
       </div>
 
+      {contextEvaluationSummary?.evaluatedReceipts ? (
+        <details className="mb-3 rounded-lg border border-teal/20 bg-teal/[0.035] px-2.5 py-2">
+          <summary className="cursor-pointer text-[0.74rem] font-bold text-teal">
+            Context evidence · {contextEvaluationSummary.evaluatedReceipts} evaluated receipt(s)
+          </summary>
+          <p className="mb-2 mt-2 text-[0.68rem] text-ink-muted">
+            Useful {contextEvaluationSummary.outcomes.useful} · Mixed {contextEvaluationSummary.outcomes.mixed} · Not useful {contextEvaluationSummary.outcomes["not-useful"]}
+          </p>
+          <div className="grid gap-1 text-[0.67rem] text-ink-faint">
+            {contextEvaluationSummary.byAuthority.map((entry) => (
+              <div key={entry.key}>
+                <span className="font-bold text-ink-muted">{entry.label}</span> · {entry.relevance.relevant} relevant / {entry.relevance.uncertain} uncertain / {entry.relevance.irrelevant} irrelevant
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {automatedContextAssessmentSummary?.assessedReceipts ? (
+        <p className="mb-3 text-[0.68rem] text-ink-muted">
+          Auto evidence checks · {automatedContextAssessmentSummary.assessedReceipts} receipt(s): {automatedContextAssessmentSummary.outcomes.supported} supported · {automatedContextAssessmentSummary.outcomes.partial} partial · {automatedContextAssessmentSummary.outcomes.unverified} unverified. Provisional only.
+        </p>
+      ) : null}
+
       {mode === "live" ? (
         <div>
           {/* Live meta bar */}
           <div className="flex items-baseline justify-between gap-2 mb-3 px-2.5 py-2 border border-[var(--border-card)] rounded-lg bg-purple/[0.04]">
-            <span className="text-[0.78rem] text-ink-muted overflow-hidden text-ellipsis whitespace-nowrap flex-1 italic">
-              {liveStatus?.goal ?? "…"}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-[0.78rem] text-ink-muted overflow-hidden text-ellipsis whitespace-nowrap italic">
+                {liveStatus?.goal ?? "…"}
+              </span>
+              {linkedTask ? (
+                <span className="block mt-0.5 text-[0.68rem] text-teal overflow-hidden text-ellipsis whitespace-nowrap">
+                  Task: {linkedTask.title} · {linkedTask.status}
+                </span>
+              ) : null}
+            </div>
             {!isTerminal && liveStatus && (
               <span className="text-[0.72rem] font-extrabold text-teal whitespace-nowrap tabular-nums">
                 {doneCount}/{totalCount}
@@ -115,12 +204,211 @@ export function SkillOrchestrationPanel() {
             )}
           </div>
 
+          {liveStatus?.execution && (
+            <div className="flex items-center justify-between gap-2 mb-3 text-[0.68rem] text-ink-faint">
+              <span>phase: {liveStatus.execution.phase}</span>
+              <span className="tabular-nums">
+                attempt {liveStatus.execution.attempt}/{liveStatus.execution.maxAttempts}
+              </span>
+            </div>
+          )}
+
+          {liveStatus?.contextReceipt && (
+            <details className="mb-3 rounded-lg border border-teal/20 bg-teal/[0.035] px-2.5 py-2" aria-label="Memory context receipt">
+              <summary className="cursor-pointer text-[0.74rem] font-bold text-teal">
+                Memory context · {liveStatus.contextReceipt.policy} · {liveStatus.contextReceipt.stableHash.slice(0, 12)}
+              </summary>
+              <p className="mb-1 mt-2 text-[0.68rem] text-ink-muted">
+                {liveStatus.contextReceipt.items.length} item(s) · {liveStatus.contextReceipt.budgets.totalBytes.toLocaleString()} byte budget · frozen for retries
+              </p>
+              <div className="grid gap-1">
+                {liveStatus.contextReceipt.items.map((item) => (
+                  <div key={`${item.path}-${item.applicableRole ?? "shared"}`} className="text-[0.67rem] text-ink-faint overflow-wrap-anywhere">
+                    <span className="font-bold text-ink-muted">{item.memory.authority}</span> · {item.path}
+                    {item.truncated ? " · truncated" : ""}
+                    {item.retrieval ? ` · score ${item.retrieval.total}` : " · direct"}
+                  </div>
+                ))}
+                {liveStatus.contextReceipt.excluded.length > 0 ? (
+                  <p className="m-0 text-[0.67rem] text-orange">{liveStatus.contextReceipt.excluded.length} path(s) excluded</p>
+                ) : null}
+              </div>
+              {liveStatus.contextEvaluation ? (
+                <p className="mb-0 mt-2 text-[0.68rem] text-teal">
+                  Evaluation: {liveStatus.contextEvaluation.outcome} · {liveStatus.contextEvaluation.assessedAt}
+                </p>
+              ) : null}
+              {liveStatus.automatedContextAssessment ? (
+                <p className="mb-0 mt-2 text-[0.68rem] text-ink-muted">
+                  Automatic evidence check: {liveStatus.automatedContextAssessment.outcome} · provisional · {liveStatus.automatedContextAssessment.assessedAt}
+                </p>
+              ) : null}
+              {!liveStatus.contextEvaluation && isTerminal ? (
+                <fieldset className="mt-3 grid gap-2 border-t border-teal/15 pt-2" aria-label="Context receipt evaluation">
+                  <legend className="text-[0.7rem] font-bold text-ink-muted">Label this receipt for future evaluation</legend>
+                  <label className="grid gap-1 text-[0.68rem] text-ink-muted">
+                    Overall usefulness
+                    <select value={contextEvaluationOutcome} onChange={(event) => setContextEvaluationOutcome(event.target.value as typeof contextEvaluationOutcome)}>
+                      <option value="useful">Useful</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="not-useful">Not useful</option>
+                    </select>
+                  </label>
+                  {liveStatus.contextReceipt.items.map((item) => {
+                    const key = `${item.path}\u0000${item.applicableRole ?? ""}`;
+                    return (
+                      <label key={key} className="grid gap-1 text-[0.67rem] text-ink-faint overflow-wrap-anywhere">
+                        {item.path}{item.applicableRole ? ` (${item.applicableRole})` : ""}
+                        <select
+                          aria-label={`Relevance for ${item.path}`}
+                          value={contextItemRelevance[key] ?? "uncertain"}
+                          onChange={(event) => setContextItemEvaluation(item.path, item.applicableRole, event.target.value as "relevant" | "uncertain" | "irrelevant")}
+                        >
+                          <option value="relevant">Relevant</option>
+                          <option value="uncertain">Uncertain</option>
+                          <option value="irrelevant">Irrelevant</option>
+                        </select>
+                      </label>
+                    );
+                  })}
+                  <label className="grid gap-1 text-[0.68rem] text-ink-muted">
+                    Optional note
+                    <textarea value={contextEvaluationNote} maxLength={1000} rows={2} onChange={(event) => setContextEvaluationNote(event.target.value)} />
+                  </label>
+                  <button type="button" className="secondary-button self-start" onClick={handleRecordContextEvaluation} disabled={isRecordingContextEvaluation}>
+                    {isRecordingContextEvaluation ? "Saving…" : "Save evaluation"}
+                  </button>
+                </fieldset>
+              ) : null}
+            </details>
+          )}
+
+          {liveStatus?.repair && liveStatus.repair.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.repair.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.repair.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn(
+                  "text-[0.76rem]",
+                  liveStatus.repair.exhausted ? "text-orange" : "text-teal",
+                )}>
+                  {liveStatus.repair.exhausted
+                    ? "Auto-repair needs input"
+                    : "Auto-repair resolved"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.repair.attemptsUsed}/{liveStatus.repair.maxAttempts} attempts
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.repair.exhausted
+                  ? (liveStatus.repair.blockerMessages[0] ?? "Deterministic validation still has blockers.")
+                  : `Deterministic validation passed on ${liveStatus.repair.finalStepId}.`}
+              </p>
+            </div>
+          )}
+
+          {liveStatus?.qaRetry && liveStatus.qaRetry.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.qaRetry.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.qaRetry.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn("text-[0.76rem]", liveStatus.qaRetry.exhausted ? "text-orange" : "text-teal")}>
+                  {liveStatus.qaRetry.exhausted ? "QA format needs input" : "QA format recovered"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.qaRetry.attemptsUsed}/{liveStatus.qaRetry.maxAttempts} retries
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.qaRetry.exhausted
+                  ? (liveStatus.qaRetry.blockerMessages[0] ?? "QA did not return a usable verdict.")
+                  : `QA returned a usable verdict on ${liveStatus.qaRetry.finalStepId}.`}
+              </p>
+            </div>
+          )}
+
+          {liveStatus?.qaChecklist && (
+            <div className="mb-3 rounded-lg border border-purple/20 bg-purple/[0.04] px-2.5 py-2.5" role="status">
+              <div className="flex items-center justify-between gap-2">
+                <strong className="text-[0.76rem] text-purple">QA acceptance checklist</strong>
+                <span className="text-[0.68rem] text-ink-faint">
+                  {liveStatus.qaChecklist.items.filter((item) => item.status === "pass").length}/{liveStatus.qaChecklist.items.length} pass
+                </span>
+              </div>
+              <ul className="m-0 mt-1.5 grid gap-1 p-0 list-none">
+                {liveStatus.qaChecklist.items.map((item, index) => (
+                  <li key={`${item.criterion}-${index}`} className="text-[0.68rem] leading-[1.4] text-ink-muted">
+                    <b className={item.status === "pass" ? "text-teal" : "text-orange"}>{item.status.toUpperCase()}</b>
+                    {` · ${item.criterion} — ${item.evidence}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {liveStatus?.repeatedFeedback?.detected && (
+            <div role="alert" className="mb-3 rounded-lg border border-orange/30 bg-orange/[0.07] px-2.5 py-2.5">
+              <strong className="text-[0.76rem] text-orange">Repeated QA feedback stopped the loop</strong>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted">
+                {liveStatus.repeatedFeedback.firstQaStepId} → {liveStatus.repeatedFeedback.repeatedQaStepId}
+              </p>
+            </div>
+          )}
+
+          {liveStatus?.semanticRepair && liveStatus.semanticRepair.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.semanticRepair.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.semanticRepair.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn("text-[0.76rem]", liveStatus.semanticRepair.exhausted ? "text-orange" : "text-teal")}>
+                  {liveStatus.semanticRepair.exhausted ? "Semantic repair needs input" : "Semantic repair resolved"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.semanticRepair.attemptsUsed}/{liveStatus.semanticRepair.maxAttempts} attempts
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.semanticRepair.exhausted
+                  ? (liveStatus.semanticRepair.blockerMessages[0] ?? "Final QA still requests changes.")
+                  : `Final QA approved on ${liveStatus.semanticRepair.finalStepId}.`}
+              </p>
+              {liveStatus.semanticRepair.lastValidArtifactStepId && (
+                <p className="m-0 mt-1 text-[0.66rem] leading-[1.4] text-ink-faint overflow-wrap-anywhere">
+                  Last valid artifact: {liveStatus.semanticRepair.lastValidArtifactStepId}
+                  {liveStatus.semanticRepair.lastQaStepId && ` · Last QA: ${liveStatus.semanticRepair.lastQaStepId}`}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Step list */}
           <ol className="grid gap-2 list-none m-0 p-0 max-h-[280px] overflow-auto">
             {liveStatus
               ? liveStatus.steps.map((step, i) => (
                   <li
-                    key={step.stepId}
+                    key={`${step.stepId}-${step.runId ?? i}`}
                     className={cn(
                       "grid grid-cols-[auto_auto_1fr] items-center gap-2.5 min-h-12 border rounded-lg px-2.5 py-2.5 transition-[border-color,background-color,box-shadow]",
                       step.status === "running" ? "orchestration-step-active" : "",
@@ -133,6 +421,9 @@ export function SkillOrchestrationPanel() {
                       <strong className="block text-ink text-[0.82rem] overflow-wrap-anywhere">{step.label}</strong>
                       <span className="text-ink-muted text-[0.72rem] overflow-wrap-anywhere">
                         {step.agentName} · {step.phase}
+                        {step.repairKind === "semantic"
+                          ? " · semantic repair"
+                          : step.repairAttempt ? " · deterministic repair" : ""}
                       </span>
                     </div>
                   </li>
@@ -155,6 +446,24 @@ export function SkillOrchestrationPanel() {
                   </li>
                 ))}
           </ol>
+
+          {runEvents.length > 0 && (
+            <div className="mt-3 border-t border-[var(--border-card)] pt-2.5">
+              <p className="m-0 mb-1.5 text-[0.65rem] font-bold tracking-[0.1em] uppercase text-ink-faint">
+                Durable activity
+              </p>
+              <ol className="grid gap-1 list-none m-0 p-0 max-h-28 overflow-auto">
+                {runEvents.slice(-6).reverse().map((event) => (
+                  <li key={event.id} className="grid grid-cols-[auto_1fr] gap-2 text-[0.7rem] leading-[1.35]">
+                    <span className="text-purple tabular-nums">#{event.sequence}</span>
+                    <span className="text-ink-muted overflow-wrap-anywhere">
+                      {event.message ?? event.type}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -193,6 +502,39 @@ export function SkillOrchestrationPanel() {
               disabled={isStartingOrchestration}
               className="w-full border border-[var(--border-card)] rounded-lg px-2.5 py-2 text-ink bg-[var(--bg-input)] font-[inherit] text-[0.82rem] leading-[1.45] resize-y outline-none focus:border-purple placeholder:text-ink-faint"
             />
+            <select
+              aria-label="Linked task"
+              value={selectedTaskId}
+              onChange={(e) => setSelectedTaskId(e.target.value)}
+              disabled={isStartingOrchestration}
+            >
+              <option value="">No linked task</option>
+              {availableTaskList.map((task) => (
+                <option key={task.id} value={task.id}>{task.title} · {task.status}</option>
+              ))}
+            </select>
+            <select
+              aria-label="Orchestration executor override"
+              value={executorModeOverride}
+              onChange={(e) => setExecutorModeOverride((e.target.value as ExecutorMode | "") ?? "")}
+              disabled={isStartingOrchestration}
+            >
+              <option value="">Executor por entorno (default)</option>
+              {availableExecutorModes.map((mode) => (
+                <option key={mode} value={mode}>{mode}</option>
+              ))}
+            </select>
+            <select
+              aria-label="Orchestration model profile override"
+              value={modelProfileOverride}
+              onChange={(e) => setModelProfileOverride((e.target.value as "" | "cheap" | "standard" | "deep") ?? "")}
+              disabled={isStartingOrchestration}
+            >
+              <option value="">Perfil por entorno (default)</option>
+              <option value="cheap">cheap · qwen3.5:4b</option>
+              <option value="standard">standard · qwen3.5:9b</option>
+              <option value="deep">deep · gpt-oss:20b</option>
+            </select>
             <button
               type="button"
               onClick={handleStartOrchestration}

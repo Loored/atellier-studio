@@ -1,9 +1,13 @@
-import type { Agent, AgentRole } from "@atellier/shared";
+import type { Agent, AgentRole, ModelProfile } from "@atellier/shared";
 
 export type ExecuteAgentInstructionInput = {
   agent: Agent;
   instruction: string;
   context?: string;
+  verifiedFiles?: string[];
+  signal?: AbortSignal;
+  maxOutputTokens?: number;
+  modelProfileOverride?: ModelProfile;
 };
 
 export type ExecuteAgentInstructionResult = {
@@ -24,6 +28,8 @@ export type OpenAiCompatibleExecutorConfig = {
   repoFileHints?: string[];
   /** Provider label used in error messages; defaults to "OpenAI-compatible". */
   providerLabel?: string;
+  /** Provider-specific fields added to the chat-completion request body. */
+  providerRequestBody?: Record<string, unknown>;
 };
 
 // Back-compat alias for callers that historically referenced the OpenAI-only shape.
@@ -44,6 +50,8 @@ export type OllamaAgentExecutorConfig = {
   baseUrl?: string;
   model: string;
   repoFileHints?: string[];
+  /** Ollama per-request context window; defaults to 8192 for Context Receipts. */
+  contextWindowTokens?: number;
 };
 
 export type AnthropicAgentExecutorConfig = {
@@ -54,6 +62,17 @@ export type AnthropicAgentExecutorConfig = {
 
 export interface AgentExecutorService {
   execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult>;
+}
+
+export class AgentExecutionCancelledError extends Error {
+  constructor(message = "Agent execution cancelled.", options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AgentExecutionCancelledError";
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 const MOCK_STEP_DELAY_MS = Number(process.env.MOCK_STEP_DELAY_MS ?? 0);
@@ -121,11 +140,37 @@ Output format: intake summary (source type → key facts → implied tasks → h
 };
 
 // Role-aware rich mock output templates.
-function buildMockResponse(agent: Agent, instruction: string, context?: string): string {
+function buildMockResponse(
+  agent: Agent,
+  instruction: string,
+  context?: string,
+  verifiedFiles: string[] = [],
+): string {
   const name = agent.name;
   const role = agent.role;
   const taskSnippet = instruction.length > 100 ? `${instruction.slice(0, 100)}…` : instruction;
   const ctxLine = context ? `\n_Context: ${context.slice(0, 80)}${context.length > 80 ? "…" : ""}_\n` : "";
+  const candidateFile = verifiedFiles[0] ?? "apps/api/src/services/wiki.service.ts";
+
+  if (role === "builder" && /Phase:\s*runtime/i.test(instruction)) {
+    return [
+      `## Runtime Report — ${name}`,
+      ctxLine,
+      `## Checks to Run`,
+      `1. Inspect the requested artifact against the linked source content.`,
+      `2. Confirm the acceptance criteria and human-review boundary.`,
+      ``,
+      `## Expected Pass/Fail Signals`,
+      `- Pass: the artifact is present, grounded, and reviewable.`,
+      `- Fail: the response only promises future work or lacks source evidence.`,
+      ``,
+      `## Blockers`,
+      `- None identified in the proposed artifact.`,
+      ``,
+      `## QA Handoff`,
+      `- Revalidate the artifact content rather than step-completion metadata.`,
+    ].join("\n");
+  }
 
   const sections: Record<AgentRole, string> = {
     pm: [
@@ -152,10 +197,13 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
       `**Task:** ${taskSnippet}`,
       ``,
       `**Candidate files:**`,
-      `- apps/api/src/services/wiki.service.ts`,
+      `- ${candidateFile}`,
       ``,
       `**Summary:**`,
       `Proposed an additive service-layer change using existing patterns.`,
+      ``,
+      `## Requested Artifact`,
+      `A complete bounded artifact for the requested goal. It records the intended outcome, the source-grounded decisions, the acceptance criteria, and the human-review boundary so QA can evaluate evidence instead of a promise of future work.`,
       ``,
       `**Risk assessment:** Low — no breaking contract changes expected`,
       ``,
@@ -175,7 +223,14 @@ function buildMockResponse(agent: Agent, instruction: string, context?: string):
       `- ✓ Existing regression risk: low`,
       `- ⚠ Minor: confirm error path is handled explicitly`,
       ``,
+      `**Acceptance Checklist:**`,
+      `- [PASS] Existing tests remain green — Evidence: Runtime reported no regression blocker.`,
+      `- [PASS] New behavior matches the specification — Evidence: The latest artifact states the requested outcome and human-review boundary.`,
+      `- [PASS] One integration test added covering the happy path — Evidence: The artifact records a bounded acceptance signal for QA.`,
+      ``,
       `**Verdict: APPROVED**`,
+      ``,
+      `**Recommendation:** Proceed to human review.`,
       ``,
       `**Handoff → Wiki Curator:** Document this cycle in operational memory.`,
     ].join("\n"),
@@ -247,13 +302,41 @@ export class RoleAwareAgentExecutorService implements AgentExecutorService {
   }
 }
 
+export class ProfileAwareAgentExecutorService implements AgentExecutorService {
+  constructor(
+    private readonly fallback: AgentExecutorService,
+    private readonly byProfile: Partial<Record<ModelProfile, AgentExecutorService>>,
+  ) {}
+
+  async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    return (this.byProfile[input.modelProfileOverride ?? "standard"] ?? this.fallback).execute(input);
+  }
+}
+
 export class MockAgentExecutorService implements AgentExecutorService {
   async execute(input: ExecuteAgentInstructionInput): Promise<ExecuteAgentInstructionResult> {
+    if (input.signal?.aborted) {
+      throw new AgentExecutionCancelledError("Mock execution cancelled.");
+    }
     if (MOCK_STEP_DELAY_MS > 0) {
-      await new Promise((r) => setTimeout(r, MOCK_STEP_DELAY_MS));
+      await new Promise<void>((resolve, reject) => {
+        const signal = input.signal;
+        const onAbort = (): void => {
+          clearTimeout(timeout);
+          reject(new AgentExecutionCancelledError("Mock execution cancelled."));
+        };
+        const timeout = setTimeout(() => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve();
+        }, MOCK_STEP_DELAY_MS);
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+        }
+      });
     }
     return {
-      response: buildMockResponse(input.agent, input.instruction, input.context),
+      response: buildMockResponse(input.agent, input.instruction, input.context, input.verifiedFiles),
       needsHuman: true,
     };
   }
@@ -266,6 +349,8 @@ function buildExecutorSystemPrompt(
   const roleExpertise = ROLE_SYSTEM_INSTRUCTIONS[input.agent.role] ?? "";
   const customInstructions = input.agent.instructions?.trim();
 
+  const verifiedFiles = [...new Set([...(repoFileHints ?? []), ...(input.verifiedFiles ?? [])])].sort();
+
   return [
     `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
     "",
@@ -273,10 +358,10 @@ function buildExecutorSystemPrompt(
     "This chat executor cannot edit repository files. Be truthful about that boundary.",
     "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
     "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
-    repoFileHints?.length
+    verifiedFiles.length
       ? [
-          "Verified repository files you may reference:",
-          ...repoFileHints.map((filePath) => `- ${filePath}`),
+          "Verified repository and Atellier vault files you may reference:",
+          ...verifiedFiles.map((filePath) => `- ${filePath}`),
         ].join("\n")
       : "",
     customInstructions ? `\nAdditional operator instructions:\n${customInstructions}` : "",
@@ -328,19 +413,29 @@ export class OpenAiCompatibleAgentExecutorService implements AgentExecutorServic
       headers.Authorization = `Bearer ${this.config.apiKey}`;
     }
 
-    const response = await fetch(this.config.baseUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: this.config.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 1024,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.config.baseUrl, {
+        method: "POST",
+        headers,
+        signal: input.signal,
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.4,
+          max_tokens: input.maxOutputTokens ?? 1024,
+          ...this.config.providerRequestBody,
+        }),
+      });
+    } catch (error) {
+      if (input.signal?.aborted || isAbortError(error)) {
+        throw new AgentExecutionCancelledError(`${label} execution cancelled.`, { cause: error });
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -414,30 +509,39 @@ export class AnthropicAgentExecutorService implements AgentExecutorService {
     const systemPrompt = buildExecutorSystemPrompt(input, this.config.repoFileHints);
     const userPrompt = buildExecutorUserPrompt(input);
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": this.config.apiKey,
-        "anthropic-version": ANTHROPIC_API_VERSION,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: this.config.model,
-        max_tokens: ANTHROPIC_MAX_TOKENS,
-        temperature: ANTHROPIC_TEMPERATURE,
-        // Naive prompt caching: the system prompt (role expertise + repo hints)
-        // is stable across runs of the same agent, so cache it ephemerally.
-        // Per-run instruction/context stays uncached in the user message.
-        system: [
-          {
-            type: "text",
-            text: systemPrompt,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": this.config.apiKey,
+          "anthropic-version": ANTHROPIC_API_VERSION,
+          "Content-Type": "application/json",
+        },
+        signal: input.signal,
+        body: JSON.stringify({
+          model: this.config.model,
+          max_tokens: input.maxOutputTokens ?? ANTHROPIC_MAX_TOKENS,
+          temperature: ANTHROPIC_TEMPERATURE,
+          // Naive prompt caching: the system prompt (role expertise + repo hints)
+          // is stable across runs of the same agent, so cache it ephemerally.
+          // Per-run instruction/context stays uncached in the user message.
+          system: [
+            {
+              type: "text",
+              text: systemPrompt,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages: [{ role: "user", content: userPrompt }],
+        }),
+      });
+    } catch (error) {
+      if (input.signal?.aborted || isAbortError(error)) {
+        throw new AgentExecutionCancelledError("Anthropic execution cancelled.", { cause: error });
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -496,6 +600,12 @@ export class OllamaAgentExecutorService extends OpenAiCompatibleAgentExecutorSer
       model: config.model,
       repoFileHints: config.repoFileHints,
       providerLabel: "Ollama",
+      providerRequestBody: {
+        options: { num_ctx: config.contextWindowTokens ?? 8192 },
+        // Qwen 3.x models think by default. For Atellier's bounded structured
+        // agent steps, reserve the output budget for the final artifact.
+        reasoning_effort: "none",
+      },
     });
   }
 }

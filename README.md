@@ -4,21 +4,36 @@ Atellier Studio is a local-first AI orchestration workspace with durable agent w
 
 ## Current Stage
 
-Current stage: Operational Spine + Agent Orchestration + Wiki Brain MVP + Codex Worker control-plane + Review Memory Capture.
+Current stage: Operational Spine + Durable Local Orchestration Runtime + bounded autonomous artifact repair + explicit memory trust contract + complete daily-use and review-learning loops + Wiki Brain MVP + grounded Wiki Dream UI + MCP server + multi-provider executors + Codex Worker control-plane + Knowledge Graph v2.
 
 Implemented:
 
 - Local MongoDB and in-memory storage mode for tests
 - Fastify API with thin routes and service-owned business logic
 - React dashboard on Tailwind CSS v4 (only `MobileView.tsx` still on legacy CSS)
-- Skill-triggered agent orchestration (`atellier-build-loop`, `llm-wiki-ingest-loop`)
+- Skill-triggered agent orchestration (`atellier-build-loop`, `llm-wiki-ingest-loop`, `wiki-dream-loop`)
+- Mongo-backed durable orchestration queue with immutable definition snapshots, leases, bounded retries, cooperative cancellation, resumable completed steps, and replayable run events
 - Agent run logs, handoffs, circular-handoff and depth guards
 - Deliverable generation, preview, promotion, unlink, and review states
 - Markdown wiki index, log, deliverables index, and synthesis pages
 - Wiki Brain MVP: deterministic `POST /wiki/ingest`, `POST /wiki/query`, `POST /wiki/lint`, safe `POST /wiki/page`
 - Wiki query surfaces related pages and possible contradictions
+- Wiki reads and retrieval expose memory layer, trust state, authority, provenance, and classification reason; generated content fails closed as context-only. See [`docs/memory-trust-contract.md`](docs/memory-trust-contract.md).
+- Wiki query supports explainable `balanced`, `evidence-first`, and `trusted-only` policies over Wiki and raw Markdown, with lexical and trust score components visible per result.
+- Reflection candidates deterministically surface patterns repeated across distinct episodic artifacts; generation is read-only and prepared drafts remain generated context pending explicit review.
+- Reflection review records idempotent accepted/rejected decisions with required notes; only accepted decisions can be promoted into trusted semantic notes.
+- Wiki Dream audit grounding: curator receives real lint findings and current wiki paths before proposing maintenance
+- Wiki Dream UI: trigger dream runs, preview reports, and save approved reports under `wiki/dreams`
 - Review memory capture: `POST /runs/:id/capture-memory` writes durable `wiki/synthesis/` pages
+- Daily-use loop: Wiki ingest creates source-linked tasks; durable runs carry task grounding; Review exposes the full evidence chain; approved memory capture closes the task idempotently
+- Review-to-memory learning: an explicit `POST /runs/:id/curate-learning` promotes one approved lesson into durable role Markdown and optional Wiki lint/graph signals
+- Curation signal resolution: Review records explicit resolved/dismissed decisions, keeps durable role-memory history, and removes closed findings from active Wiki lint
+- MCP server package (`apps/mcp-server`) exposes the local REST API as stdio tools for Claude Code / Cowork
+- Multi-provider agent executors: mock, OpenAI, Anthropic, Groq, and Ollama with profile-based local routing. The safe local default maps all profiles to lightweight `qwen3.5:4b`; larger models remain opt-in through profile environment variables.
+- Orchestration runs can override the Ollama model profile per request; the chosen profile is persisted and visible in the run input.
+- When no override is supplied, orchestration uses conservative deterministic profile classification and defaults ambiguous work to `standard`.
 - Codex Worker control-plane: create / plan / approve-step / execute-next / cancel / retry-step / finalize, with persisted per-step evidence artifacts
+- Knowledge Graph v2: force-directed live canvas (react-force-graph-2d) clustered by wiki/raw/runtime/meta layers, inspector with markdown render + run timeline, ⌘K search with keyboard nav, URL-synced filters/density/selection, sesión viva polling, time-travel slider with snapshot ticks, hover tooltip, layer breakdown, Office↔Graph navigation, mobile tab, in-memory snapshot ring buffer at `/knowledge/graph/snapshots`
 - Agent grounding validation: builder/QA responses are checked against verified repo files; review approval is blocked on validation errors
 - Executor/model safety: `/health` exposes `executorMode`, `executorModel`, `modelProfile`; UI badge + warnings before OpenAI-backed runs
 - Focused API and web tests (no real OpenAI/Codex calls in tests)
@@ -48,7 +63,38 @@ docker compose up -d mongo
 
 ## Development
 
-Run both apps:
+Recommended local startup:
+
+```bash
+./scripts/dev-local
+```
+
+The launcher uses Node directly, loads the repository `.env` without overriding explicit shell variables, prefers the repository-pinned `pnpm@9.15.4` through Corepack, checks dependencies and ports, starts Colima when needed, ensures Mongo is healthy, and launches the API, durable worker, and web app. It waits for API and web health before reporting:
+
+- Web: `http://127.0.0.1:5174`
+- API: `http://127.0.0.1:4000`
+
+It never installs dependencies or kills an existing port owner. `Ctrl+C` stops only launcher-owned API, worker, and web processes; Mongo remains running. Run the non-mutating preflight with:
+
+```bash
+./scripts/dev-local --check
+```
+
+If `pnpm` is already available, the equivalent package script is:
+
+```bash
+pnpm dev:local
+```
+
+Override isolated validation ports or the Mongo database explicitly:
+
+```bash
+API_PORT=4010 WEB_PORT=5180 \
+MONGO_URI=mongodb://127.0.0.1:27017/atellier_launcher_validation \
+AGENT_EXECUTOR_MODE=mock ./scripts/dev-local
+```
+
+Manual workspace startup remains available. This starts every workspace with a `dev` script, including the MCP server, but does not start Docker or the standalone durable worker:
 
 ```bash
 pnpm dev
@@ -58,6 +104,43 @@ Run only the API:
 
 ```bash
 pnpm --filter @atellier/api dev
+```
+
+Mongo-backed orchestration execution runs in a separate local worker. Start it in a second terminal with the same executor environment as the API:
+
+```bash
+pnpm dev:worker
+```
+
+The API accepts and persists work even while the worker is offline. When the worker starts, it claims queued or lease-expired runs. `API_STORAGE=memory` keeps an inline worker for tests and lightweight UI review, so `dev:memory` does not need a second process.
+
+`SIGINT` and `SIGTERM` stop new polling immediately, keep the heartbeat alive for any already claimed run, wait for that run to settle, and only then disconnect Mongo. The standalone worker prints structured lifecycle diagnostics with its worker ID, state, active run, processed count, lease/poll settings, and latest error.
+
+Cancelling a running durable orchestration now propagates an `AbortSignal` to fetch-based OpenAI, Anthropic, Groq, and Ollama calls. A separate worker detects a persisted cancellation within one second; providers that cannot abort still stop at the next safe step boundary.
+
+Irreversible tool effects must pass through the durable idempotency ledger with a stable key and deterministic fingerprint. Completed outcomes are reused, concurrent duplicates are reported as in progress, and conflicting key reuse fails closed. See [`docs/tool-effect-idempotency.md`](docs/tool-effect-idempotency.md).
+
+Optional worker controls:
+
+```bash
+RUN_WORKER_LEASE_MS=30000
+RUN_WORKER_POLL_MS=1000
+```
+
+Codex Worker command execution stays fake by default. To opt into the controlled local adapter, start the API with an authenticated `codex` CLI available on `PATH`:
+
+```bash
+CODEX_WORKER_REAL_ENABLED=true pnpm --filter @atellier/api dev
+```
+
+The real adapter executes only the fixed `rg --files`, `codex exec`, `git diff --no-ext-diff`, and `pnpm typecheck` envelopes with `shell: false`. The implementation step still requires explicit approval in Atellier; Codex runs with `--sandbox workspace-write`, the installed CLI's `--approve-for-me` automatic review, and `--ephemeral`, and dangerous bypass flags are rejected.
+
+Optional boundaries:
+
+```bash
+CODEX_WORKER_ALLOWED_DIRS=.,apps/api
+CODEX_WORKER_TIMEOUT_MS=120000
+CODEX_WORKER_MAX_OUTPUT_BYTES=1048576
 ```
 
 Run the API with OpenAI-backed agent execution:
@@ -76,8 +159,10 @@ Optional execution policy controls:
 
 ```bash
 AGENT_MAX_HANDOFF_DEPTH=1
-AGENT_EXECUTION_TIMEOUT_MS=45000
+AGENT_EXECUTION_TIMEOUT_MS=240000
 ```
+
+The 120-second default leaves enough room for source-grounded local models to return complete knowledge artifacts instead of timing out mid-document.
 
 Run the API without MongoDB for local UI review:
 
@@ -93,7 +178,7 @@ pnpm --filter @atellier/web dev
 
 The API defaults to `http://127.0.0.1:4000`.
 The web app defaults to Vite's local dev URL.
-Agent execution runs in real OpenAI mode by default for local runtime. You must provide `OPENAI_API_KEY`, or explicitly opt into mock mode with `AGENT_EXECUTOR_MODE=mock`.
+Agent execution defaults to `mock` unless you explicitly set `AGENT_EXECUTOR_MODE` or provide an `OPENAI_API_KEY` without an explicit mode.
 
 The API CORS default is intentionally local-first: browser origins on `localhost`, `127.0.0.1`, and `::1` are allowed for local development, while arbitrary remote origins are not reflected.
 The API listen host also defaults to `127.0.0.1`; set `API_HOST=0.0.0.0` only when you intentionally want LAN exposure.
@@ -109,6 +194,14 @@ pnpm test:api
 pnpm test:web
 ```
 
+With the local Mongo container running, execute the dedicated durable-runtime concurrency suite:
+
+```bash
+pnpm test:api:mongo-runtime
+```
+
+The suite creates a uniquely named test database and removes it after the run. Normal `pnpm test:api` remains deterministic and skips this opt-in Mongo suite.
+
 ## Build
 
 ```bash
@@ -122,14 +215,20 @@ pnpm build
 - `atelier/tasks`: markdown task views
 - `atelier/runs`: execution history
 
+Generated deliverables whose filenames start with ObjectIds or UUIDs are treated as local artifacts by default. Durable knowledge should be promoted into curated wiki pages and logs; see [docs/memory-artifact-hygiene.md](docs/memory-artifact-hygiene.md).
+
 ## Agent Orchestration
 
 The dashboard includes an Orchestration panel backed by:
 
 - `GET /orchestrations/skills`
 - `POST /orchestrations/skills/:skillId/run`
+- `GET /orchestrations/:runId/status`
+- `GET /runs?type=orchestration&status=queued,running`
+- `GET /runs/:runId/events` and `GET /runs/:runId/events/stream`
+- `POST /runs/:runId/cancel` and `POST /runs/:runId/retry`
 
-Current skills are `atellier-build-loop` and `llm-wiki-ingest-loop`. They use the existing local agent/run/wiki spine and do not yet execute external Codex workers or MCP tools.
+Current skills are `atellier-build-loop`, `llm-wiki-ingest-loop`, and `wiki-dream-loop`. They use the existing local agent/run/wiki spine and do not execute external Codex workers or MCP tools. See [docs/durable-local-runtime.md](docs/durable-local-runtime.md) for runtime semantics and recovery behavior.
 
 ## Codex Workflow
 
@@ -150,14 +249,12 @@ pnpm codex:wiki-lint
 
 ## Next Work
 
-Active plan: [`docs/next-iteration-plan-2026-05-06.md`](docs/next-iteration-plan-2026-05-06.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
+Active plan: [`docs/roadmap.md`](docs/roadmap.md). Strategic reframe after the *Code with Claude 2026* keynote (2026-05-06).
 
-1. **MCP server wrapper** over the REST API: expose `wiki/query`, `wiki/ingest`, `wiki/page`, `orchestrations/skills/:id/run`, `runs/list`, `runs/get` as MCP tools. Local-only auth. Targeted at Cowork + Claude Code.
-2. **Wiki Dream loop**: scheduled `wiki-curator` that prunes stale, resolves contradictions via `/wiki/lint`, links orphans, and reorganizes the index. v1 produces *proposed* changes the operator approves.
-3. **Anthropic executor mode** (`AGENT_EXECUTOR_MODE=anthropic`): Opus 4.7 default, native prompt caching, `/health` exposes new mode/model.
-4. **Skills 2.0 alignment**: audit `.agents/skills/` against the new format and migrate `atellier-build-loop` and `llm-wiki-ingest-loop` if compatible.
-5. **Codex Worker Evidence Pass v1.1** (deferred from previous P1): stronger per-step evidence, approval audit metadata. No real Codex CLI integration yet.
+1. **Daily-use repair soak and learning feedback**: use the bounded three-attempt repair loop against the local Mongo worker, resolve real curation signals, and record which failures repeat before expanding product scope.
 
-Auth, cloud deploy, multiplayer, vector search, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
+Already shipped: memory hygiene, Knowledge Graph v2 and follow-ups, role memory, Durable Runtime v1/v1.1, provider cancellation, irreversible-effect idempotency, the feature-flagged controlled Codex Worker adapter, the complete daily-use operational loop, explicit review-to-memory learning, and auditable curation-signal resolution.
 
-Read `CODEX_MEMORY.md`, `docs/next-iteration-plan-2026-05-06.md`, `docs/roadmap.md`, and `docs/current-state-and-next-steps.md` before starting an implementation pass.
+Auth, cloud deploy, multiplayer, vector search, graph DB, external meeting/chat/drive integrations, Computer Use, Batch/Citations/Files API, and broad creative connectors are intentionally out of scope. Pixel office expansion is no longer a priority — it remains as a visualization layer only.
+
+Read `CODEX_MEMORY.md`, `docs/next-iteration-plan-2026-05-06.md`, `docs/roadmap.md`, `docs/memory-artifact-hygiene.md`, `docs/knowledge-graph.md`, and `docs/current-state-and-next-steps.md` before starting an implementation pass.

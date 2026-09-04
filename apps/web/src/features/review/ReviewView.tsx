@@ -11,7 +11,19 @@ import {
   ShieldCheck,
   TimerReset,
 } from "lucide-react";
-import { RUN_REVIEW_STATUSES } from "@atellier/shared";
+import {
+  AGENT_ROLES,
+  REVIEW_LEARNING_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH,
+  REVIEW_LEARNING_RESOLUTION_OUTCOMES,
+  REVIEW_LEARNING_SIGNALS,
+  RUN_REVIEW_STATUSES,
+  type AgentRole,
+  type ReviewLearningResolutionOutcome,
+  type ReviewLearningSignal,
+  type Run,
+  type Task,
+} from "@atellier/shared";
 import { ValidationSummary } from "../../components/ValidationSummary";
 import { useRunsTimeline } from "../runs/hooks/useRunsTimeline";
 import { WikiPanel } from "../wiki/components/WikiPanel";
@@ -29,6 +41,7 @@ const TABS: { id: TabFilter; label: string }[] = [
 export function ReviewView() {
   const {
     runList,
+    taskList,
     filteredRunList,
     runLogMessages,
     agentFilter,
@@ -42,7 +55,11 @@ export function ReviewView() {
     isPromotingRunDeliverable,
     isUnlinkingRunDeliverable,
     isCapturingRunMemory,
+    isCuratingRunLearning,
+    isResolvingRunLearningSignal,
     capturedMemoryPath,
+    capturedRoleMemoryPath,
+    resolvedRoleMemoryPath,
     isAppendingRunLog,
     isCompletingRun,
     setAgentFilter,
@@ -55,6 +72,12 @@ export function ReviewView() {
     promoteRunDeliverable,
     unlinkRunDeliverable,
     captureRunMemory,
+    curateRunLearning,
+    getRunLearningDraft,
+    setRunLearningDraft,
+    getRunLearningResolutionDraft,
+    setRunLearningResolutionDraft,
+    resolveRunLearningSignal,
   } = useRunsTimeline();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,8 +120,12 @@ export function ReviewView() {
     })
     .filter((validation): validation is NonNullable<ReturnType<typeof readRunValidation>> => Boolean(validation));
 
-  const validationAlertIssues = validationAlerts.flatMap((validation) => validation.issues ?? []);
-  const validationAlertInvalidRefs = validationAlerts.flatMap((validation) => validation.invalidReferencedFiles ?? []);
+  const validationAlertIssues = dedupeValidationIssues(
+    validationAlerts.flatMap((validation) => validation.issues ?? []),
+  );
+  const validationAlertInvalidRefs = [...new Set(
+    validationAlerts.flatMap((validation) => validation.invalidReferencedFiles ?? []),
+  )].sort();
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -186,7 +213,8 @@ export function ReviewView() {
             </div>
             <ValidationSummary
               validation={{
-                role: "builder",
+                role: "aggregate",
+                profile: `${validationAlerts.length} affected run${validationAlerts.length === 1 ? "" : "s"}`,
                 passed: false,
                 issues: validationAlertIssues,
                 verifiedRepoFiles: [],
@@ -202,6 +230,18 @@ export function ReviewView() {
         {capturedMemoryPath ? (
           <p className="mb-4 m-0 border border-teal/25 rounded-lg px-2.5 py-2 text-[0.74rem] text-teal bg-teal/10 overflow-wrap-anywhere">
             Captured memory: {capturedMemoryPath}
+          </p>
+        ) : null}
+
+        {capturedRoleMemoryPath ? (
+          <p className="mb-4 m-0 border border-purple/25 rounded-lg px-2.5 py-2 text-[0.74rem] text-purple bg-purple/10 overflow-wrap-anywhere">
+            Curated role memory: {capturedRoleMemoryPath}
+          </p>
+        ) : null}
+
+        {resolvedRoleMemoryPath ? (
+          <p className="mb-4 m-0 border border-teal/25 rounded-lg px-2.5 py-2 text-[0.74rem] text-teal bg-teal/10 overflow-wrap-anywhere">
+            Resolved role signal: {resolvedRoleMemoryPath}
           </p>
         ) : null}
 
@@ -246,6 +286,9 @@ export function ReviewView() {
             const isRunning  = run.status === "running";
             const validation = readRunValidation(run);
             const validationHasIssues = Boolean(validation && !validation.passed);
+            const linkedTask = run.taskId ? taskList.find((task) => task.id === run.taskId) : undefined;
+            const learningDraft = getRunLearningDraft(run);
+            const resolutionDraft = getRunLearningResolutionDraft(run.id);
 
             return (
               <div
@@ -288,6 +331,10 @@ export function ReviewView() {
                     {latestLog.level}: {latestLog.message}
                   </p>
                 )}
+
+                {linkedTask ? <DailyLoopChain run={run} task={linkedTask} /> : null}
+
+                {run.type === "orchestration" ? <OrchestrationArtifactReview run={run} /> : null}
 
                 {validation ? (
                   <div className="mt-2 ml-6">
@@ -360,7 +407,7 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-green-400/35 text-green-400 bg-green-400/10 hover:bg-green-400/20"
                       onClick={() => setRunReview(run.id, "approved")}
-                      disabled={isUpdatingRunReview || validationHasIssues}
+                      disabled={isUpdatingRunReview || validationHasIssues || run.reviewStatus === "approved"}
                       title={validationHasIssues ? "Validation failed. Resolve issues before approving." : "Approve run"}
                     >
                       <ShieldCheck size={13} />
@@ -371,7 +418,7 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-orange/35 text-orange bg-orange/10 hover:bg-orange/20"
                       onClick={() => setRunReview(run.id, "changes-requested")}
-                      disabled={isUpdatingRunReview}
+                      disabled={isUpdatingRunReview || run.reviewStatus === "changes-requested"}
                     >
                       <CircleSlash size={13} />
                       Request changes
@@ -381,18 +428,18 @@ export function ReviewView() {
                       type="button"
                       className="h-7 px-2.5 text-[0.75rem] border-teal/35 text-teal bg-teal/10 hover:bg-teal/20"
                       onClick={() => captureRunMemory(run.id)}
-                      disabled={isCapturingRunMemory}
-                      title="Capture review memory to wiki"
+                      disabled={isCapturingRunMemory || run.reviewStatus !== "approved" || Boolean(run.memory)}
+                      title={run.memory ? `Memory captured at ${run.memory.wikiPath}` : "Approve the run before capturing review memory"}
                     >
                       <Archive size={13} />
-                      Capture memory
+                      {run.memory ? "Memory captured" : "Capture memory"}
                     </button>
 
                     <button
                       type="button"
                       className="icon-only-button w-7 min-w-[28px] h-7"
                       onClick={() => setRunReview(run.id, "pending")}
-                      disabled={isUpdatingRunReview}
+                      disabled={isUpdatingRunReview || run.reviewStatus === "pending"}
                       title="Reset to pending"
                       aria-label="Reset to pending review"
                     >
@@ -400,6 +447,122 @@ export function ReviewView() {
                     </button>
                   </div>
                 )}
+
+                {run.status === "completed" && run.reviewStatus === "approved" && run.memory && !run.memory.learning ? (
+                  <div className="mt-2.5 ml-6 border border-purple/20 rounded-lg p-2.5 bg-purple/[0.04]">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="m-0 text-[0.68rem] font-bold tracking-[0.08em] uppercase text-purple">
+                        Curate approved learning
+                      </p>
+                      <span className="text-[0.66rem] text-ink-faint">Explicit Wiki write</span>
+                    </div>
+                    <div className="grid grid-cols-[minmax(120px,0.35fr)_1fr] gap-2">
+                      <select
+                        aria-label={`Learning role for ${run.id}`}
+                        value={learningDraft.role}
+                        onChange={(event) => setRunLearningDraft(run.id, { role: event.target.value as AgentRole })}
+                        disabled={isCuratingRunLearning}
+                      >
+                        {AGENT_ROLES.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                      <input
+                        aria-label={`Learning note for ${run.id}`}
+                        value={learningDraft.lesson}
+                        maxLength={REVIEW_LEARNING_MAX_LENGTH}
+                        onChange={(event) => setRunLearningDraft(run.id, { lesson: event.target.value })}
+                        disabled={isCuratingRunLearning}
+                      />
+                      <select
+                        aria-label={`Curation signal for ${run.id}`}
+                        value={learningDraft.signal}
+                        onChange={(event) => setRunLearningDraft(run.id, {
+                          signal: event.target.value as ReviewLearningSignal | "",
+                        })}
+                        disabled={isCuratingRunLearning}
+                      >
+                        <option value="">No curation signal</option>
+                        {REVIEW_LEARNING_SIGNALS.map((signal) => (
+                          <option key={signal} value={signal}>{signal}</option>
+                        ))}
+                      </select>
+                      {learningDraft.signal ? (
+                        <input
+                          aria-label={`Curation signal path for ${run.id}`}
+                          value={learningDraft.signalPath}
+                          onChange={(event) => setRunLearningDraft(run.id, { signalPath: event.target.value })}
+                          placeholder="wiki/path/to-page.md"
+                          disabled={isCuratingRunLearning}
+                        />
+                      ) : (
+                        <p className="m-0 self-center text-[0.68rem] text-ink-faint">
+                          Optional signals appear in Wiki lint and Knowledge Graph.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-2 h-7 px-2.5 text-[0.75rem] border-purple/35 text-purple bg-purple/10 hover:bg-purple/20"
+                      onClick={() => curateRunLearning(run)}
+                      disabled={
+                        isCuratingRunLearning ||
+                        !learningDraft.lesson.trim() ||
+                        Boolean(learningDraft.signal && !learningDraft.signalPath.trim())
+                      }
+                    >
+                      <Archive size={13} />
+                      {isCuratingRunLearning ? "Curating..." : "Curate learning"}
+                    </button>
+                  </div>
+                ) : null}
+
+                {run.memory?.learning ? (
+                  <div className="mt-2 ml-6 border border-purple/15 rounded-lg p-2.5 bg-purple/[0.03] text-[0.68rem] text-purple overflow-wrap-anywhere">
+                    <p className="m-0">
+                      Role learning: {run.memory.learning.role} · {run.memory.learning.roleMemoryPath}
+                      {run.memory.learning.signal
+                        ? ` · ${run.memory.learning.signal}: ${run.memory.learning.signalPath}`
+                        : ""}
+                    </p>
+                    {run.memory.learning.resolution ? (
+                      <p className="mt-1 mb-0 text-teal">
+                        Signal {run.memory.learning.resolution.outcome}: {run.memory.learning.resolution.note}
+                      </p>
+                    ) : run.memory.learning.signal ? (
+                      <div className="mt-2 grid grid-cols-[minmax(120px,0.3fr)_1fr_auto] gap-2">
+                        <select
+                          aria-label={`Signal resolution outcome for ${run.id}`}
+                          value={resolutionDraft.outcome}
+                          onChange={(event) => setRunLearningResolutionDraft(run.id, {
+                            outcome: event.target.value as ReviewLearningResolutionOutcome,
+                          })}
+                          disabled={isResolvingRunLearningSignal}
+                        >
+                          {REVIEW_LEARNING_RESOLUTION_OUTCOMES.map((outcome) => (
+                            <option key={outcome} value={outcome}>{outcome}</option>
+                          ))}
+                        </select>
+                        <input
+                          aria-label={`Signal resolution note for ${run.id}`}
+                          value={resolutionDraft.note}
+                          maxLength={REVIEW_LEARNING_RESOLUTION_NOTE_MAX_LENGTH}
+                          placeholder="Record why this signal can be closed…"
+                          onChange={(event) => setRunLearningResolutionDraft(run.id, { note: event.target.value })}
+                          disabled={isResolvingRunLearningSignal}
+                        />
+                        <button
+                          type="button"
+                          className="h-8 px-2.5 text-[0.72rem] border-teal/35 text-teal bg-teal/10 hover:bg-teal/20"
+                          onClick={() => resolveRunLearningSignal(run.id)}
+                          disabled={isResolvingRunLearningSignal || !resolutionDraft.note.trim()}
+                        >
+                          {isResolvingRunLearningSignal ? "Resolving..." : "Resolve signal"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -417,6 +580,174 @@ export function ReviewView() {
   );
 }
 
+type OrchestrationReviewOutput = {
+  artifact?: { content?: string; sourceRunId?: string; stepId?: string };
+  repair?: { finalStepId?: string };
+  qaRetry?: {
+    attemptsUsed?: number;
+    maxAttempts?: number;
+    exhausted?: boolean;
+    finalStepId?: string;
+  };
+  qaChecklist?: {
+    complete?: boolean;
+    qaStepId?: string;
+    items?: Array<{ criterion?: string; status?: "pass" | "fail"; evidence?: string }>;
+  };
+  repeatedFeedback?: {
+    detected?: boolean;
+    firstQaStepId?: string;
+    repeatedQaStepId?: string;
+  };
+  semanticRepair?: {
+    attemptsUsed?: number;
+    maxAttempts?: number;
+    exhausted?: boolean;
+    finalStepId?: string;
+    lastValidArtifactStepId?: string;
+    lastQaStepId?: string;
+  };
+};
+
+function OrchestrationArtifactReview({ run }: { run: Run }) {
+  const output = run.output as OrchestrationReviewOutput | undefined;
+  const artifact = output?.artifact;
+  const qaRetry = output?.qaRetry;
+  const qaChecklist = output?.qaChecklist;
+  const repeatedFeedback = output?.repeatedFeedback;
+  const semantic = output?.semanticRepair;
+  if (!artifact?.content && !qaRetry && !semantic) return null;
+
+  return (
+    <div className="mt-2 ml-6 rounded-lg border border-purple/20 bg-purple/[0.04] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-ink-muted">
+        <strong className="text-ink text-[0.74rem]">Reviewable artifact</strong>
+        {artifact?.stepId ? <span>Preserved from: <b className="text-teal">{artifact.stepId}</b></span> : null}
+        {semantic?.finalStepId ? <span>Latest attempt: <b className="text-orange">{semantic.finalStepId}</b></span> : null}
+        {semantic?.lastQaStepId ? <span>Last QA: <b className="text-ink">{semantic.lastQaStepId}</b></span> : null}
+        {qaRetry?.attemptsUsed ? (
+          <span>{qaRetry.attemptsUsed}/{qaRetry.maxAttempts ?? 2} QA format retries</span>
+        ) : null}
+        {semantic?.attemptsUsed ? (
+          <span>{semantic.attemptsUsed}/{semantic.maxAttempts ?? 3} semantic attempts</span>
+        ) : null}
+      </div>
+      {semantic?.exhausted ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          Semantic repair exhausted. The artifact below remains reviewable, but approval and memory stay blocked.
+        </p>
+      ) : null}
+      {qaRetry?.exhausted ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          QA format retries exhausted. The artifact remains reviewable, but semantic repair, approval, and memory stay blocked.
+        </p>
+      ) : null}
+      {repeatedFeedback?.detected ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          Repeated QA findings stopped semantic repair ({repeatedFeedback.firstQaStepId} → {repeatedFeedback.repeatedQaStepId}).
+        </p>
+      ) : null}
+      {qaChecklist?.items?.length ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[0.72rem] font-semibold text-purple hover:text-ink">
+            Inspect QA acceptance checklist ({qaChecklist.items.filter((item) => item.status === "pass").length}/{qaChecklist.items.length} pass)
+          </summary>
+          <ul className="mt-2 mb-0 grid gap-1 pl-4 text-[0.7rem] text-ink-muted">
+            {qaChecklist.items.map((item, index) => (
+              <li key={`${item.criterion}-${index}`}>
+                <b className={item.status === "pass" ? "text-teal" : "text-orange"}>{item.status?.toUpperCase()}</b>
+                {` · ${item.criterion} — ${item.evidence}`}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {artifact?.content ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[0.72rem] font-semibold text-purple hover:text-ink">
+            Inspect preserved artifact
+          </summary>
+          <pre className="mt-2 mb-0 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-md border border-[var(--border-card)] bg-[var(--bg-app)] p-3 font-sans text-[0.72rem] leading-[1.55] text-ink-muted">
+            {artifact.content}
+          </pre>
+        </details>
+      ) : (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">No valid artifact is available for review.</p>
+      )}
+    </div>
+  );
+}
+
+function DailyLoopChain({ run, task }: { run: Run; task: Task }) {
+  const stages = [
+    { label: "Source", value: `${task.sourceIds?.length ?? 0} linked`, complete: Boolean(task.sourceIds?.length) },
+    { label: "Task", value: task.status, complete: true },
+    { label: "Run", value: run.status, complete: run.status === "completed" },
+    { label: "Deliverable", value: run.deliverablePath ? "ready" : "missing", complete: Boolean(run.deliverablePath) },
+    { label: "QA", value: hasQaEvidence(run) ? "passed" : "pending", complete: hasQaEvidence(run) },
+    { label: "Review", value: run.reviewStatus ?? "unlinked", complete: run.reviewStatus === "approved" },
+    { label: "Memory", value: run.memory ? "captured" : "pending", complete: Boolean(run.memory) },
+    {
+      label: "Learning",
+      value: run.memory?.learning ? run.memory.learning.role : "pending",
+      complete: Boolean(run.memory?.learning),
+    },
+    {
+      label: "Signal",
+      value: run.memory?.learning?.signal
+        ? run.memory.learning.resolution?.outcome ?? "open"
+        : "none",
+      complete: !run.memory?.learning?.signal || Boolean(run.memory.learning.resolution),
+    },
+  ];
+
+  return (
+    <div className="mt-2 ml-6 border border-[var(--border-card)] rounded-lg p-2 bg-black/15" aria-label={`Daily loop for ${task.title}`}>
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="m-0 text-[0.68rem] font-bold tracking-[0.08em] uppercase text-ink-faint">Daily loop</p>
+        <p className="m-0 text-[0.7rem] text-teal overflow-hidden text-ellipsis whitespace-nowrap" title={task.title}>
+          {task.title}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {stages.map((stage) => (
+          <span
+            key={stage.label}
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[0.66rem] ${
+              stage.complete
+                ? "border-teal/25 bg-teal/[0.06] text-teal"
+                : "border-[var(--border-card)] bg-white/[0.02] text-ink-faint"
+            }`}
+          >
+            <strong>{stage.label}</strong>
+            <span>{stage.value}</span>
+          </span>
+        ))}
+      </div>
+      {task.sourceIds?.length ? (
+        <p className="mt-1.5 mb-0 text-[0.66rem] text-ink-faint overflow-wrap-anywhere">
+          Sources: {task.sourceIds.join(" · ")}
+        </p>
+      ) : null}
+      {run.memory ? (
+        <p className="mt-1 mb-0 text-[0.66rem] text-teal overflow-wrap-anywhere">
+          Memory: {run.memory.wikiPath}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function hasQaEvidence(run: Run): boolean {
+  const validation = readRunValidation(run);
+  if (validation) {
+    return Boolean(validation.passed);
+  }
+
+  const steps = (run.output as { steps?: Array<{ stepId?: string; status?: string }> } | undefined)?.steps;
+  return Boolean(steps?.some((step) => ["qa", "approve"].includes(step.stepId ?? "") && step.status === "completed"));
+}
+
 function readRunValidation(run: {
   output?: unknown;
 }) {
@@ -424,6 +755,7 @@ function readRunValidation(run: {
     | {
         validation?: {
           role?: string;
+          profile?: string;
           passed?: boolean;
           issues?: Array<{ code?: string; message?: string; severity?: string }>;
           verifiedRepoFiles?: string[];
@@ -436,4 +768,16 @@ function readRunValidation(run: {
     | undefined;
 
   return output?.validation ?? null;
+}
+
+function dedupeValidationIssues<T extends { code?: string; message?: string; severity?: string }>(issues: T[]): T[] {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = [issue.code, issue.message, issue.severity].join("|");
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }

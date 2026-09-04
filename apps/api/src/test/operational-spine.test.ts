@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -6,15 +6,23 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {
   Agent,
   AgentMessage,
+  KnowledgeGraphResponse,
   OrchestrationSkillSummary,
   OrchestrationStatusResult,
   Run,
+  RunEventsResponse,
   RunAgentResult,
   StartSkillOrchestrationResponse,
   Task,
+  WikiIngestResponse,
   WikiPageResponse,
+  WikiQueryResponse,
+  WikiReflectionResponse,
+  WikiReflectionDecisionRecord,
+  WikiReflectionPromotionRecord,
 } from "@atellier/shared";
 import { buildServer } from "../server";
+import { createAppServices } from "../services/app-services";
 
 describe("operational spine routes", () => {
   let server: FastifyInstance;
@@ -57,6 +65,12 @@ describe("operational spine routes", () => {
       executorMode: "mock",
       executorModel: "mock",
       modelProfile: "standard",
+      availableExecutorModes: expect.arrayContaining(["mock"]),
+      codexWorker: {
+        executionAdapter: "fake",
+        label: "fake-safe",
+        realExecutionEnabled: false,
+      },
       mongo: {
         connected: false,
       },
@@ -116,6 +130,141 @@ describe("operational spine routes", () => {
     expect(task.priority).toBe("high");
   });
 
+  it("builds a deterministic knowledge graph from local operational memory", async () => {
+    const deliverablesDir = path.join(atelierRoot, "wiki", "deliverables");
+    await mkdir(deliverablesDir, { recursive: true });
+    await writeFile(
+      path.join(deliverablesDir, "45d6e401-5f68-4d6c-a189-809b554cfe25-atellier-build-loop-completed.md"),
+      "# Generated deliverable\n",
+      "utf8",
+    );
+    const agentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Graph Builder",
+        role: "builder",
+      },
+    });
+    const agent = agentResponse.json<Agent>();
+
+    const taskResponse = await server.inject({
+      method: "POST",
+      url: "/tasks",
+      payload: {
+        title: "Map operational memory",
+        status: "active",
+        assignedAgentId: agent.id,
+      },
+    });
+    const task = taskResponse.json<Task>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: "/runs",
+      payload: {
+        agentId: agent.id,
+        taskId: task.id,
+        type: "manual",
+      },
+    });
+    const run = runResponse.json<Run>();
+
+    await server.inject({
+      method: "PATCH",
+      url: `/runs/${run.id}/complete`,
+      payload: {
+        summary: "Graph read model seed run.",
+        reviewStatus: "approved",
+      },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/dreams/2026-05-13-dream-report.md",
+        content: "# Dream Report\n\n## Proposed actions\n\n1. Link orphan pages.",
+      },
+    });
+
+    const decisionResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: {
+        reportPath: "wiki/dreams/2026-05-13-dream-report.md",
+        proposal: "Link orphan pages.",
+        decision: "accepted",
+        rationale: "Page cleanup approved.",
+      },
+    });
+    expect(decisionResponse.statusCode).toBe(201);
+
+    const graphResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph",
+    });
+
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(graph.stats.nodes).toBe(graph.nodes.length);
+    expect(graph.stats.edges).toBe(graph.edges.length);
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: `agent:${agent.id}`, type: "agent", label: "Graph Builder" }),
+        expect.objectContaining({ id: "role:builder", type: "role", label: "builder" }),
+        expect.objectContaining({ id: `task:${task.id}`, type: "task", label: "Map operational memory" }),
+        expect.objectContaining({ id: `run:${run.id}`, type: "run", label: "manual run" }),
+        expect.objectContaining({ type: "dream-decision", label: "Dream accepted" }),
+      ]),
+    );
+    expect(graph.nodes.some((node) => node.path === "wiki/deliverables/45d6e401-5f68-4d6c-a189-809b554cfe25-atellier-build-loop-completed.md")).toBe(false);
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "agent_has_role",
+          from: `agent:${agent.id}`,
+          to: "role:builder",
+        }),
+        expect.objectContaining({
+          type: "agent_assigned_task",
+          from: `agent:${agent.id}`,
+          to: `task:${task.id}`,
+        }),
+        expect.objectContaining({
+          type: "run_by_agent",
+          from: `run:${run.id}`,
+          to: `agent:${agent.id}`,
+        }),
+        expect.objectContaining({
+          type: "run_for_task",
+          from: `run:${run.id}`,
+          to: `task:${task.id}`,
+        }),
+        expect.objectContaining({
+          type: "dream_decision_for_report",
+          to: "wiki-page:wiki/dreams/2026-05-13-dream-report.md",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps knowledge graph reads free of wiki lint log side effects", async () => {
+    const beforeResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    const before = beforeResponse.json<WikiPageResponse>().content;
+
+    expect((await server.inject({ method: "GET", url: "/knowledge/graph" })).statusCode).toBe(200);
+    expect((await server.inject({ method: "GET", url: "/knowledge/graph" })).statusCode).toBe(200);
+
+    const afterResponse = await server.inject({ method: "GET", url: "/wiki/log" });
+    expect(afterResponse.json<WikiPageResponse>().content).toBe(before);
+
+    expect((await server.inject({ method: "POST", url: "/wiki/lint" })).statusCode).toBe(200);
+    const explicitLintLog = await server.inject({ method: "GET", url: "/wiki/log" });
+    expect(explicitLintLog.json<WikiPageResponse>().content).toContain("wiki_lint | Wiki lint run");
+  });
+
   it("rejects oversized task titles and run log messages", async () => {
     const oversizedTaskResponse = await server.inject({
       method: "POST",
@@ -146,6 +295,262 @@ describe("operational spine routes", () => {
     });
 
     expect(oversizedLogResponse.statusCode).toBe(400);
+  });
+
+  it("creates dream_decision_for_report edge when referenced dream report exists", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/dreams/2026-05-13-existing-report.md",
+        content: "# Dream Report\n\n## Proposed actions\n\n1. Keep curation cadence.",
+      },
+    });
+
+    const decisionResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: {
+        reportPath: "wiki/dreams/2026-05-13-existing-report.md",
+        proposal: "Keep curation cadence.",
+        decision: "accepted",
+      },
+    });
+    expect(decisionResponse.statusCode).toBe(201);
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream-decision",
+          metadata: expect.objectContaining({
+            decision: "accepted",
+            reportPath: "wiki/dreams/2026-05-13-existing-report.md",
+            proposal: "Keep curation cadence.",
+          }),
+        }),
+      ]),
+    );
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream_decision_for_report",
+          to: "wiki-page:wiki/dreams/2026-05-13-existing-report.md",
+        }),
+      ]),
+    );
+  });
+
+  it("does not create dream_decision_for_report edge when referenced dream report is missing", async () => {
+    const decisionResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: {
+        reportPath: "wiki/dreams/2026-05-13-missing-report.md",
+        proposal: "This report is intentionally absent.",
+        decision: "deferred",
+      },
+    });
+    expect(decisionResponse.statusCode).toBe(201);
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream-decision",
+          metadata: expect.objectContaining({
+            decision: "deferred",
+            reportPath: "wiki/dreams/2026-05-13-missing-report.md",
+            proposal: "This report is intentionally absent.",
+          }),
+        }),
+      ]),
+    );
+
+    const hasEdgeToMissingReport = graph.edges.some(
+      (edge) =>
+        edge.type === "dream_decision_for_report" &&
+        edge.to === "wiki-page:wiki/dreams/2026-05-13-missing-report.md",
+    );
+    expect(hasEdgeToMissingReport).toBe(false);
+  });
+
+  it("maps dream decision quality states in the graph", async () => {
+    const reportPath = "wiki/dreams/2026-05-13-quality-map-report.md";
+    await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: reportPath,
+        content: "# Dream Report\n\n## Proposed actions\n\n1. A\n2. B\n3. C",
+      },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: { reportPath, proposal: "A", decision: "accepted" },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: { reportPath, proposal: "B", decision: "deferred" },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/wiki/dream-decisions",
+      payload: { reportPath, proposal: "C", decision: "rejected" },
+    });
+
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    expect(graphResponse.statusCode).toBe(200);
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "dream-decision",
+          quality: "verified",
+          metadata: expect.objectContaining({ decision: "accepted", proposal: "A" }),
+        }),
+        expect.objectContaining({
+          type: "dream-decision",
+          quality: "proposed",
+          metadata: expect.objectContaining({ decision: "deferred", proposal: "B" }),
+        }),
+        expect.objectContaining({
+          type: "dream-decision",
+          quality: "contradicted",
+          metadata: expect.objectContaining({ decision: "rejected", proposal: "C" }),
+        }),
+      ]),
+    );
+  });
+
+  it("reloads persisted graph snapshots after server restart", async () => {
+    const firstGraphResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph",
+    });
+    expect(firstGraphResponse.statusCode).toBe(200);
+    const firstGraph = firstGraphResponse.json<KnowledgeGraphResponse>();
+
+    const firstListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph/snapshots",
+    });
+    expect(firstListResponse.statusCode).toBe(200);
+    const firstList = firstListResponse.json<{ snapshots: Array<{ id: string }> }>();
+    expect(firstList.snapshots.length).toBeGreaterThan(0);
+
+    await server.close();
+    server = await buildServer({
+      storageMode: "memory",
+      atelierRoot,
+    });
+
+    const reloadedListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph/snapshots",
+    });
+    expect(reloadedListResponse.statusCode).toBe(200);
+    const reloadedList = reloadedListResponse.json<{ snapshots: Array<{ id: string }> }>();
+    expect(reloadedList.snapshots.some((snapshot) => snapshot.id === firstGraph.generatedAt)).toBe(true);
+  });
+
+  it("returns snapshot diff for a valid snapshot pair", async () => {
+    const firstGraphResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/graph",
+    });
+    expect(firstGraphResponse.statusCode).toBe(200);
+    const firstGraph = firstGraphResponse.json<KnowledgeGraphResponse>();
+
+    const diffResponse = await server.inject({
+      method: "GET",
+      url: `/knowledge/graph/diff?base=${encodeURIComponent(firstGraph.generatedAt)}&head=${encodeURIComponent(firstGraph.generatedAt)}`,
+    });
+    expect(diffResponse.statusCode).toBe(200);
+    const diff = diffResponse.json<{
+      baseId: string;
+      headId: string;
+      nodes: { added: number; removed: number };
+      edges: { added: number; removed: number };
+    }>();
+    expect(diff.baseId).toBe(firstGraph.generatedAt);
+    expect(diff.headId).toBe(firstGraph.generatedAt);
+    expect(diff.nodes.added).toBe(0);
+    expect(diff.nodes.removed).toBe(0);
+    expect(diff.edges.added).toBe(0);
+    expect(diff.edges.removed).toBe(0);
+  });
+
+  it("stores knowledge annotations and filter presets", async () => {
+    const graphResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    const graph = graphResponse.json<KnowledgeGraphResponse>();
+    const nodeId = graph.nodes[0]?.id;
+    expect(nodeId).toBeDefined();
+
+    const saveAnnotationResponse = await server.inject({
+      method: "POST",
+      url: "/knowledge/annotations",
+      payload: {
+        nodeId,
+        note: "Needs follow-up in the next curation pass.",
+        tags: ["curation", "follow-up"],
+      },
+    });
+    expect(saveAnnotationResponse.statusCode).toBe(201);
+
+    const annotationListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/annotations",
+    });
+    expect(annotationListResponse.statusCode).toBe(200);
+    expect(annotationListResponse.json<{ annotations: Array<{ nodeId: string }> }>().annotations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ nodeId })]),
+    );
+
+    const presetCreateResponse = await server.inject({
+      method: "POST",
+      url: "/knowledge/filter-presets",
+      payload: {
+        name: "Needs curation",
+        nodeTypeFilter: "all",
+        qualityFilter: "stale",
+        activeLayers: ["wiki", "meta"],
+        dreamDecisionFilter: "all",
+        densityMode: "comfort",
+      },
+    });
+    expect(presetCreateResponse.statusCode).toBe(201);
+
+    const presetListResponse = await server.inject({
+      method: "GET",
+      url: "/knowledge/filter-presets",
+    });
+    expect(presetListResponse.statusCode).toBe(200);
+    expect(presetListResponse.json<{ presets: Array<{ name: string }> }>().presets).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Needs curation" })]),
+    );
+
+    const graphWithAnnotationResponse = await server.inject({ method: "GET", url: "/knowledge/graph" });
+    const graphWithAnnotation = graphWithAnnotationResponse.json<KnowledgeGraphResponse>();
+    expect(graphWithAnnotation.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: nodeId,
+          metadata: expect.objectContaining({
+            annotationNote: "Needs follow-up in the next curation pass.",
+            annotationTags: "curation,follow-up",
+          }),
+        }),
+      ]),
+    );
   });
 
   it("creates runs, appends run logs, and writes wiki log on completion", async () => {
@@ -294,6 +699,59 @@ describe("operational spine routes", () => {
     expect(messageList).toHaveLength(2);
     expect(messageList[0]?.role).toBe("user");
     expect(messageList[1]?.role).toBe("assistant");
+  });
+
+  it("accepts a per-run executor override when the mode is available", async () => {
+    const createAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Override Agent",
+        role: "builder",
+      },
+    });
+
+    const agent = createAgentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run`,
+      payload: {
+        instruction: "Run with an explicit mode override.",
+        executorModeOverride: "mock",
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(200);
+    const result = runResponse.json<RunAgentResult>();
+    expect((result.run.input as { executorMode?: string }).executorMode).toBe("mock");
+  });
+
+  it("rejects per-run executor overrides for unavailable modes", async () => {
+    const createAgentResponse = await server.inject({
+      method: "POST",
+      url: "/agents",
+      payload: {
+        name: "Unavailable Override Agent",
+        role: "builder",
+      },
+    });
+
+    const agent = createAgentResponse.json<Agent>();
+
+    const runResponse = await server.inject({
+      method: "POST",
+      url: `/agents/${agent.id}/run`,
+      payload: {
+        instruction: "Try unavailable override.",
+        executorModeOverride: "openai",
+      },
+    });
+
+    expect(runResponse.statusCode).toBe(400);
+    expect(runResponse.json()).toMatchObject({
+      error: expect.stringContaining("not available"),
+    });
   });
 
   it("updates agent instructions", async () => {
@@ -624,6 +1082,183 @@ describe("operational spine routes", () => {
     );
   });
 
+  it("persists queued orchestration state and supports cancellation before claim", async () => {
+    await server.close();
+    server = await buildServer({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+    });
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: { goal: "Keep this orchestration queued until a worker claims it." },
+    });
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+
+    const runResponse = await server.inject({ method: "GET", url: `/runs/${started.runId}` });
+    const queuedRun = runResponse.json<Run>();
+    expect(queuedRun.status).toBe("queued");
+    expect(queuedRun.execution).toMatchObject({
+      schemaVersion: 1,
+      kind: "skill-orchestration",
+      phase: "queued",
+      attempt: 0,
+      maxAttempts: 3,
+      nextEventSequence: 1,
+    });
+    expect(queuedRun.execution?.definitionHash).toMatch(/^[a-f0-9]{64}$/);
+
+    const activeResponse = await server.inject({
+      method: "GET",
+      url: "/runs?type=orchestration&status=queued,running",
+    });
+    expect(activeResponse.json<Run[]>().map((run) => run.id)).toContain(started.runId);
+
+    const cancelResponse = await server.inject({ method: "POST", url: `/runs/${started.runId}/cancel` });
+    expect(cancelResponse.statusCode).toBe(200);
+    expect(cancelResponse.json<Run>()).toMatchObject({
+      id: started.runId,
+      status: "cancelled",
+      execution: { phase: "cancelled" },
+    });
+
+    const eventsResponse = await server.inject({ method: "GET", url: `/runs/${started.runId}/events` });
+    const events = eventsResponse.json<RunEventsResponse>();
+    expect(events.events.map((event) => event.type)).toEqual(["queued", "cancelled"]);
+    expect(events.nextCursor).toBe(2);
+  });
+
+  it("retries durable orchestrations without duplicating completed step runs", async () => {
+    await server.close();
+    const services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/wiki-dream-loop/run",
+      payload: { goal: "Exercise resumable step commits." },
+    });
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+
+    const firstStepRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    expect(firstStepRuns).toHaveLength(4);
+    await services.runs.updateExecution(started.runId, {
+      status: "failed",
+      phase: "failed",
+      finishedAt: new Date().toISOString(),
+    });
+
+    const retryResponse = await server.inject({ method: "POST", url: `/runs/${started.runId}/retry` });
+    expect(retryResponse.statusCode).toBe(200);
+    expect(retryResponse.json<Run>().status).toBe("queued");
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+
+    const replayedStepRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    expect(replayedStepRuns).toHaveLength(firstStepRuns.length);
+    const eventsResponse = await server.inject({ method: "GET", url: `/runs/${started.runId}/events` });
+    const eventTypes = eventsResponse.json<RunEventsResponse>().events.map((event) => event.type);
+    expect(eventTypes.filter((type) => type === "step_reused")).toHaveLength(4);
+    expect(eventTypes.at(-1)).toBe("completed");
+  });
+
+  it("settles interrupted child runs before a reclaimed orchestration resumes", async () => {
+    await server.close();
+    const services = await createAppServices({
+      storageMode: "memory",
+      atelierRoot,
+      inlineDurableRuntime: false,
+    });
+    server = await buildServer({ storageMode: "memory", atelierRoot, services });
+
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/wiki-dream-loop/run",
+      payload: { goal: "Recover an interrupted child run." },
+    });
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    await services.runs.updateExecution(started.runId, {
+      status: "queued",
+      phase: "queued",
+      attempt: 1,
+      availableAt: new Date().toISOString(),
+    });
+    const interrupted = await services.runs.create({
+      type: "manual",
+      status: "running",
+      input: {
+        orchestrationRunId: started.runId,
+        orchestrationStepId: "audit",
+        orchestrationStepLabel: "Audit the wiki",
+      },
+    });
+
+    expect(await services.durableRuntime.runOnce()).toBe(true);
+
+    expect(await services.runs.getById(interrupted.id)).toMatchObject({
+      status: "failed",
+      logs: [
+        expect.objectContaining({
+          level: "warn",
+          message: "Superseded after the parent orchestration was reclaimed or retried.",
+        }),
+      ],
+    });
+    const childRuns = await services.runs.listByOrchestrationRunId(started.runId);
+    expect(childRuns.filter((run) => run.status === "running")).toHaveLength(0);
+    expect((await services.runs.getById(started.runId))?.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "Recovered 1 interrupted child run(s) from an earlier worker attempt.",
+        }),
+      ]),
+    );
+  });
+
+  it("accepts orchestration executor override when available", async () => {
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: {
+        goal: "Run orchestration with explicit override.",
+        executorModeOverride: "mock",
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(202);
+    const started = startResponse.json<StartSkillOrchestrationResponse>();
+    const runResponse = await server.inject({
+      method: "GET",
+      url: "/runs",
+    });
+    const runList = runResponse.json<Run[]>();
+    const orchestrationRun = runList.find((run) => run.id === started.runId);
+    expect(orchestrationRun).toBeDefined();
+    expect((orchestrationRun?.input as { executorModeOverride?: string })?.executorModeOverride).toBe("mock");
+  });
+
+  it("rejects orchestration executor override when unavailable", async () => {
+    const startResponse = await server.inject({
+      method: "POST",
+      url: "/orchestrations/skills/atellier-build-loop/run",
+      payload: {
+        goal: "Run orchestration with unavailable override.",
+        executorModeOverride: "openai",
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(400);
+    expect(startResponse.json()).toMatchObject({
+      error: expect.stringContaining("not available"),
+    });
+  });
+
   it("returns 400 for invalid object ids on agent run stream route", async () => {
     const response = await server.inject({
       method: "POST",
@@ -676,10 +1311,17 @@ describe("operational spine routes", () => {
     });
 
     expect(ingestResponse.statusCode).toBe(201);
-    const ingest = ingestResponse.json<{ rawPath: string; summaryPagePath: string; logPath: string }>();
+    const ingest = ingestResponse.json<WikiIngestResponse>();
     expect(ingest.rawPath).toContain("raw/ingest/");
     expect(ingest.summaryPagePath).toContain("wiki/sources/");
     expect(ingest.logPath).toBe("wiki/log.md");
+    expect(ingest.rawMemory).toMatchObject({ layer: "raw", state: "immutable-source", authority: "evidence-only" });
+    expect(ingest.summaryMemory).toMatchObject({
+      layer: "semantic",
+      state: "generated",
+      authority: "context-only",
+      provenancePaths: [ingest.rawPath],
+    });
     expect(Array.isArray((ingestResponse.json() as { proposedTasks?: unknown[] }).proposedTasks)).toBe(true);
 
     const rawPageResponse = await server.inject({
@@ -743,15 +1385,339 @@ describe("operational spine routes", () => {
     expect(queryResponse.statusCode).toBe(200);
     const queryResult = queryResponse.json<{
       query: string;
-      matches: Array<{ path: string; snippet: string }>;
-      relatedPages: Array<{ path: string; summary: string; reason: string }>;
+      retrievalPolicy: string;
+      matches: Array<{ path: string; snippet: string; memory: { state: string; authority: string; provenancePaths: string[] }; retrieval: { lexical: number; trustAdjustment: number; total: number; reason: string } }>;
+      relatedPages: Array<{ path: string; summary: string; reason: string; memory: { state: string } }>;
       contradictions: Array<{ primaryPath: string; conflictingPath: string; reason: string }>;
     }>();
     expect(queryResult.query).toBe("preserve raw sources");
+    expect(queryResult.retrievalPolicy).toBe("balanced");
     expect(queryResult.matches.length).toBeGreaterThan(0);
     expect(queryResult.matches.some((match) => match.path.startsWith("wiki/"))).toBe(true);
+    expect(queryResult.matches.find((match) => match.path.startsWith("wiki/"))?.memory).toMatchObject({
+      state: "generated",
+      authority: "context-only",
+      provenancePaths: [expect.stringContaining("raw/ingest/")],
+    });
+    expect(queryResult.matches.find((match) => match.path.startsWith("wiki/"))?.retrieval).toMatchObject({
+      trustAdjustment: 0,
+      reason: expect.stringContaining("no authority boost"),
+    });
+    expect(queryResult.matches.find((match) => match.path.startsWith("raw/"))?.memory.authority).toBe("evidence-only");
     expect(Array.isArray(queryResult.relatedPages)).toBe(true);
     expect(Array.isArray(queryResult.contradictions)).toBe(true);
+  });
+
+  it("queries a fresh Wiki safely when no raw directory exists", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "not present", retrievalPolicy: "evidence-first" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<WikiQueryResponse>()).toMatchObject({
+      retrievalPolicy: "evidence-first",
+      matches: [],
+    });
+  });
+
+  it("applies explicit trust-aware retrieval policies", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: {
+        title: "Generated retrieval context",
+        content: "trust aware retrieval marker",
+        sourceType: "note",
+      },
+    });
+    await mkdir(path.join(atelierRoot, "wiki", "notes"), { recursive: true });
+    await writeFile(
+      path.join(atelierRoot, "wiki", "notes", "trusted-retrieval-note.md"),
+      "# Trusted note\n\ntrust aware retrieval marker\n",
+      "utf8",
+    );
+
+    const balanced = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "balanced", limit: 10 },
+    });
+    expect(balanced.statusCode).toBe(200);
+    const balancedBody = balanced.json<WikiQueryResponse>();
+    expect(balancedBody.retrievalPolicy).toBe("balanced");
+    expect(balancedBody.matches[0]).toMatchObject({
+      path: "wiki/notes/trusted-retrieval-note.md",
+      memory: { authority: "trusted" },
+      retrieval: { trustAdjustment: 4 },
+    });
+
+    const evidenceFirst = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "evidence-first", limit: 10 },
+    });
+    expect(evidenceFirst.json<WikiQueryResponse>().matches[0]).toMatchObject({
+      memory: { authority: "evidence-only" },
+      retrieval: { trustAdjustment: 4 },
+    });
+
+    const trustedOnly = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "trusted-only", limit: 10 },
+    });
+    const trustedOnlyBody = trustedOnly.json<WikiQueryResponse>();
+    expect(trustedOnlyBody.matches).toHaveLength(1);
+    expect(trustedOnlyBody.matches[0]?.memory.authority).toBe("trusted");
+
+    const invalid = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "trust aware retrieval marker", retrievalPolicy: "automatic-trust" },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json<{ error: string }>().error).toContain("Invalid retrieval policy");
+  });
+
+  it("derives generated reflection candidates from repeated episodic evidence without persisting them", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const repeated = "Validation blockers need explicit evidence before approval.";
+    await writeFile(path.join(atelierRoot, "runs", "run-one.md"), `# Run one\n\n- Summary: ${repeated}\n- Summary: ${repeated}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "run-two.md"), `# Run two\n\n- Blocker: ${repeated}\n`, "utf8");
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections",
+      payload: { minOccurrences: 2, limit: 5 },
+    });
+    expect(response.statusCode).toBe(200);
+    const result = response.json<WikiReflectionResponse>();
+    expect(result).toMatchObject({ scannedEpisodes: 2, minOccurrences: 2 });
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+      pattern: repeated,
+      occurrenceCount: 2,
+      evidencePaths: ["runs/run-one.md", "runs/run-two.md"],
+      suggestedPath: expect.stringMatching(/^wiki\/reflections\/reflection-/),
+      memory: {
+        layer: "semantic",
+        state: "generated",
+        authority: "context-only",
+        provenancePaths: ["runs/run-one.md", "runs/run-two.md"],
+      },
+    });
+    expect(result.candidates[0]?.draftMarkdown).toContain("- Status: proposed");
+
+    const unsavedPage = await server.inject({
+      method: "GET",
+      url: `/wiki/page?path=${encodeURIComponent(result.candidates[0]!.suggestedPath)}`,
+    });
+    expect(unsavedPage.statusCode).toBe(404);
+
+    const accept = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: result.candidates[0]!.id, decision: "accepted", note: "This is a reusable approval rule." },
+    });
+    expect(accept.statusCode).toBe(201);
+    const decision = accept.json<WikiReflectionDecisionRecord>();
+    expect(decision).toMatchObject({ decision: "accepted", note: "This is a reusable approval rule." });
+
+    const retry = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: result.candidates[0]!.id, decision: "accepted", note: "This is a reusable approval rule." },
+    });
+    expect(retry.statusCode).toBe(201);
+    expect(retry.json<WikiReflectionDecisionRecord>().path).toBe(decision.path);
+
+    const conflict = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: result.candidates[0]!.id, decision: "rejected", note: "Changed mind." },
+    });
+    expect(conflict.statusCode).toBe(400);
+    expect(conflict.json<{ error: string }>().error).toContain("different durable decision");
+
+    const promote = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/promote",
+      payload: { decisionPath: decision.path },
+    });
+    expect(promote.statusCode).toBe(201);
+    expect(promote.json<WikiReflectionPromotionRecord>()).toMatchObject({
+      decisionPath: decision.path,
+      promotedPath: expect.stringMatching(/^wiki\/notes\/reflection-/),
+      memory: { state: "verified", authority: "trusted" },
+    });
+  });
+
+  it("blocks promotion from a rejected reflection decision", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Repeated handoff failures require a documented owner.";
+    await writeFile(path.join(atelierRoot, "runs", "handoff-one.md"), `# One\n\n- Summary: ${pattern}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "handoff-two.md"), `# Two\n\n- Summary: ${pattern}\n`, "utf8");
+    const reflection = await server.inject({ method: "POST", url: "/wiki/reflections", payload: {} });
+    const candidate = reflection.json<WikiReflectionResponse>().candidates[0]!;
+    const rejected = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: candidate.id, decision: "rejected", note: "This pattern is incidental." },
+    });
+    const decision = rejected.json<WikiReflectionDecisionRecord>();
+    const promotion = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/promote",
+      payload: { decisionPath: decision.path },
+    });
+    expect(promotion.statusCode).toBe(400);
+    expect(promotion.json<{ error: string }>().error).toContain("Only an accepted reflection decision");
+  });
+
+  it("rehydrates durable reflection review status and filters structural noise", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Operators should inspect grounded evidence before accepting reusable memory.";
+    const noise = [
+      '- Summary: {"id":"69f95af32a78a0f3f371f5ce","path":"wiki/notes/noise.md"}',
+      "- Summary: Builder completed execution and requests review.",
+      "- Summary: Atellier Build Loop completed.",
+      "- Summary: Atellier Build Loop completed with validation blockers.",
+      "- Summary: `pnpm test:api` passed.",
+      "- Summary: pnpm typecheck/test ✅",
+      "- Summary: LLM Wiki Ingest Loop completed.",
+      "- Summary: Manual run completed.",
+      "- Summary: Phase 3 finalize generated run artifact.",
+      "- Summary: Completed steps 3/3.",
+      "- Summary: fake executor returned deterministic output.",
+      "- Summary: stdout/stderr written to runs/output.log.",
+      "- Summary: Bruno Builder completed handoff execution.",
+      "- Summary: Codex Worker completed all steps. Live demo.",
+      "- Summary: Finalized from dashboard codex worker panel.",
+      "- Summary: Live flow demo completed successfully.",
+      "This repeated unlabeled operational sentence must not become a reflection candidate.",
+    ].join("\n");
+    await writeFile(path.join(atelierRoot, "runs", "review-one.md"), `# One\n\n- Lesson: ${pattern}\n${noise}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "review-two.md"), `# Two\n\n- Lesson: ${pattern}\n${noise}\n`, "utf8");
+
+    const initial = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(initial.statusCode).toBe(200);
+    const pending = initial.json<import("@atellier/shared").WikiReflectionReviewResponse>().items;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ pattern, status: "pending", id: expect.stringMatching(/^reflection-.+-[a-f0-9]{20}$/) });
+
+    const decision = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/decisions",
+      payload: { candidateId: pending[0]!.id, decision: "accepted", note: "Verified across two grounded runs." },
+    });
+    expect(decision.statusCode).toBe(201);
+    const afterDecision = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(afterDecision.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]).toMatchObject({
+      status: "accepted",
+      decisionNote: "Verified across two grounded runs.",
+      decisionPath: expect.stringContaining("wiki/decisions/reflection-"),
+    });
+    const fakePromotion = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: `wiki/notes/${pending[0]!.id}.md`, content: "# Not a promotion\n\n- Review: approved" },
+    });
+    expect(fakePromotion.statusCode).toBe(201);
+    const afterFakePromotion = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(afterFakePromotion.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]?.status).toBe("accepted");
+  });
+
+  it("rejects malformed or generic reflection decisions during promotion", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Promotion requires a canonical specialized decision with complete provenance.";
+    await writeFile(path.join(atelierRoot, "runs", "tamper-one.md"), `# One\n\n- Lesson: ${pattern}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "tamper-two.md"), `# Two\n\n- Lesson: ${pattern}\n`, "utf8");
+    const review = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    const candidate = review.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]!;
+    const decisionPath = `wiki/decisions/${candidate.id}.md`;
+    await mkdir(path.join(atelierRoot, "wiki", "decisions"), { recursive: true });
+    await writeFile(
+      path.join(atelierRoot, decisionPath),
+      `# Fake decision\n\n- Trust source: generic-write\n- Candidate ID: ${candidate.id}\n- Decision: accepted\n\n## Pattern\n\n${pattern}\n`,
+      "utf8",
+    );
+    const promotion = await server.inject({
+      method: "POST",
+      url: "/wiki/reflections/promote",
+      payload: { decisionPath },
+    });
+    expect(promotion.statusCode).toBe(400);
+    expect(promotion.json<{ error: string }>().error).toContain("not a trusted specialized decision");
+    const rehydrated = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(rehydrated.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]?.status).toBe("pending");
+  });
+
+  it("fails closed when conflicting reflection decisions arrive concurrently", async () => {
+    await mkdir(path.join(atelierRoot, "runs"), { recursive: true });
+    const pattern = "Concurrent review decisions must preserve exactly one durable operator outcome.";
+    await writeFile(path.join(atelierRoot, "runs", "race-one.md"), `# One\n\n- Lesson: ${pattern}\n`, "utf8");
+    await writeFile(path.join(atelierRoot, "runs", "race-two.md"), `# Two\n\n- Lesson: ${pattern}\n`, "utf8");
+    const review = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    const candidate = review.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]!;
+    const [accepted, rejected] = await Promise.all([
+      server.inject({
+        method: "POST",
+        url: "/wiki/reflections/decisions",
+        payload: { candidateId: candidate.id, decision: "accepted", note: "Accept the grounded pattern." },
+      }),
+      server.inject({
+        method: "POST",
+        url: "/wiki/reflections/decisions",
+        payload: { candidateId: candidate.id, decision: "rejected", note: "Reject the incidental pattern." },
+      }),
+    ]);
+    expect([accepted.statusCode, rejected.statusCode].sort()).toEqual([201, 400]);
+    const persisted = await server.inject({ method: "GET", url: "/wiki/reflections/review" });
+    expect(["accepted", "rejected"]).toContain(
+      persisted.json<import("@atellier/shared").WikiReflectionReviewResponse>().items[0]?.status,
+    );
+  });
+
+  it("keeps raw ingest append-only and makes exact retries idempotent", async () => {
+    const payload = { title: "Same title", content: "First immutable source body.", sourceType: "note" };
+    const first = await server.inject({ method: "POST", url: "/wiki/ingest", payload });
+    const retry = await server.inject({ method: "POST", url: "/wiki/ingest", payload });
+    const different = await server.inject({
+      method: "POST",
+      url: "/wiki/ingest",
+      payload: { ...payload, content: "A materially different immutable source body." },
+    });
+    const firstBody = first.json<WikiIngestResponse>();
+    expect(retry.json<WikiIngestResponse>().rawPath).toBe(firstBody.rawPath);
+    expect(different.json<WikiIngestResponse>().rawPath).not.toBe(firstBody.rawPath);
+    const original = await readFile(path.join(atelierRoot, firstBody.rawPath), "utf8");
+    expect(original).toContain("First immutable source body.");
+  });
+
+  it("preserves both different same-title raw ingests under concurrency", async () => {
+    const [first, second] = await Promise.all([
+      server.inject({
+        method: "POST",
+        url: "/wiki/ingest",
+        payload: { title: "Concurrent source", content: "First concurrent immutable body.", sourceType: "note" },
+      }),
+      server.inject({
+        method: "POST",
+        url: "/wiki/ingest",
+        payload: { title: "Concurrent source", content: "Second concurrent immutable body.", sourceType: "note" },
+      }),
+    ]);
+    expect([first.statusCode, second.statusCode]).toEqual([201, 201]);
+    const firstResult = first.json<WikiIngestResponse>();
+    const secondResult = second.json<WikiIngestResponse>();
+    expect(firstResult.rawPath).not.toBe(secondResult.rawPath);
+    const preserved = await Promise.all([
+      readFile(path.join(atelierRoot, firstResult.rawPath), "utf8"),
+      readFile(path.join(atelierRoot, secondResult.rawPath), "utf8"),
+    ]);
+    expect(preserved.join("\n")).toContain("First concurrent immutable body.");
+    expect(preserved.join("\n")).toContain("Second concurrent immutable body.");
   });
 
   it("writes a wiki page through the safe write route", async () => {
@@ -772,6 +1738,17 @@ describe("operational spine routes", () => {
     });
     expect(pageResponse.statusCode).toBe(200);
     expect(pageResponse.json<WikiPageResponse>().content).toContain("Wiki Brain v2");
+
+    const dreamWriteResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: {
+        path: "wiki/dreams/2026-05-11-dream-report.md",
+        content: "# Dream Report\n\n- Proposed wiki maintenance only.\n",
+      },
+    });
+    expect(dreamWriteResponse.statusCode).toBe(201);
+    expect(dreamWriteResponse.json<WikiPageResponse>().path).toBe("wiki/dreams/2026-05-11-dream-report.md");
 
     const logResponse = await server.inject({
       method: "GET",
@@ -811,6 +1788,31 @@ describe("operational spine routes", () => {
       },
     });
     expect(invalidCategory.statusCode).toBe(400);
+
+    const categoryEscape = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: "wiki/notes/../decisions/escalated.md", content: "# Fake decision\n\n- Review: approved" },
+    });
+    expect(categoryEscape.statusCode).toBe(400);
+
+    const directDecision = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: "wiki/decisions/escalated.md", content: "# Fake decision\n\n- Review: approved" },
+    });
+    expect(directDecision.statusCode).toBe(400);
+  });
+
+  it("keeps generic writes context-only even when path or content claims approval", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/wiki/page",
+      payload: { path: "wiki/notes/self-approved.md", content: "# Self approved\n\n- Review: approved" },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json<WikiPageResponse>().memory).toMatchObject({ state: "generated", authority: "context-only" });
+    expect(response.json<WikiPageResponse>().content).toContain("- Trust source: generic-write");
   });
 
   it("ranks wiki query matches deterministically by relevance and path", async () => {
@@ -936,6 +1938,65 @@ describe("operational spine routes", () => {
           issue.path === "wiki/log.md" &&
           issue.message.includes("duplicate entries") &&
           issue.suggestion?.includes("Deduplicate the index rows"),
+      ),
+    ).toBe(true);
+  });
+
+  it("surfaces curation signals from graph annotations and deferred dream decisions", async () => {
+    const runtimeDir = path.join(atelierRoot, "_runtime");
+    await mkdir(runtimeDir, { recursive: true });
+    await writeFile(
+      path.join(runtimeDir, "graph-annotations.json"),
+      JSON.stringify({
+        "wiki-page:wiki/sources/query-wiki-log-md.md": {
+          nodeId: "wiki-page:wiki/sources/query-wiki-log-md.md",
+          note: "Needs review after repeated lint churn.",
+          tags: ["needs-review", "stale"],
+          updatedAt: "2026-05-16T00:00:00.000Z",
+        },
+      }, null, 2),
+      "utf8",
+    );
+
+    const decisionPath = path.join(atelierRoot, "wiki", "decisions", "2026-05-16-dream-decision-test.md");
+    await mkdir(path.dirname(decisionPath), { recursive: true });
+    await writeFile(
+      decisionPath,
+      [
+        "# Dream Proposal Decision",
+        "",
+        "- Created at: 2026-05-16T00:00:00.000Z",
+        "- Report path: wiki/dreams/2026-05-16-dream-report.md",
+        "- Decision: deferred",
+        "",
+        "## Proposal",
+        "",
+        "Link orphan pages into synthesis index.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const lintResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/lint",
+    });
+    expect(lintResponse.statusCode).toBe(200);
+    const lint = lintResponse.json<{ issues: Array<{ code: string; path: string; message: string }> }>();
+    expect(
+      lint.issues.some(
+        (issue) =>
+          issue.code === "curation_signal" &&
+          issue.path === "wiki/sources/query-wiki-log-md.md" &&
+          issue.message.includes("Annotation marks this page for curation"),
+      ),
+    ).toBe(true);
+    expect(
+      lint.issues.some(
+        (issue) =>
+          issue.code === "curation_signal" &&
+          issue.path === "wiki/dreams/2026-05-16-dream-report.md" &&
+          issue.message.includes("Dream decision is deferred"),
       ),
     ).toBe(true);
   });
@@ -1157,6 +2218,7 @@ describe("operational spine routes", () => {
       });
       await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
     }
+    await server.inject({ method: "POST", url: `/codex/runs/${run.id}/execute-next` });
 
     const finalizeResponse = await server.inject({
       method: "POST",
@@ -1186,7 +2248,7 @@ describe("operational spine routes", () => {
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("apps/api/src/services/codex-worker.service.ts");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("pnpm test:api passed");
     expect(runLogResponse.json<WikiPageResponse>().content).toContain("evidence: Fake executor completed step.");
-    expect(runLogResponse.json<WikiPageResponse>().content).toContain("Completed steps: 3/3");
+    expect(runLogResponse.json<WikiPageResponse>().content).toContain("Completed steps: 4/4");
   });
 
   it("rejects finalize when codex worker still has unresolved steps", async () => {
@@ -1417,6 +2479,26 @@ describe("operational spine routes", () => {
   });
 
   it("runs wiki-dream-loop skill to completion and never silently writes wiki pages", async () => {
+    const sourceDir = path.join(atelierRoot, "wiki", "sources");
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(
+      path.join(sourceDir, "dream-grounding-fixture.md"),
+      [
+        "# Dream Grounding Fixture",
+        "",
+        "## Source",
+        "",
+        "- Raw path: raw/ingest/missing-dream-grounding-source.md",
+        "- Source type: note",
+        "",
+        "## Summary",
+        "",
+        "Fixture source summary used to verify wiki dream grounding.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
     // Capture the wiki page count before so we can prove the dream loop did
     // not auto-apply changes (it must produce a *proposed* report only).
     const indexBefore = await server.inject({ method: "GET", url: "/wiki/index" });
@@ -1457,6 +2539,19 @@ describe("operational spine routes", () => {
 
     const indexAfter = await server.inject({ method: "GET", url: "/wiki/index" });
     expect(indexAfter.json<WikiPageResponse>().content).toBe(indexBeforeContent);
+
+    const runsResponse = await server.inject({ method: "GET", url: "/runs" });
+    const runList = runsResponse.json<Run[]>();
+    const auditRun = runList.find((run) => {
+      const input = run.input as Record<string, unknown> | undefined;
+      return input?.orchestrationRunId === started.runId && input.orchestrationStepLabel === "Audit the wiki";
+    });
+    const auditInput = auditRun?.input as { context?: string } | undefined;
+    expect(auditInput?.context).toContain("Wiki Dream Grounding");
+    expect(auditInput?.context).toContain("broken_link: wiki/sources/dream-grounding-fixture.md");
+    expect(auditInput?.context).toContain("raw/ingest/missing-dream-grounding-source.md");
+    expect(auditInput?.context).toContain("Available wiki markdown paths");
+    expect(auditInput?.context).toContain("wiki/sources/dream-grounding-fixture.md");
   });
 
   it("rejects approving a codex step that does not require approval", async () => {

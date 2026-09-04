@@ -11,6 +11,7 @@ import { runsRoutes } from "./routes/runs.routes";
 import { tasksRoutes } from "./routes/tasks.routes";
 import { wikiRoutes } from "./routes/wiki.routes";
 import { codexRoutes } from "./routes/codex.routes";
+import { knowledgeRoutes } from "./routes/knowledge.routes";
 
 export type BuildServerOptions = {
   storageMode?: StorageMode;
@@ -32,9 +33,18 @@ export type BuildServerOptions = {
   | "ollamaBaseUrl"
   | "ollamaModel"
   | "ollamaModelProfile"
+  | "ollamaModelByProfile"
   | "ollamaModelByRole"
   | "maxHandoffDepth"
   | "executionTimeoutMs"
+  | "seedDemoData"
+  | "inlineDurableRuntime"
+  | "runtimeLeaseMs"
+  | "runtimePollMs"
+  | "codexWorkerRealEnabled"
+  | "codexWorkerTimeoutMs"
+  | "codexWorkerMaxOutputBytes"
+  | "codexWorkerAllowedWorkingDirectories"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -45,6 +55,11 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const services = options.services ?? await createAppServices(options);
 
   await services.wiki.ensureWiki();
+  await services.knowledgeGraph.initialize();
+  services.knowledgeLive.attach(fastify.server);
+  fastify.addHook("onClose", async () => {
+    await services.durableRuntime.stop();
+  });
   fastify.addHook("onRequest", async (_request, reply) => {
     reply.header("Referrer-Policy", "no-referrer");
     reply.header("X-Content-Type-Options", "nosniff");
@@ -104,6 +119,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await fastify.register(async (instance) => runsRoutes(instance, services));
   await fastify.register(async (instance) => wikiRoutes(instance, services));
   await fastify.register(async (instance) => codexRoutes(instance, services));
+  await fastify.register(async (instance) => knowledgeRoutes(instance, services));
 
   return fastify;
 }

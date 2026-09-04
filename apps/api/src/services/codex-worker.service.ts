@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   CodexWorkerFinalizeEvidence,
+  CodexWorkerExecutionAdapter,
   CodexWorkerMode,
   CodexWorkerProfile,
   CodexWorkerStep,
@@ -10,6 +11,14 @@ import type {
 } from "@atellier/shared";
 import { RunService } from "./run.service";
 import { WikiService } from "./wiki.service";
+import {
+  CodexWorkerSafetyError,
+  FakeCodexWorkerExecutor,
+  type CodexWorkerExecutionResult,
+  type CodexWorkerExecutor,
+} from "./codex-worker-executor.service";
+import { MemoryEffectIdempotencyRepository } from "./effect-idempotency.repository";
+import { EffectIdempotencyService } from "./effect-idempotency.service";
 
 type CreateCodexWorkerRunInput = {
   goal: string;
@@ -28,20 +37,47 @@ type CodexWorkerRunView = {
   profile: CodexWorkerProfile;
   goal: string;
   steps: CodexWorkerStep[];
+  executionAdapter: CodexWorkerExecutionAdapter;
+};
+
+type ExtractedCodexWorker = {
+  mode: CodexWorkerMode;
+  profile: CodexWorkerProfile;
+  goal: string;
+  steps: CodexWorkerStep[];
+  executionAdapter: CodexWorkerExecutionAdapter;
 };
 
 export class CodexWorkerService {
+  private readonly activeExecutions = new Map<string, AbortController>();
+
   constructor(
     private readonly runs: RunService,
     private readonly wiki: WikiService,
     private readonly atelierRoot: string,
+    private readonly executor: CodexWorkerExecutor = new FakeCodexWorkerExecutor(),
+    private readonly effectIdempotency = new EffectIdempotencyService(
+      new MemoryEffectIdempotencyRepository(),
+    ),
   ) {}
+
+  getExecutionAdapter(): CodexWorkerExecutionAdapter {
+    return { mode: this.executor.mode, label: this.executor.label };
+  }
 
   async create(input: CreateCodexWorkerRunInput): Promise<Run> {
     return this.runs.create({
       type: "build",
       status: "queued",
-      input: { codexWorker: { goal: input.goal, mode: input.mode, profile: input.profile, steps: [] } },
+      input: {
+        codexWorker: {
+          goal: input.goal,
+          mode: input.mode,
+          profile: input.profile,
+          steps: [],
+          executionAdapter: { mode: this.executor.mode, label: this.executor.label },
+        },
+      },
     });
   }
 
@@ -60,7 +96,8 @@ export class CodexWorkerService {
     if (!worker) return null;
     const steps: CodexWorkerStep[] = [
       this.step("Inspect relevant files and constraints", "rg --files", "low", false),
-      this.step("Implement bounded change and update tests", "pnpm test:api", "medium", true),
+      this.step("Implement bounded change with Codex", "codex exec", "medium", true),
+      this.step("Capture the workspace diff", "git diff --no-ext-diff", "low", false),
       this.step("Validate full project contract checks", "pnpm typecheck", "high", true),
     ];
     return this.runs.updateStatus(id, "queued", { ...(run.output as object | undefined), codexWorker: { ...worker, steps } });
@@ -85,64 +122,193 @@ export class CodexWorkerService {
   }
 
   async executeNext(id: string): Promise<Run | { error: string } | null> {
+    if (this.activeExecutions.has(id)) {
+      return { error: "A Codex worker step is already executing for this run." };
+    }
     const run = await this.runs.getById(id);
     if (!run) return null;
     const worker = this.extract(run);
     if (!worker) return null;
     if (run.status === "blocked") return { error: "Run is cancelled or blocked." };
     if (run.status === "completed") return { error: "Run is already completed." };
+    if (worker.mode === "dry_run") return { error: "Dry-run mode only previews the plan and cannot execute commands." };
+    if (worker.executionAdapter.mode !== this.executor.mode) {
+      return { error: `Run requires the ${worker.executionAdapter.mode} execution adapter, but ${this.executor.mode} is active.` };
+    }
     if (worker.steps.length === 0) return { error: "Run has not been planned yet." };
-    const idx = worker.steps.findIndex((s) => s.status === "approved" || (!s.needsApproval && s.status === "pending"));
-    if (idx === -1) return { error: "No executable step available. Approve a step first." };
+    const idx = worker.steps.findIndex((step) => step.status !== "completed");
+    if (idx === -1) return { error: "No executable step available." };
     const step = worker.steps[idx];
-    if (step.needsApproval && step.status !== "approved") return { error: "Step requires approval before execution." };
-    const startedAt = new Date().toISOString();
-    const finishedAt = new Date().toISOString();
+    if (step.status === "running") return { error: "The next Codex worker step is already running." };
+    if (step.status === "failed" || step.status === "blocked") {
+      return { error: "Retry the failed or blocked step before continuing." };
+    }
+    if (step.needsApproval && step.status !== "approved") {
+      return { error: "No executable step available. Approve a step first." };
+    }
+    const startedAtDate = new Date();
+    const startedAt = startedAtDate.toISOString();
     const datePrefix = startedAt.slice(0, 10);
     const artifactBaseName = `${datePrefix}-codex-worker-${id}-step-${idx + 1}-${step.id}`;
     const stdoutPath = `runs/artifacts/${artifactBaseName}.stdout.log`;
     const stderrPath = `runs/artifacts/${artifactBaseName}.stderr.log`;
     const stdoutAbsolute = path.join(this.atelierRoot, stdoutPath);
     const stderrAbsolute = path.join(this.atelierRoot, stderrPath);
+    const runningSteps = worker.steps.map((candidate, stepIndex) =>
+      stepIndex === idx
+        ? { ...candidate, status: "running" as const, startedAt }
+        : candidate,
+    );
+    const runningRun = await this.runs.updateStatus(id, "running", {
+      ...(run.output as object | undefined),
+      codexWorker: { ...worker, steps: runningSteps },
+    });
+    if (!runningRun) return null;
     await mkdir(path.dirname(stdoutAbsolute), { recursive: true });
-    await writeFile(stdoutAbsolute, `Fake executor completed step: ${step.summary}\nCommand: ${step.command}\n`, "utf8");
-    await writeFile(stderrAbsolute, "", "utf8");
+    let safetyFailure = false;
+    let idempotencyDisposition: "executed" | "reused" | "failed" | null = null;
+    let execution: CodexWorkerExecutionResult;
+    const controller = new AbortController();
+    this.activeExecutions.set(id, controller);
+    try {
+      const executionInput = {
+        runId: id,
+        stepId: step.id,
+        goal: worker.goal,
+        profile: worker.profile,
+        command: step.command,
+        workingDirectory: step.workingDirectory,
+        signal: controller.signal,
+      };
+      const irreversible = this.executor.mode === "real" && step.command === "codex exec";
+      const attempt = step.executionAttempt ?? 1;
+      const outcome = await this.effectIdempotency.execute(
+        {
+          toolName: "codex-worker",
+          classification: irreversible ? "irreversible" : "read",
+          ...(irreversible
+            ? {
+                idempotencyKey: `codex-worker:${id}:${step.id}:${attempt}`,
+                fingerprint: this.executionFingerprint(worker, step, attempt),
+              }
+            : {}),
+        },
+        () => this.executor.execute(executionInput),
+      );
+      if (outcome.disposition === "in-progress") {
+        const current = await this.runs.getById(id);
+        if (current?.status !== "blocked") {
+          await this.runs.updateStatus(id, "queued", {
+            ...(run.output as object | undefined),
+            codexWorker: worker,
+          });
+        }
+        return { error: "This approved Codex effect is already in progress." };
+      }
+      if (outcome.disposition === "failed") {
+        idempotencyDisposition = "failed";
+        execution = {
+          stdout: "",
+          stderr: outcome.error,
+          exitCode: null,
+          durationMs: Math.max(0, Date.now() - startedAtDate.getTime()),
+          timedOut: false,
+        };
+      } else {
+        idempotencyDisposition = outcome.disposition;
+        execution = outcome.result;
+      }
+    } catch (error) {
+      safetyFailure = error instanceof CodexWorkerSafetyError;
+      execution = {
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "Codex worker execution failed before process start.",
+        exitCode: null,
+        durationMs: Math.max(0, Date.now() - startedAtDate.getTime()),
+        timedOut: false,
+      };
+    } finally {
+      if (this.activeExecutions.get(id) === controller) {
+        this.activeExecutions.delete(id);
+      }
+    }
+    const stdoutContent = execution.stdout;
+    const stderrContent = execution.stderr;
+    await writeFile(stdoutAbsolute, stdoutContent, "utf8");
+    await writeFile(stderrAbsolute, stderrContent, "utf8");
+    const finishedAtDate = new Date();
+    const finishedAt = finishedAtDate.toISOString();
+    const durationMs = Math.max(0, execution.durationMs);
+    const failed = safetyFailure || execution.cancelled || execution.timedOut || execution.exitCode !== 0;
+    const stepStatus = safetyFailure || execution.cancelled
+      ? "blocked" as const
+      : failed
+        ? "failed" as const
+        : "completed" as const;
+    const executorName = this.executor.mode === "fake" ? "Fake executor" : "Real allowlisted executor";
+    const evidenceSummary = safetyFailure
+      ? "Execution blocked by Codex worker safety policy."
+      : execution.cancelled
+        ? `${executorName} was cancelled by the operator.`
+      : execution.timedOut
+        ? `${executorName} timed out.`
+        : execution.exitCode === 0
+          ? `${executorName} completed step.`
+          : `${executorName} failed with exit code ${execution.exitCode ?? "unknown"}.`;
+    const notes = [
+      `Execution adapter: ${this.executor.label} (${this.executor.mode}).`,
+      `stdout written to ${stdoutPath}`,
+      `stderr written to ${stderrPath}`,
+    ];
+    if (execution.stdoutTruncated) notes.push("stdout was truncated at the configured capture limit.");
+    if (execution.stderrTruncated) notes.push("stderr was truncated at the configured capture limit.");
+    if (execution.timedOut) notes.push("Process exceeded the configured timeout and was terminated.");
+    if (execution.cancelled) notes.push("Process was terminated after operator cancellation.");
+    if (idempotencyDisposition) notes.push(`Idempotency disposition: ${idempotencyDisposition}.`);
     const evidence = {
-      summary: "Fake executor completed step.",
+      summary: evidenceSummary,
       capturedAt: finishedAt,
       command: step.command,
       workingDirectory: step.workingDirectory,
-      notes: [
-        "Executed by the fake executor.",
-        `stdout written to ${stdoutPath}`,
-        `stderr written to ${stderrPath}`,
-      ],
+      durationMs,
+      notes,
       artifacts: [
-        { label: "stdout", path: stdoutPath },
-        { label: "stderr", path: stderrPath },
+        { label: "stdout", path: stdoutPath, byteSize: Buffer.byteLength(stdoutContent, "utf8") },
+        { label: "stderr", path: stderrPath, byteSize: Buffer.byteLength(stderrContent, "utf8") },
       ],
     };
     const updated = worker.steps.map((s, i) =>
       i === idx
         ? {
             ...s,
-            status: "completed" as const,
+            status: stepStatus,
             startedAt,
             finishedAt,
-            exitCode: 0,
-            output: "Fake executor completed step.",
+            exitCode: execution.exitCode ?? undefined,
+            output: execution.stdout.trim() || execution.stderr.trim() || evidenceSummary,
             stdoutPath,
             stderrPath,
             evidence,
           }
         : s,
     );
-    await this.runs.appendLog(id, { level: "info", message: `Codex worker executed step: ${step.summary}` });
+    await this.runs.appendLog(id, {
+      level: failed ? "error" : "info",
+      message: `${evidenceSummary} Step: ${step.summary}`,
+    });
     const allCompleted = updated.every((candidate) => candidate.status === "completed");
+    const latestRun = await this.runs.getById(id);
+    const computedStatus = allCompleted
+      ? "completed"
+      : safetyFailure || execution.cancelled
+        ? "blocked"
+        : failed
+          ? "failed"
+          : "running";
     return this.runs.updateStatus(
       id,
-      allCompleted ? "completed" : "running",
-      { ...(run.output as object | undefined), codexWorker: { ...worker, steps: updated } },
+      latestRun?.status === "blocked" ? "blocked" : computedStatus,
+      { ...(latestRun?.output as object | undefined), codexWorker: { ...worker, steps: updated } },
     );
   }
 
@@ -160,7 +326,9 @@ export class CodexWorkerService {
       s.id === stepId
         ? {
             ...s,
-            status: s.needsApproval ? ("approved" as const) : ("pending" as const),
+            status: "pending" as const,
+            executionAttempt: (s.executionAttempt ?? 1) + 1,
+            approvedAt: undefined,
             startedAt: undefined,
             finishedAt: undefined,
             exitCode: undefined,
@@ -180,7 +348,24 @@ export class CodexWorkerService {
     if (!run) return null;
     if (run.status === "completed") return { error: "Completed runs cannot be cancelled." };
     if (run.status === "blocked") return { error: "Run is already cancelled." };
-    return this.runs.updateStatus(id, "blocked", { reason: "Cancelled by operator" });
+    this.activeExecutions.get(id)?.abort(new Error("Cancelled by operator."));
+    const worker = this.extract(run);
+    const now = new Date().toISOString();
+    const steps = worker?.steps.map((step) =>
+      step.status === "running"
+        ? {
+            ...step,
+            status: "blocked" as const,
+            finishedAt: now,
+            output: "Cancelled by operator.",
+          }
+        : step,
+    );
+    return this.runs.updateStatus(id, "blocked", {
+      ...(run.output as object | undefined),
+      reason: "Cancelled by operator",
+      ...(worker ? { codexWorker: { ...worker, steps } } : {}),
+    });
   }
 
   async finalize(id: string, input: FinalizeCodexWorkerRunInput = {}): Promise<Run | { error: string } | null> {
@@ -199,6 +384,13 @@ export class CodexWorkerService {
     const datePrefix = now.toISOString().slice(0, 10);
     const runPath = `runs/${datePrefix}-codex-worker-${id}.md`;
     const completed = worker.steps.filter((s) => s.status === "completed").length;
+    const failed = worker.steps.filter((s) => s.status === "failed").length;
+    const blocked = worker.steps.filter((s) => s.status === "blocked").length;
+    const totalDurationMs = worker.steps.reduce((sum, step) => {
+      const value = step.evidence?.durationMs;
+      return sum + (typeof value === "number" && Number.isFinite(value) ? value : 0);
+    }, 0);
+    const artifactCount = worker.steps.reduce((sum, step) => sum + (step.evidence?.artifacts.length ?? 0), 0);
     const content = [
       "# Run Log - Codex Worker Finalize",
       "",
@@ -208,6 +400,7 @@ export class CodexWorkerService {
       `- Goal: ${worker.goal}`,
       `- Mode: ${worker.mode}`,
       `- Profile: ${worker.profile}`,
+      `- Execution adapter: ${worker.executionAdapter.label} (${worker.executionAdapter.mode})`,
       "",
       "## Summary",
       "",
@@ -240,6 +433,10 @@ export class CodexWorkerService {
       "## Evidence",
       "",
       `- Completed steps: ${completed}/${worker.steps.length}`,
+      `- Failed steps: ${failed}`,
+      `- Blocked steps: ${blocked}`,
+      `- Total step duration: ${totalDurationMs} ms`,
+      `- Captured artifacts: ${artifactCount}`,
       `- Changed files: ${(input.changedFiles ?? []).length}`,
       ...(input.changedFiles ?? []).map((file) => `  - ${file}`),
       `- Test evidence: ${(input.testEvidence ?? []).length}`,
@@ -266,6 +463,10 @@ export class CodexWorkerService {
         testEvidence: (input.testEvidence ?? []).join(", "),
         evidenceCompletedSteps: completed,
         evidenceTotalSteps: worker.steps.length,
+        evidenceFailedSteps: failed,
+        evidenceBlockedSteps: blocked,
+        evidenceTotalDurationMs: totalDurationMs,
+        evidenceArtifactCount: artifactCount,
       },
     });
     return this.runs.updateStatus(id, "completed", {
@@ -277,6 +478,10 @@ export class CodexWorkerService {
         evidence: {
           completedSteps: completed,
           totalSteps: worker.steps.length,
+          failedSteps: failed,
+          blockedSteps: blocked,
+          totalDurationMs,
+          artifactCount,
           changedFiles: input.changedFiles ?? [],
           testEvidence: input.testEvidence ?? [],
         } satisfies CodexWorkerFinalizeEvidence,
@@ -291,19 +496,54 @@ export class CodexWorkerService {
         (r.input as Record<string, unknown> | undefined)?.codexWorker ??
         (r.output as Record<string, unknown> | undefined)?.codexWorker
       );
-      return hasCodex && r.status !== "completed" && r.status !== "blocked";
+      return hasCodex && (r.status === "queued" || r.status === "running");
     });
     if (!active) return null;
     return this.getById(active.id);
   }
 
   private step(summary: string, command: string, riskLevel: "low" | "medium" | "high", needsApproval: boolean): CodexWorkerStep {
-    return { id: randomUUID(), summary, command, workingDirectory: ".", riskLevel, needsApproval, status: "pending" };
+    return {
+      id: randomUUID(),
+      summary,
+      command,
+      workingDirectory: ".",
+      riskLevel,
+      needsApproval,
+      status: "pending",
+      executionAttempt: 1,
+    };
   }
 
-  private extract(run: Run): { mode: CodexWorkerMode; profile: CodexWorkerProfile; goal: string; steps: CodexWorkerStep[] } | null {
+  private executionFingerprint(
+    worker: ExtractedCodexWorker,
+    step: CodexWorkerStep,
+    attempt: number,
+  ): string {
+    return createHash("sha256")
+      .update(JSON.stringify({
+        adapter: worker.executionAdapter,
+        attempt,
+        command: step.command,
+        goal: worker.goal,
+        profile: worker.profile,
+        workingDirectory: step.workingDirectory,
+      }))
+      .digest("hex");
+  }
+
+  private extract(run: Run): ExtractedCodexWorker | null {
     const source = ((run.output as any)?.codexWorker ?? (run.input as any)?.codexWorker) as any;
     if (!source?.goal || !source?.mode || !source?.profile) return null;
-    return { goal: source.goal, mode: source.mode, profile: source.profile, steps: Array.isArray(source.steps) ? source.steps : [] };
+    const executionAdapter = source.executionAdapter?.mode === "real" || source.executionAdapter?.mode === "fake"
+      ? { mode: source.executionAdapter.mode, label: String(source.executionAdapter.label ?? source.executionAdapter.mode) }
+      : { mode: this.executor.mode, label: this.executor.label };
+    return {
+      goal: source.goal,
+      mode: source.mode,
+      profile: source.profile,
+      steps: Array.isArray(source.steps) ? source.steps : [],
+      executionAdapter,
+    };
   }
 }

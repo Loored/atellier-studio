@@ -1,5 +1,11 @@
 import type { AgentRole } from "./agent";
-import type { Run, RunStatus } from "./run";
+import type { ExecutorMode, ModelProfile } from "./health";
+import type { Run, RunExecution, RunStatus } from "./run";
+import type {
+  AgentMemoryContextReceipt,
+  AutomatedContextReceiptAssessment,
+  ContextReceiptEvaluation,
+} from "./agent-memory-context";
 
 export const ORCHESTRATION_SKILL_IDS = [
   "atellier-build-loop",
@@ -28,11 +34,21 @@ export type OrchestrationSkillSummary = {
   steps: OrchestrationSkillStepSummary[];
 };
 
+export type OrchestrationExecutionStep = OrchestrationSkillStepSummary & {
+  instruction: string;
+};
+
+export type OrchestrationExecutionDefinition = Omit<OrchestrationSkillSummary, "steps"> & {
+  steps: OrchestrationExecutionStep[];
+};
+
 export type StartSkillOrchestrationInput = {
   skillId: OrchestrationSkillId;
   goal: string;
   context?: string;
   taskId?: string;
+  executorModeOverride?: ExecutorMode;
+  modelProfileOverride?: ModelProfile;
 };
 
 export type SkillOrchestrationStepResult = {
@@ -44,6 +60,41 @@ export type SkillOrchestrationStepResult = {
   agentRole: AgentRole;
   runId: string;
   status: RunStatus;
+  logicalStepId?: string;
+  repairAttempt?: number;
+  repairAttemptLimit?: number;
+  repairKind?: "deterministic" | "semantic";
+};
+
+export type OrchestrationRepairSummary = {
+  maxAttempts: number;
+  attemptsUsed: number;
+  resolved: boolean;
+  exhausted: boolean;
+  finalStepId: string;
+  lastValidArtifactStepId?: string;
+  lastQaStepId?: string;
+  blockerMessages: string[];
+};
+
+export type OrchestrationQaChecklistItem = {
+  criterion: string;
+  status: "pass" | "fail";
+  evidence: string;
+};
+
+export type OrchestrationQaChecklistSummary = {
+  sourceStepId: string;
+  qaStepId: string;
+  complete: boolean;
+  items: OrchestrationQaChecklistItem[];
+};
+
+export type OrchestrationRepeatedFeedbackSummary = {
+  detected: boolean;
+  firstQaStepId: string;
+  repeatedQaStepId: string;
+  feedback: string;
 };
 
 export type SkillOrchestrationResult = {
@@ -51,6 +102,11 @@ export type SkillOrchestrationResult = {
   goal: string;
   orchestrationRun: Run;
   steps: SkillOrchestrationStepResult[];
+  repair?: OrchestrationRepairSummary;
+  qaRetry?: OrchestrationRepairSummary;
+  qaChecklist?: OrchestrationQaChecklistSummary;
+  repeatedFeedback?: OrchestrationRepeatedFeedbackSummary;
+  semanticRepair?: OrchestrationRepairSummary;
 };
 
 export type OrchestrationStepStatusEntry = {
@@ -61,18 +117,32 @@ export type OrchestrationStepStatusEntry = {
   agentName: string;
   agentId?: string;
   runId?: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | RunStatus;
   isActive: boolean;
+  logicalStepId?: string;
+  repairAttempt?: number;
+  repairAttemptLimit?: number;
+  repairKind?: "deterministic" | "semantic";
 };
 
 export type OrchestrationStatusResult = {
   orchestrationRunId: string;
+  taskId?: string;
   skillId: OrchestrationSkillId;
   goal: string;
-  status: string;
+  status: RunStatus;
+  execution?: RunExecution;
   steps: OrchestrationStepStatusEntry[];
   activeStep: OrchestrationStepStatusEntry | null;
   nextStep: OrchestrationStepStatusEntry | null;
+  contextReceipt?: AgentMemoryContextReceipt;
+  contextEvaluation?: ContextReceiptEvaluation;
+  automatedContextAssessment?: AutomatedContextReceiptAssessment;
+  repair?: OrchestrationRepairSummary;
+  qaRetry?: OrchestrationRepairSummary;
+  qaChecklist?: OrchestrationQaChecklistSummary;
+  repeatedFeedback?: OrchestrationRepeatedFeedbackSummary;
+  semanticRepair?: OrchestrationRepairSummary;
 };
 
 export type StartSkillOrchestrationResponse = {

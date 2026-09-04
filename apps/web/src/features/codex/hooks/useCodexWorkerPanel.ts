@@ -12,6 +12,11 @@ export function useCodexWorkerPanel() {
   const { data: healthStatus } = useHealthApi();
   const api = useCodexWorkerApi(runId);
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
+  const executionAdapter = api.codexWorkerQuery.data?.executionAdapter ?? {
+    mode: healthStatus?.codexWorker?.executionAdapter ?? "fake",
+    label: healthStatus?.codexWorker?.label ?? "fake-safe",
+  };
+  const isRealCodexExecution = executionAdapter.mode === "real";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
 
@@ -24,9 +29,14 @@ export function useCodexWorkerPanel() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const hasPlannedSteps = steps.length > 0;
-  const hasPendingApproval = steps.some((step) => step.needsApproval && step.status === "pending");
-  const hasExecutableStep = steps.some(
-    (step) => step.status === "approved" || (!step.needsApproval && step.status === "pending"),
+  const nextIncompleteStep = steps.find((step) => step.status !== "completed") ?? null;
+  const hasPendingApproval = Boolean(
+    nextIncompleteStep?.needsApproval && nextIncompleteStep.status === "pending",
+  );
+  const hasExecutableStep = Boolean(
+    nextIncompleteStep
+    && (nextIncompleteStep.status === "approved"
+      || (!nextIncompleteStep.needsApproval && nextIncompleteStep.status === "pending")),
   );
   const hasUnresolvedSteps = steps.some((step) => step.status !== "completed");
   const isRunCancelled = runStatus === "blocked";
@@ -52,6 +62,10 @@ export function useCodexWorkerPanel() {
         ? "Run is cancelled."
         : isRunCompleted
           ? "Run is already completed."
+          : nextIncompleteStep?.status === "failed" || nextIncompleteStep?.status === "blocked"
+            ? "Retry the failed or blocked step before continuing."
+            : nextIncompleteStep?.status === "running"
+              ? "The next step is already running."
           : hasPendingApproval
             ? "Approve pending protected steps first."
             : !hasExecutableStep
@@ -74,9 +88,12 @@ export function useCodexWorkerPanel() {
 
   async function createRun() {
     setActionError(null);
-    if (isOpenAiExecution) {
+    if (isOpenAiExecution || isRealCodexExecution) {
+      const costContext = isRealCodexExecution
+        ? `Controlled real Codex execution is enabled (${executionAdapter.label}). Approved implementation steps may modify the workspace and consume Codex tokens.`
+        : `OpenAI execution is active (${executorModel}, ${modelProfile}). Creating and running codex steps may consume tokens.`;
       const confirmed = window.confirm(
-        `OpenAI execution is active (${executorModel}, ${modelProfile}). Creating and running codex steps may consume tokens. Continue?`,
+        `${costContext} Continue?`,
       );
       if (!confirmed) return;
     }
@@ -121,6 +138,17 @@ export function useCodexWorkerPanel() {
     }
   }
 
+  async function retry(stepId: string) {
+    if (!runId) return;
+    setActionError(null);
+    try {
+      await api.retryCodexWorkerStepMutation.mutateAsync({ id: runId, stepId });
+      await api.codexWorkerQuery.refetch();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to retry step.");
+    }
+  }
+
   async function cancel() {
     if (!runId || !canCancel) return;
     setActionError(null);
@@ -136,7 +164,27 @@ export function useCodexWorkerPanel() {
     if (!runId || !canFinalize) return;
     setActionError(null);
     try {
-      await api.finalizeCodexWorkerMutation.mutateAsync({ id: runId, summary: "Finalized from dashboard codex worker panel." });
+      const testEvidence = steps
+        .filter((step) => step.status === "completed")
+        .map((step) => {
+          const durationSuffix = step.evidence?.durationMs !== undefined ? ` (${step.evidence.durationMs} ms)` : "";
+          return `${step.summary}${durationSuffix}`;
+        });
+      const changedFiles = Array.from(
+        new Set(
+          steps.flatMap((step) =>
+            (step.evidence?.artifacts ?? [])
+              .map((artifact) => artifact.path)
+              .filter((artifactPath) => artifactPath.endsWith(".ts") || artifactPath.endsWith(".tsx") || artifactPath.endsWith(".md")),
+          ),
+        ),
+      );
+      await api.finalizeCodexWorkerMutation.mutateAsync({
+        id: runId,
+        summary: "Finalized from dashboard codex worker panel.",
+        changedFiles,
+        testEvidence,
+      });
       await api.codexWorkerQuery.refetch();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Failed to finalize run.");
@@ -159,6 +207,8 @@ export function useCodexWorkerPanel() {
     runId,
     runStatus,
     isOpenAiExecution,
+    isRealCodexExecution,
+    executionAdapter,
     executorModel,
     modelProfile,
     runLogPath,
@@ -179,6 +229,7 @@ export function useCodexWorkerPanel() {
     plan,
     approve,
     executeNext,
+    retry,
     cancel,
     finalize,
     openRunLog,

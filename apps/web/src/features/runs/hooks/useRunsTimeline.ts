@@ -1,17 +1,41 @@
 import { type FormEvent, useState } from "react";
-import type { RunReviewStatus } from "@atellier/shared";
+import type {
+  AgentRole,
+  CurateRunLearningInput,
+  ResolveRunLearningSignalInput,
+  ReviewLearningResolutionOutcome,
+  ReviewLearningSignal,
+  Run,
+  RunReviewStatus,
+} from "@atellier/shared";
 import { useAgentsApi } from "../../../api/hooks/agents/useAgentsApi";
 import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
+import { useTasksApi } from "../../../api/hooks/tasks/useTasksApi";
 import {
   useAppendRunLogApi,
   useCaptureRunMemoryApi,
   useCompleteRunApi,
   useCreateRunApi,
+  useCurateRunLearningApi,
   usePromoteRunDeliverableApi,
+  useRetryRunApi,
+  useResolveRunLearningSignalApi,
   useRunsApi,
   useUnlinkRunDeliverableApi,
   useUpdateRunReviewApi,
 } from "../../../api/hooks/runs/useRunsApi";
+
+type RunLearningDraft = {
+  role: AgentRole;
+  lesson: string;
+  signal: ReviewLearningSignal | "";
+  signalPath: string;
+};
+
+type RunLearningResolutionDraft = {
+  outcome: ReviewLearningResolutionOutcome;
+  note: string;
+};
 
 export function useRunsTimeline() {
   const {
@@ -20,6 +44,7 @@ export function useRunsTimeline() {
     isLoadingWithoutCache: isLoadingRunsWithoutCache,
   } = useRunsApi();
   const { data: agentList = [] } = useAgentsApi();
+  const { data: taskList = [] } = useTasksApi();
   const { data: healthStatus } = useHealthApi();
   const createRun = useCreateRunApi();
   const appendRunLog = useAppendRunLogApi();
@@ -28,21 +53,59 @@ export function useRunsTimeline() {
   const promoteRunDeliverable = usePromoteRunDeliverableApi();
   const unlinkRunDeliverable = useUnlinkRunDeliverableApi();
   const captureRunMemory = useCaptureRunMemoryApi();
+  const curateRunLearning = useCurateRunLearningApi();
+  const resolveRunLearningSignal = useResolveRunLearningSignalApi();
+  const retryRun = useRetryRunApi();
   const [runLogMessages, setRunLogMessages] = useState<Record<string, string>>({});
   const [agentFilter, setAgentFilter] = useState<"all" | "needs-human" | "blocked">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | RunReviewStatus>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [runLearningDrafts, setRunLearningDrafts] = useState<Record<string, Partial<RunLearningDraft>>>({});
+  const [runLearningResolutionDrafts, setRunLearningResolutionDrafts] = useState<
+    Record<string, Partial<RunLearningResolutionDraft>>
+  >({});
   const isOpenAiExecution = healthStatus?.executorMode === "openai";
   const executorModel = healthStatus?.executorModel ?? "unknown";
   const modelProfile = healthStatus?.modelProfile ?? "standard";
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredRunList = runList.filter((run) => {
     const relatedAgent = run.agentId ? agentList.find((agent) => agent.id === run.agentId) : undefined;
     const agentMatches =
       agentFilter === "all" ? true : relatedAgent?.status === agentFilter;
     const reviewMatches =
       reviewFilter === "all" ? true : run.reviewStatus === reviewFilter;
-    return agentMatches && reviewMatches;
+    const searchMatches =
+      normalizedSearch.length === 0
+        ? true
+        : [
+            run.type,
+            run.id,
+            run.status,
+            run.reviewStatus ?? "",
+            run.deliverablePath ?? "",
+            relatedAgent?.name ?? "",
+            relatedAgent?.role ?? "",
+            run.taskId ? taskList.find((task) => task.id === run.taskId)?.title ?? "" : "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedSearch);
+    return agentMatches && reviewMatches && searchMatches;
   });
+  const reviewStatusCounts = runList.reduce<Record<RunReviewStatus, number>>(
+    (counts, run) => {
+      if (run.reviewStatus) {
+        counts[run.reviewStatus] += 1;
+      }
+      return counts;
+    },
+    {
+      pending: 0,
+      approved: 0,
+      "changes-requested": 0,
+    },
+  );
 
   const deliverableRuns = runList.filter((run) => Boolean(run.deliverablePath));
 
@@ -89,13 +152,92 @@ export function useRunsTimeline() {
     });
   }
 
+  function getRunLearningDraft(run: Run): RunLearningDraft {
+    const relatedAgent = run.agentId ? agentList.find((agent) => agent.id === run.agentId) : undefined;
+    const stepRoles = ((run.output as { steps?: Array<{ agentRole?: AgentRole }> } | undefined)?.steps ?? [])
+      .map((step) => step.agentRole)
+      .filter((role): role is AgentRole => Boolean(role));
+    const role = relatedAgent?.role
+      ?? (stepRoles.includes("builder") ? "builder" : stepRoles.at(-1))
+      ?? (run.type === "review" ? "qa" : "builder");
+    const goal = (run.output as { goal?: unknown } | undefined)?.goal
+      ?? (run.input as { goal?: unknown } | undefined)?.goal;
+    const lesson = typeof goal === "string" && goal.trim()
+      ? `Approved outcome: ${goal.trim()}`
+      : `Approved ${run.type} run ${run.id}.`;
+    const defaults: RunLearningDraft = {
+      role,
+      lesson,
+      signal: "",
+      signalPath: run.deliverablePath ?? run.memory?.wikiPath ?? "",
+    };
+    return { ...defaults, ...(runLearningDrafts[run.id] ?? {}) };
+  }
+
+  function setRunLearningDraft(runId: string, patch: Partial<RunLearningDraft>) {
+    setRunLearningDrafts((current) => ({
+      ...current,
+      [runId]: { ...(current[runId] ?? {}), ...patch },
+    }));
+  }
+
+  function handleCurateRunLearning(run: Run) {
+    const draft = getRunLearningDraft(run);
+    const lesson = draft.lesson.trim();
+    if (!lesson) {
+      return;
+    }
+    const input: CurateRunLearningInput = {
+      role: draft.role,
+      lesson,
+      ...(draft.signal
+        ? {
+            signal: draft.signal,
+            signalPath: draft.signalPath.trim(),
+          }
+        : {}),
+    };
+    curateRunLearning.mutate({ runId: run.id, input });
+  }
+
+  function getRunLearningResolutionDraft(runId: string): RunLearningResolutionDraft {
+    return {
+      outcome: "resolved",
+      note: "",
+      ...(runLearningResolutionDrafts[runId] ?? {}),
+    };
+  }
+
+  function setRunLearningResolutionDraft(runId: string, patch: Partial<RunLearningResolutionDraft>) {
+    setRunLearningResolutionDrafts((current) => ({
+      ...current,
+      [runId]: { ...(current[runId] ?? {}), ...patch },
+    }));
+  }
+
+  function handleResolveRunLearningSignal(runId: string) {
+    const draft = getRunLearningResolutionDraft(runId);
+    const note = draft.note.trim();
+    if (!note) {
+      return;
+    }
+    const input: ResolveRunLearningSignalInput = {
+      outcome: draft.outcome,
+      note,
+    };
+    resolveRunLearningSignal.mutate({ runId, input });
+  }
+
   return {
     runList,
     filteredRunList,
     deliverableRuns,
+    taskList,
     runLogMessages,
     agentFilter,
     reviewFilter,
+    searchQuery,
+    reviewStatusCounts,
     isFetchingRuns,
     isLoadingRunsWithoutCache,
     isOpenAiExecution,
@@ -108,10 +250,20 @@ export function useRunsTimeline() {
     isPromotingRunDeliverable: promoteRunDeliverable.isPending,
     isUnlinkingRunDeliverable: unlinkRunDeliverable.isPending,
     isCapturingRunMemory: captureRunMemory.isPending,
+    isCuratingRunLearning: curateRunLearning.isPending,
+    isResolvingRunLearningSignal: resolveRunLearningSignal.isPending,
+    isRetryingRun: retryRun.isPending,
     capturedMemoryPath: captureRunMemory.data?.wikiPath ?? null,
+    capturedRoleMemoryPath: curateRunLearning.data?.roleMemoryPath ?? null,
+    resolvedRoleMemoryPath: resolveRunLearningSignal.data?.roleMemoryPath ?? null,
+    getRunLearningDraft,
+    setRunLearningDraft,
+    getRunLearningResolutionDraft,
+    setRunLearningResolutionDraft,
     setRunLogMessage,
     setAgentFilter,
     setReviewFilter,
+    setSearchQuery,
     handleAppendRunLog,
     startManualRun: () => {
       if (isOpenAiExecution) {
@@ -151,6 +303,16 @@ export function useRunsTimeline() {
         runId,
       }),
     unlinkRunDeliverable: handleUnlinkRunDeliverable,
+    retryRun: (runId: string) => retryRun.mutate({ runId }),
+    openOrchestration: (runId: string) => {
+      window.dispatchEvent(new CustomEvent("navigation:view", { detail: "dashboard" }));
+      // Dashboard mounts the orchestration panel in response to navigation;
+      // dispatch after that mount so its historical-run listener can recover
+      // the terminal receipt reliably.
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("orchestration:open", { detail: runId }));
+      }, 0);
+    },
     captureRunMemory: (runId: string) =>
       captureRunMemory.mutate({
         runId,
@@ -158,5 +320,7 @@ export function useRunsTimeline() {
           summary: "Review memory captured from dashboard.",
         },
       }),
+    curateRunLearning: handleCurateRunLearning,
+    resolveRunLearningSignal: handleResolveRunLearningSignal,
   };
 }

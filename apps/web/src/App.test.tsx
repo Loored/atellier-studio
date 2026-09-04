@@ -2,29 +2,63 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./features/knowledge/components/ForceGraphCanvas", () => ({
+  ForceGraphCanvas: () => null,
+}));
+
 import App from "./App";
 import { queryClient } from "./api/query/queryClient";
 import { wikiService } from "./api/services/wiki.service";
 
 const createTaskMock = vi.hoisted(() => vi.fn());
 const appendLogMock = vi.hoisted(() => vi.fn());
+const listRunsMock = vi.hoisted(() => vi.fn());
 const updateRunReviewMock = vi.hoisted(() => vi.fn());
 const promoteDeliverableMock = vi.hoisted(() => vi.fn());
 const unlinkDeliverableMock = vi.hoisted(() => vi.fn());
 const captureRunMemoryMock = vi.hoisted(() => vi.fn());
+const curateRunLearningMock = vi.hoisted(() => vi.fn());
+const resolveRunLearningSignalMock = vi.hoisted(() => vi.fn());
+const retryRunMock = vi.hoisted(() => vi.fn());
+const recordContextEvaluationMock = vi.hoisted(() => vi.fn());
 const startSkillOrchestrationMock = vi.hoisted(() => vi.fn());
+const getOrchestrationStatusMock = vi.hoisted(() => vi.fn());
 const ingestWikiMock = vi.hoisted(() => vi.fn());
 const queryWikiMock = vi.hoisted(() => vi.fn());
 const lintWikiMock = vi.hoisted(() => vi.fn());
+const reflectWikiMock = vi.hoisted(() => vi.fn());
+const readReflectionReviewMock = vi.hoisted(() => vi.fn());
+const showReflectionReviewMock = vi.hoisted(() => ({ value: false }));
+const decideReflectionMock = vi.hoisted(() => vi.fn());
+const promoteReflectionMock = vi.hoisted(() => vi.fn());
 const appendWikiLogMock = vi.hoisted(() => vi.fn());
 const writeWikiPageMock = vi.hoisted(() => vi.fn());
+const recordDreamDecisionMock = vi.hoisted(() => vi.fn());
 const createCodexRunMock = vi.hoisted(() => vi.fn());
 const getCodexRunMock = vi.hoisted(() => vi.fn());
 const planCodexRunMock = vi.hoisted(() => vi.fn());
 const approveCodexStepMock = vi.hoisted(() => vi.fn());
 const executeNextCodexMock = vi.hoisted(() => vi.fn());
+const retryCodexStepMock = vi.hoisted(() => vi.fn());
 const cancelCodexMock = vi.hoisted(() => vi.fn());
 const finalizeCodexMock = vi.hoisted(() => vi.fn());
+const readKnowledgeGraphMock = vi.hoisted(() => vi.fn());
+const listKnowledgeSnapshotsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ snapshots: [] }));
+const readKnowledgeSnapshotDiffMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    generatedAt: "2026-05-16T00:00:00.000Z",
+    baseId: "",
+    headId: "",
+    nodes: { added: 0, removed: 0, addedNodeIds: [], removedNodeIds: [] },
+    edges: { added: 0, removed: 0, addedEdgeIds: [], removedEdgeIds: [] },
+  }),
+);
+const listKnowledgeAnnotationsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ annotations: [] }));
+const listKnowledgeFilterPresetsMock = vi.hoisted(() => vi.fn().mockResolvedValue({ presets: [] }));
+const saveKnowledgeAnnotationMock = vi.hoisted(() => vi.fn());
+const createKnowledgeFilterPresetMock = vi.hoisted(() => vi.fn());
+const readKnowledgeRoleMemoryMock = vi.hoisted(() => vi.fn().mockResolvedValue({ generatedAt: "2026-05-16T00:00:00.000Z", roles: [] }));
 
 vi.mock("./api/services/agents.service", () => ({
   agentsService: {
@@ -63,35 +97,7 @@ vi.mock("./api/services/tasks.service", () => ({
 
 vi.mock("./api/services/runs.service", () => ({
   runsService: {
-    list: vi.fn().mockResolvedValue([
-      {
-        id: "run-1",
-        type: "manual",
-        status: "running",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
-      {
-        id: "run-2",
-        type: "review",
-        status: "completed",
-        reviewStatus: "pending",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
-      {
-        id: "run-3",
-        type: "build",
-        status: "completed",
-        reviewStatus: "approved",
-        deliverablePath: "wiki/deliverables/run-3.md",
-        logs: [],
-        createdAt: "2026-05-04T00:00:00.000Z",
-        updatedAt: "2026-05-04T00:00:00.000Z",
-      },
-    ]),
+    list: listRunsMock,
     create: vi.fn(),
     appendLog: appendLogMock,
     complete: vi.fn(),
@@ -99,6 +105,10 @@ vi.mock("./api/services/runs.service", () => ({
     promoteDeliverable: promoteDeliverableMock,
     unlinkDeliverable: unlinkDeliverableMock,
     captureMemory: captureRunMemoryMock,
+    curateLearning: curateRunLearningMock,
+    resolveLearningSignal: resolveRunLearningSignalMock,
+    retry: retryRunMock,
+    recordContextEvaluation: recordContextEvaluationMock,
   },
 }));
 
@@ -128,8 +138,32 @@ vi.mock("./api/services/orchestrations.service", () => ({
           },
         ],
       },
+      {
+        id: "wiki-dream-loop",
+        name: "Wiki Dream Loop",
+        description: "Periodic curator pass over the wiki.",
+        steps: [
+          {
+            id: "audit",
+            label: "Audit the wiki",
+            phase: "wiki",
+            agentRole: "wiki-curator",
+            agentName: "Wiki Curator",
+            objective: "Surface structural issues.",
+          },
+          {
+            id: "draft-report",
+            label: "Draft the dream report",
+            phase: "wiki",
+            agentRole: "wiki-curator",
+            agentName: "Wiki Curator",
+            objective: "Draft the report.",
+          },
+        ],
+      },
     ]),
     startSkillRun: startSkillOrchestrationMock,
+    getStatus: getOrchestrationStatusMock,
   },
 }));
 
@@ -139,19 +173,38 @@ vi.mock("./api/services/wiki.service", () => ({
       path: "atelier/wiki/index.md",
       content: "# Atellier Studio Wiki Index",
       ready: true,
+      memory: {
+        layer: "semantic",
+        state: "verified",
+        authority: "trusted",
+        provenancePaths: [],
+        reason: "Operator-maintained wiki index.",
+      },
     }),
     readLog: vi.fn().mockResolvedValue({
       path: "atelier/wiki/log.md",
       content:
         "# Atellier Studio Wiki Log\n\n## [2026-05-04T00:00:00.000Z] initialization | Milestone 0 wiki log created",
       ready: true,
+      memory: {
+        layer: "episodic",
+        state: "generated",
+        authority: "context-only",
+        provenancePaths: [],
+        reason: "Chronological system-generated operational log.",
+      },
     }),
     appendLog: appendWikiLogMock,
     readPage: vi.fn(),
     ingest: ingestWikiMock,
     query: queryWikiMock,
     lint: lintWikiMock,
+    reflect: reflectWikiMock,
+    readReflectionReview: readReflectionReviewMock,
+    decideReflection: decideReflectionMock,
+    promoteReflection: promoteReflectionMock,
     writePage: writeWikiPageMock,
+    recordDreamDecision: recordDreamDecisionMock,
   },
 }));
 
@@ -164,6 +217,11 @@ vi.mock("./api/services/system.service", () => ({
       executorMode: "openai",
       executorModel: "gpt-4.1-mini",
       modelProfile: "standard",
+      codexWorker: {
+        executionAdapter: "fake",
+        label: "fake-safe",
+        realExecutionEnabled: false,
+      },
       mongo: { connected: false, state: "disconnected" },
       metrics: { agentsTotal: 1, waitingAgents: 0, activeRuns: 1 },
       memory: { rssBytes: 1000, heapUsedBytes: 500 },
@@ -178,8 +236,22 @@ vi.mock("./api/services/codex-worker.service", () => ({
     plan: planCodexRunMock,
     approveStep: approveCodexStepMock,
     executeNext: executeNextCodexMock,
+    retryStep: retryCodexStepMock,
     cancel: cancelCodexMock,
     finalize: finalizeCodexMock,
+  },
+}));
+
+vi.mock("./api/services/knowledge.service", () => ({
+  knowledgeService: {
+    readGraph: readKnowledgeGraphMock,
+    listSnapshots: listKnowledgeSnapshotsMock,
+    readSnapshotDiff: readKnowledgeSnapshotDiffMock,
+    readRoleMemory: readKnowledgeRoleMemoryMock,
+    listAnnotations: listKnowledgeAnnotationsMock,
+    listFilterPresets: listKnowledgeFilterPresetsMock,
+    saveAnnotation: saveKnowledgeAnnotationMock,
+    createFilterPreset: createKnowledgeFilterPresetMock,
   },
 }));
 
@@ -190,7 +262,37 @@ describe("App", () => {
       value: vi.fn(() => true),
     });
     vi.clearAllMocks();
+    showReflectionReviewMock.value = false;
     queryClient.clear();
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-1",
+        type: "manual",
+        status: "running",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-2",
+        type: "review",
+        status: "completed",
+        reviewStatus: "pending",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
     createTaskMock.mockResolvedValue({
       id: "task-2",
       title: "Review V3",
@@ -244,42 +346,152 @@ describe("App", () => {
     });
     captureRunMemoryMock.mockResolvedValue({
       run: {
-        id: "run-2",
-        type: "review",
+        id: "run-3",
+        type: "build",
         status: "completed",
-        reviewStatus: "pending",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+        },
         logs: [],
         createdAt: "2026-05-04T00:00:00.000Z",
         updatedAt: "2026-05-04T00:00:00.000Z",
       },
-      wikiPath: "wiki/synthesis/run-run-2-review-memory-captured-from-dashboard.md",
+      wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
       logPath: "wiki/log.md",
     });
-    startSkillOrchestrationMock.mockResolvedValue({
-      skillId: "atellier-build-loop",
-      goal: "Build orchestration",
-      orchestrationRun: {
-        id: "run-4",
-        type: "orchestration",
+    curateRunLearningMock.mockResolvedValue({
+      run: {
+        id: "run-3",
+        type: "build",
         status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+          learning: {
+            runId: "run-3",
+            role: "qa",
+            lesson: "Preserve validation evidence for approved deliverables.",
+            memoryPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+            roleMemoryPath: "wiki/role-memory/qa.md",
+            logPath: "wiki/log.md",
+            signal: "stale",
+            signalPath: "wiki/deliverables/run-3.md",
+            capturedAt: "2026-05-04T00:00:00.000Z",
+          },
+        },
         logs: [],
         createdAt: "2026-05-04T00:00:00.000Z",
         updatedAt: "2026-05-04T00:00:00.000Z",
       },
+      roleMemoryPath: "wiki/role-memory/qa.md",
+      logPath: "wiki/log.md",
+    });
+    resolveRunLearningSignalMock.mockResolvedValue({
+      run: {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+          learning: {
+            runId: "run-3",
+            role: "qa",
+            lesson: "Preserve validation evidence for approved deliverables.",
+            memoryPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+            roleMemoryPath: "wiki/role-memory/qa.md",
+            logPath: "wiki/log.md",
+            signal: "stale",
+            signalPath: "wiki/deliverables/run-3.md",
+            capturedAt: "2026-05-04T00:00:00.000Z",
+            resolution: {
+              runId: "run-3",
+              outcome: "dismissed",
+              note: "The page is intentionally historical and needs no update.",
+              signal: "stale",
+              signalPath: "wiki/deliverables/run-3.md",
+              logPath: "wiki/log.md",
+              resolvedAt: "2026-05-04T00:01:00.000Z",
+            },
+          },
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:01:00.000Z",
+      },
+      roleMemoryPath: "wiki/role-memory/qa.md",
+      logPath: "wiki/log.md",
+    });
+    retryRunMock.mockResolvedValue({
+      id: "run-retry",
+      type: "orchestration",
+      status: "queued",
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
+    });
+    startSkillOrchestrationMock.mockResolvedValue({ runId: "run-4" });
+    getOrchestrationStatusMock.mockResolvedValue({
+      orchestrationRunId: "run-4",
+      skillId: "atellier-build-loop",
+      goal: "Build orchestration",
+      status: "completed",
       steps: [],
+      activeStep: null,
+      nextStep: null,
     });
     ingestWikiMock.mockResolvedValue({
       rawPath: "raw/ingest/2026-05-05-client-meeting-notes.md",
       summaryPagePath: "wiki/sources/2026-05-05-client-meeting-notes.md",
       logPath: "wiki/log.md",
+      rawMemory: {
+        layer: "raw",
+        state: "immutable-source",
+        authority: "evidence-only",
+        provenancePaths: ["raw/ingest/2026-05-05-client-meeting-notes.md"],
+        reason: "Immutable ingested source evidence.",
+      },
+      summaryMemory: {
+        layer: "semantic",
+        state: "generated",
+        authority: "context-only",
+        provenancePaths: ["raw/ingest/2026-05-05-client-meeting-notes.md"],
+        reason: "Generated source summary awaiting operator verification.",
+      },
       proposedTasks: ["- [ ] Client meeting notes (source: wiki/sources/2026-05-05-client-meeting-notes.md)"],
     });
     queryWikiMock.mockResolvedValue({
       query: "raw sources",
+      retrievalPolicy: "balanced",
       matches: [
         {
           path: "wiki/sources/2026-05-05-client-meeting-notes.md",
           snippet: "preserve raw sources first",
+          memory: {
+            layer: "semantic",
+            state: "generated",
+            authority: "context-only",
+            provenancePaths: ["raw/ingest/2026-05-05-client-meeting-notes.md"],
+            reason: "Generated source summary awaiting operator verification.",
+          },
+          retrieval: {
+            lexical: 1,
+            trustAdjustment: 0,
+            total: 1,
+            reason: "Generated context receives no authority boost.",
+          },
         },
       ],
       relatedPages: [
@@ -287,6 +499,13 @@ describe("App", () => {
           path: "wiki/sources/2026-05-05-client-meeting-notes.md",
           summary: "preserve raw sources first",
           reason: "Source summary shares query terms.",
+          memory: {
+            layer: "semantic",
+            state: "generated",
+            authority: "context-only",
+            provenancePaths: ["raw/ingest/2026-05-05-client-meeting-notes.md"],
+            reason: "Generated source summary awaiting operator verification.",
+          },
         },
       ],
       contradictions: [
@@ -309,10 +528,97 @@ describe("App", () => {
       ],
       checkedAt: "2026-05-05T00:00:00.000Z",
     });
+    reflectWikiMock.mockResolvedValue({
+      candidates: [{
+        id: "reflection-repeated-validation-blocker",
+        title: "Reflection candidate: Repeated validation blocker",
+        pattern: "Repeated validation blocker needs explicit evidence.",
+        occurrenceCount: 2,
+        evidencePaths: ["runs/run-1.md", "runs/run-2.md"],
+        suggestedPath: "wiki/reflections/reflection-repeated-validation-blocker.md",
+        draftMarkdown: "# Reflection candidate\n\n## Review Decision\n\n- Status: proposed\n",
+        memory: {
+          layer: "semantic",
+          state: "generated",
+          authority: "context-only",
+          provenancePaths: [],
+          reason: "Reflection candidates are generated proposals pending an explicit operator decision.",
+        },
+      }],
+      scannedEpisodes: 4,
+      minOccurrences: 2,
+      generatedAt: "2026-08-30T00:00:00.000Z",
+    });
+    readReflectionReviewMock.mockImplementation(async () => ({
+      items: showReflectionReviewMock.value ? [{
+        id: "reflection-repeated-validation-blocker",
+        title: "Reflection candidate: Repeated validation blocker",
+        pattern: "Repeated validation blocker needs explicit evidence.",
+        occurrenceCount: 2,
+        evidencePaths: ["runs/run-1.md", "runs/run-2.md"],
+        suggestedPath: "wiki/reflections/reflection-repeated-validation-blocker.md",
+        draftMarkdown: "# Reflection candidate\n\n## Review Decision\n\n- Status: proposed\n",
+        memory: {
+          layer: "semantic",
+          state: "generated",
+          authority: "context-only",
+          provenancePaths: [],
+          reason: "Reflection candidates are generated proposals pending an explicit operator decision.",
+        },
+        status: promoteReflectionMock.mock.calls.length > 0
+          ? "promoted"
+          : decideReflectionMock.mock.calls.length > 0
+            ? "accepted"
+            : "pending",
+        decisionPath: decideReflectionMock.mock.calls.length > 0
+          ? "wiki/decisions/reflection-repeated-validation-blocker.md"
+          : undefined,
+        decisionNote: decideReflectionMock.mock.calls.length > 0 ? "Keep this reusable rule." : undefined,
+        promotedPath: promoteReflectionMock.mock.calls.length > 0
+          ? "wiki/notes/reflection-repeated-validation-blocker.md"
+          : undefined,
+      }] : [],
+      scannedEpisodes: 4,
+      minOccurrences: 2,
+      generatedAt: "2026-08-30T00:00:00.000Z",
+    }));
+    decideReflectionMock.mockResolvedValue({
+      candidateId: "reflection-repeated-validation-blocker",
+      decision: "accepted",
+      note: "Keep this reusable rule.",
+      path: "wiki/decisions/reflection-repeated-validation-blocker.md",
+      createdAt: "2026-08-30T00:00:00.000Z",
+    });
+    promoteReflectionMock.mockResolvedValue({
+      decisionPath: "wiki/decisions/reflection-repeated-validation-blocker.md",
+      promotedPath: "wiki/notes/reflection-repeated-validation-blocker.md",
+      memory: {
+        layer: "semantic",
+        state: "verified",
+        authority: "trusted",
+        provenancePaths: ["wiki/decisions/reflection-repeated-validation-blocker.md"],
+        reason: "Page is stored in an operator-curated semantic Wiki category.",
+      },
+    });
     writeWikiPageMock.mockResolvedValue({
       path: "wiki/notes/wiki-brain-v2.md",
       content: "# Wiki Brain v2\n\n- Safe write route active.",
       ready: true,
+      memory: {
+        layer: "semantic",
+        state: "verified",
+        authority: "trusted",
+        provenancePaths: [],
+        reason: "Operator-curated wiki page.",
+      },
+    });
+    recordDreamDecisionMock.mockResolvedValue({
+      id: "decision-1",
+      path: "wiki/decisions/2026-05-13-dream-decision-1.md",
+      reportPath: "wiki/dreams/2026-05-11-dream-report.md",
+      proposal: "Keep the report as a proposed maintenance page.",
+      decision: "accepted",
+      createdAt: "2026-05-13T00:00:00.000Z",
     });
     createCodexRunMock.mockResolvedValue({ id: "codex-run-1" });
     getCodexRunMock.mockResolvedValue({
@@ -335,6 +641,7 @@ describe("App", () => {
       mode: "approved_step",
       profile: "standard",
       goal: "Implement a safe API change",
+      executionAdapter: { mode: "fake", label: "fake-safe" },
       steps: [
         {
           id: "step-1",
@@ -379,10 +686,79 @@ describe("App", () => {
     executeNextCodexMock.mockResolvedValue({});
     cancelCodexMock.mockResolvedValue({});
     finalizeCodexMock.mockResolvedValue({});
+    readKnowledgeGraphMock.mockResolvedValue({
+      generatedAt: "2026-05-12T00:00:00.000Z",
+      nodes: [
+        {
+          id: "agent:agent-1",
+          type: "agent",
+          layer: "runtime",
+          label: "Builder Agent",
+          sourceId: "agent-1",
+          role: "builder",
+          status: "idle",
+          quality: "verified",
+        },
+        {
+          id: "role:builder",
+          type: "role",
+          layer: "meta",
+          label: "builder",
+          role: "builder",
+          quality: "verified",
+        },
+      ],
+      edges: [
+        {
+          id: "edge:agent:agent-1->role:builder:agent_has_role",
+          type: "agent_has_role",
+          from: "agent:agent-1",
+          to: "role:builder",
+          label: "has role",
+          quality: "verified",
+        },
+      ],
+      stats: {
+        nodes: 2,
+        edges: 1,
+        byNodeType: {
+          agent: 1,
+          role: 1,
+          task: 0,
+          run: 0,
+          "wiki-page": 0,
+          deliverable: 0,
+          "lint-issue": 0,
+          "raw-source": 0,
+          "runtime-log": 0,
+        },
+        byQuality: {
+          verified: 2,
+          proposed: 0,
+          contradicted: 0,
+          stale: 0,
+          orphaned: 0,
+          generated: 0,
+        },
+        byLayer: {
+          wiki: 0,
+          raw: 0,
+          runtime: 1,
+          meta: 1,
+        },
+      },
+    });
     vi.mocked(wikiService.readPage).mockResolvedValue({
       path: "runs/2026-05-05-codex-worker-codex-run-1.md",
       ready: true,
       content: "# Run Log - Codex Worker Finalize\n\nFinalized from dashboard codex worker panel.",
+      memory: {
+        layer: "episodic",
+        state: "generated",
+        authority: "context-only",
+        provenancePaths: [],
+        reason: "System-generated run history.",
+      },
     });
   });
 
@@ -395,7 +771,20 @@ describe("App", () => {
     expect(await screen.findByText("Prepare project spine")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Wiki Log" })).toBeInTheDocument();
     // Executor mode badge in header shows the mode name
-    expect(await screen.findByText("openai")).toBeInTheDocument();
+    expect((await screen.findAllByText("openai")).length).toBeGreaterThan(0);
+  });
+
+  it("renders the knowledge graph view from the graph API chain", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Graph" }));
+
+    expect(await screen.findByRole("heading", { name: "Knowledge Graph" })).toBeInTheDocument();
+    expect(await screen.findByText("Composición por capa")).toBeInTheDocument();
+    expect((await screen.findAllByRole("button", { name: /WIKI/i })).length).toBeGreaterThan(0);
+    expect(await screen.findByPlaceholderText("Buscar nodos…")).toBeInTheDocument();
+    expect(readKnowledgeGraphMock).toHaveBeenCalled();
   });
 
   it("creates a task through the dashboard form", async () => {
@@ -431,6 +820,34 @@ describe("App", () => {
     });
   });
 
+  it("retries a failed orchestration from the runs timeline", async () => {
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-retry",
+        type: "orchestration",
+        status: "failed",
+        logs: [
+          {
+            timestamp: "2026-05-04T00:00:00.000Z",
+            level: "error",
+            message: "fetch failed",
+          },
+        ],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
+    await user.click(await screen.findByRole("button", { name: "Retry orchestration run" }));
+
+    await waitFor(() => {
+      expect(retryRunMock).toHaveBeenCalledWith("run-retry");
+    });
+  });
+
   it("updates run review status from the runs timeline", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -444,6 +861,78 @@ describe("App", () => {
         reviewStatus: "approved",
       });
     });
+  });
+
+  it("shows review counters and combines review filter with run search", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
+
+    expect((await screen.findAllByText(/pending/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/approved/i)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/changes/i)).length).toBeGreaterThan(0);
+
+    const reviewSelects = screen.getAllByRole("combobox");
+    await user.selectOptions(reviewSelects[1] as HTMLElement, "approved");
+    await user.type(screen.getByLabelText("Run search"), "run-3");
+
+    expect(await screen.findByRole("button", { name: /unlink/i })).toBeInTheDocument();
+    expect(screen.queryByText(/No runs match current filters/i)).not.toBeInTheDocument();
+  });
+
+  it("deduplicates aggregate validation alerts across affected runs", async () => {
+    const validation = {
+      role: "builder",
+      profile: "artifact-builder",
+      passed: false,
+      issues: [
+        {
+          code: "artifact-builder.unverified_referenced_file",
+          severity: "error",
+          message: "Builder referenced an unverified file: wiki/sources/daily-plan.md",
+        },
+      ],
+      verifiedRepoFiles: [],
+      invalidReferencedFiles: ["wiki/sources/daily-plan.md"],
+      referencedFiles: ["wiki/sources/daily-plan.md"],
+      candidateFiles: [],
+      changedFiles: [],
+    };
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-validation-1",
+        type: "manual",
+        status: "completed",
+        reviewStatus: "pending",
+        output: { validation },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+      {
+        id: "run-validation-2",
+        type: "manual",
+        status: "completed",
+        reviewStatus: "pending",
+        output: { validation },
+        logs: [],
+        createdAt: "2026-05-04T00:00:01.000Z",
+        updatedAt: "2026-05-04T00:00:01.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    const alertLabel = await screen.findByText("Validation alerts (2)");
+    const alertContainer = alertLabel.parentElement;
+    expect(alertContainer).not.toBeNull();
+    const scoped = within(alertContainer as HTMLElement);
+    expect(scoped.getByText("2 affected runs")).toBeInTheDocument();
+    expect(scoped.getByText("1 invalid reference(s)")).toBeInTheDocument();
+    expect(scoped.getByText("1 issue(s)")).toBeInTheDocument();
+    expect(scoped.getAllByText(/wiki\/sources\/daily-plan\.md/)).toHaveLength(2);
   });
 
   it("promotes a completed run to deliverable from timeline", async () => {
@@ -478,14 +967,106 @@ describe("App", () => {
 
     await user.click(await screen.findByRole("button", { name: "Review" }));
     const captureButtons = await screen.findAllByRole("button", { name: /capture memory/i });
-    await user.click(captureButtons[0]);
+    const enabledCaptureButton = captureButtons.find((button) => !(button as HTMLButtonElement).disabled);
+    expect(enabledCaptureButton).toBeDefined();
+    await user.click(enabledCaptureButton!);
 
     await waitFor(() => {
-      expect(captureRunMemoryMock).toHaveBeenCalledWith("run-2", {
+      expect(captureRunMemoryMock).toHaveBeenCalledWith("run-3", {
         summary: "Review memory captured from dashboard.",
       });
     });
-    expect(await screen.findByText(/Captured memory: wiki\/synthesis\/run-run-2-review-memory-captured-from-dashboard\.md/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Captured memory: wiki\/synthesis\/run-run-3-review-memory-captured-from-dashboard\.md/i)).toBeInTheDocument();
+  });
+
+  it("curates an approved run into explicit role learning", async () => {
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        deliverablePath: "wiki/deliverables/run-3.md",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    const learningNote = await screen.findByLabelText("Learning note for run-3");
+    await user.clear(learningNote);
+    await user.type(learningNote, "Preserve validation evidence for approved deliverables.");
+    await user.selectOptions(screen.getByLabelText("Learning role for run-3"), "qa");
+    await user.selectOptions(screen.getByLabelText("Curation signal for run-3"), "stale");
+    await user.click(screen.getByRole("button", { name: "Curate learning" }));
+
+    await waitFor(() => {
+      expect(curateRunLearningMock).toHaveBeenCalledWith("run-3", {
+        role: "qa",
+        lesson: "Preserve validation evidence for approved deliverables.",
+        signal: "stale",
+        signalPath: "wiki/deliverables/run-3.md",
+      });
+    });
+    expect(await screen.findByText(/Curated role memory: wiki\/role-memory\/qa\.md/i)).toBeInTheDocument();
+  });
+
+  it("resolves an open role learning signal from review", async () => {
+    listRunsMock.mockResolvedValue([
+      {
+        id: "run-3",
+        type: "build",
+        status: "completed",
+        reviewStatus: "approved",
+        memory: {
+          wikiPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+          logPath: "wiki/log.md",
+          summary: "Review memory captured from dashboard.",
+          capturedAt: "2026-05-04T00:00:00.000Z",
+          learning: {
+            runId: "run-3",
+            role: "qa",
+            lesson: "Preserve validation evidence for approved deliverables.",
+            memoryPath: "wiki/synthesis/run-run-3-review-memory-captured-from-dashboard.md",
+            roleMemoryPath: "wiki/role-memory/qa.md",
+            logPath: "wiki/log.md",
+            signal: "stale",
+            signalPath: "wiki/deliverables/run-3.md",
+            capturedAt: "2026-05-04T00:00:00.000Z",
+          },
+        },
+        logs: [],
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    await user.selectOptions(screen.getByLabelText("Signal resolution outcome for run-3"), "dismissed");
+    await user.type(
+      screen.getByLabelText("Signal resolution note for run-3"),
+      "The page is intentionally historical and needs no update.",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve signal" }));
+
+    await waitFor(() => {
+      expect(resolveRunLearningSignalMock).toHaveBeenCalledWith("run-3", {
+        outcome: "dismissed",
+        note: "The page is intentionally historical and needs no update.",
+      });
+    });
+    expect(await screen.findByText(/Resolved role signal: wiki\/role-memory\/qa\.md/i)).toBeInTheDocument();
   });
 
   it("filters deliverables by type and review", async () => {
@@ -508,6 +1089,78 @@ describe("App", () => {
 
   it("starts a skill orchestration from the dashboard", async () => {
     const user = userEvent.setup();
+    getOrchestrationStatusMock.mockResolvedValue({
+      orchestrationRunId: "run-4",
+      skillId: "atellier-build-loop",
+      goal: "Build orchestration",
+      status: "completed",
+      steps: [
+        {
+          stepId: "repair-3",
+          label: "Auto-repair 3/3",
+          phase: "backend",
+          agentRole: "builder",
+          agentName: "Pepe Builder",
+          runId: "repair-run-3",
+          status: "completed",
+          isActive: false,
+          logicalStepId: "fix",
+          repairAttempt: 3,
+          repairAttemptLimit: 3,
+        },
+      ],
+      activeStep: null,
+      nextStep: null,
+      repair: {
+        maxAttempts: 3,
+        attemptsUsed: 3,
+        resolved: false,
+        exhausted: true,
+        finalStepId: "repair-3",
+        blockerMessages: ["Requested Artifact is missing Day 2."],
+      },
+      semanticRepair: {
+        maxAttempts: 3,
+        attemptsUsed: 2,
+        resolved: true,
+        exhausted: false,
+        finalStepId: "qa-recheck-2",
+        lastValidArtifactStepId: "semantic-repair-2",
+        lastQaStepId: "qa-recheck-2",
+        blockerMessages: [],
+      },
+      qaChecklist: {
+        sourceStepId: "scope",
+        qaStepId: "qa-recheck-2",
+        complete: true,
+        items: [{ criterion: "Artifact is complete", status: "pass", evidence: "All requested days are present." }],
+      },
+      contextReceipt: {
+        schemaVersion: 1,
+        query: "Build orchestration",
+        policy: "evidence-first",
+        budgets: { totalBytes: 16000, perItemBytes: 4000, maxRetrievalItems: 6 },
+        createdAt: "2026-08-30T10:00:00.000Z",
+        stableHash: "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890",
+        items: [{
+          source: "direct",
+          path: "raw/brief.md",
+          memory: {
+            layer: "raw",
+            state: "immutable-source",
+            authority: "evidence-only",
+            provenancePaths: ["raw/brief.md"],
+            reason: "Immutable source evidence.",
+          },
+          contentSha256: "content-hash",
+          originalBytes: 20,
+          includedBytes: 20,
+          truncated: false,
+          excerpt: "Brief evidence",
+        }],
+        excluded: [{ path: "wiki/notes/draft.md", reason: "context-only" }],
+      },
+    });
     render(<App />);
 
     await screen.findByText("Atellier Build Loop");
@@ -518,6 +1171,7 @@ describe("App", () => {
 
     await user.type(scoped.getByLabelText("Orchestration goal"), "Build orchestration");
     await user.type(scoped.getByLabelText("Orchestration context"), "Use the existing run spine.");
+    await user.selectOptions(scoped.getByLabelText("Linked task"), "task-1");
     await user.click(scoped.getByRole("button", { name: /start/i }));
 
     await waitFor(() => {
@@ -525,11 +1179,99 @@ describe("App", () => {
         skillId: "atellier-build-loop",
         goal: "Build orchestration",
         context: "Use the existing run spine.",
+        taskId: "task-1",
+      });
+    });
+    expect(await scoped.findByRole("alert")).toHaveTextContent("Auto-repair needs input");
+    expect(scoped.getByText("Requested Artifact is missing Day 2.")).toBeInTheDocument();
+    expect(scoped.getByText(/deterministic repair/i)).toBeInTheDocument();
+    expect(scoped.getByText("Semantic repair resolved")).toBeInTheDocument();
+    expect(scoped.getByText(/Final QA approved on qa-recheck-2/i)).toBeInTheDocument();
+    expect(scoped.getByText(/Last valid artifact: semantic-repair-2 · Last QA: qa-recheck-2/i)).toBeInTheDocument();
+    expect(scoped.getByText("QA acceptance checklist")).toBeInTheDocument();
+    expect(scoped.getByText(/Artifact is complete — All requested days are present/i)).toBeInTheDocument();
+    const receipt = scoped.getByRole("group", { name: "Memory context receipt" });
+    expect(receipt).toHaveTextContent("Memory context · evidence-first · a1b2c3d4e5f6");
+    await user.click(within(receipt).getByText(/Memory context/i));
+    expect(receipt).toHaveTextContent("raw/brief.md");
+    expect(receipt).toHaveTextContent("1 path(s) excluded");
+    expect(within(receipt).getByRole("group", { name: "Context receipt evaluation" })).toBeInTheDocument();
+    expect(within(receipt).getByLabelText("Relevance for raw/brief.md")).toHaveValue("uncertain");
+    await user.selectOptions(within(receipt).getByLabelText("Relevance for raw/brief.md"), "relevant");
+    recordContextEvaluationMock.mockResolvedValue({ id: "run-4" });
+    await user.click(within(receipt).getByRole("button", { name: "Save evaluation" }));
+    await waitFor(() => {
+      expect(recordContextEvaluationMock).toHaveBeenCalledWith("run-4", {
+        outcome: "useful",
+        items: [{ path: "raw/brief.md", relevance: "relevant" }],
+        note: undefined,
       });
     });
   });
 
+  it("shows preserved orchestration artifacts and semantic evidence in Review", async () => {
+    listRunsMock.mockResolvedValue([{
+      id: "orchestration-review-1",
+      taskId: "task-1",
+      type: "orchestration",
+      status: "completed",
+      reviewStatus: "pending",
+      deliverablePath: "wiki/deliverables/orchestration-review-1.md",
+      output: {
+        artifact: {
+          content: "### Day 1\nObjective: Use the system.\nHuman Approval Boundary: Approve before memory.",
+          sourceRunId: "builder-run-1",
+          stepId: "build",
+        },
+        semanticRepair: {
+          attemptsUsed: 3,
+          maxAttempts: 3,
+          exhausted: true,
+          finalStepId: "semantic-repair-3",
+          lastValidArtifactStepId: "build",
+          lastQaStepId: "qa",
+        },
+        qaChecklist: {
+          complete: true,
+          qaStepId: "qa-recheck-1",
+          items: [{ criterion: "Approval boundary is explicit", status: "fail", evidence: "The final approver is unnamed." }],
+        },
+        repeatedFeedback: {
+          detected: true,
+          firstQaStepId: "qa",
+          repeatedQaStepId: "qa-recheck-1",
+        },
+        validation: {
+          role: "qa",
+          profile: "orchestration",
+          passed: false,
+          issues: [{ code: "orchestration.semantic_repair_attempts_exhausted", severity: "error", message: "Semantic repair exhausted." }],
+          invalidReferencedFiles: [],
+        },
+      },
+      logs: [],
+      createdAt: "2026-05-04T00:00:00.000Z",
+      updatedAt: "2026-05-04T00:00:00.000Z",
+    }]);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+
+    expect(await screen.findByText("Preserved from:")).toBeInTheDocument();
+    expect(screen.getByText("build", { selector: "b" })).toBeInTheDocument();
+    expect(screen.getByText(/Latest attempt:/)).toBeInTheDocument();
+    expect(screen.getByText(/Semantic repair exhausted.*approval and memory stay blocked/i)).toBeInTheDocument();
+    expect(screen.getByText(/Repeated QA findings stopped semantic repair/i)).toBeInTheDocument();
+    await user.click(screen.getByText(/Inspect QA acceptance checklist/i));
+    expect(screen.getByText(/Approval boundary is explicit — The final approver is unnamed/i)).toBeInTheDocument();
+    await user.click(screen.getByText("Inspect preserved artifact"));
+    expect(screen.getByText(/Human Approval Boundary: Approve before memory/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Capture memory" })).toBeDisabled();
+  });
+
   it("runs wiki ingest and query actions from the wiki panel", async () => {
+    showReflectionReviewMock.value = true;
     const user = userEvent.setup();
     render(<App />);
 
@@ -547,8 +1289,23 @@ describe("App", () => {
       });
     });
 
+    await user.click(await screen.findByRole("button", { name: /create linked task/i }));
+    await waitFor(() => {
+      expect(createTaskMock).toHaveBeenCalledWith({
+        title: "Client meeting notes",
+        description: "Grounded in wiki/sources/2026-05-05-client-meeting-notes.md (raw: raw/ingest/2026-05-05-client-meeting-notes.md).",
+        status: "inbox",
+        priority: "medium",
+        sourceIds: [
+          "raw/ingest/2026-05-05-client-meeting-notes.md",
+          "wiki/sources/2026-05-05-client-meeting-notes.md",
+        ],
+      });
+    });
+
     await user.type(screen.getByLabelText("Search term"), "raw sources");
     await user.selectOptions(screen.getAllByLabelText("Source type")[1] as HTMLElement, "note");
+    await user.selectOptions(screen.getByLabelText("Retrieval policy"), "evidence-first");
     await user.click(screen.getByRole("button", { name: /query wiki/i }));
 
     await waitFor(() => {
@@ -556,13 +1313,37 @@ describe("App", () => {
         query: "raw sources",
         limit: 5,
         sourceType: "note",
+        retrievalPolicy: "evidence-first",
       });
     });
     expect(await screen.findByText(/related pages/i)).toBeInTheDocument();
     expect(await screen.findByText(/possible contradictions/i)).toBeInTheDocument();
+    expect((await screen.findAllByLabelText(/Memory trust: semantic, generated, context-only/i)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Score 1 · Generated context receives no authority boost/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Generate candidates" }));
+    await waitFor(() => expect(reflectWikiMock).toHaveBeenCalledWith({ minOccurrences: 2, limit: 5 }));
+    expect(await screen.findByText("Repeated validation blocker needs explicit evidence.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Reflection status: pending")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prepare review draft" })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Operator note"), "Keep this reusable rule.");
+    await user.click(screen.getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(decideReflectionMock).toHaveBeenCalledWith({
+      candidateId: "reflection-repeated-validation-blocker",
+      decision: "accepted",
+      note: "Keep this reusable rule.",
+    }));
+    expect(await screen.findByLabelText("Reflection status: accepted")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Promote accepted" }));
+    await waitFor(() => expect(promoteReflectionMock).toHaveBeenCalledWith({
+      decisionPath: "wiki/decisions/reflection-repeated-validation-blocker.md",
+    }));
 
     await user.click(screen.getByRole("button", { name: /promote to draft/i }));
-    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toContain("wiki/decisions/query-");
+    expect(screen.getAllByLabelText(/Memory trust: semantic, generated, context-only/i).length).toBeGreaterThan(0);
+    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).toContain("wiki/notes/query-decision-");
+    expect((screen.getByLabelText("Wiki path") as HTMLInputElement).value).not.toContain("wiki/decisions/");
+    expect(screen.getByText(/Saveable review draft.*semantic intent stays in the Markdown/i)).toBeInTheDocument();
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Source");
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Draft Provenance");
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("Suggested page type: decision");
@@ -572,6 +1353,7 @@ describe("App", () => {
     expect((screen.getByLabelText("Markdown content") as HTMLTextAreaElement).value).toContain("## Review Notes");
 
     await user.clear(screen.getByLabelText("Wiki path"));
+    expect(screen.getByText(/automatic provenance detached/i)).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Markdown content"));
     await user.type(screen.getByLabelText("Wiki path"), "wiki/notes/wiki-brain-v2.md");
     await user.type(screen.getByLabelText("Markdown content"), "# Wiki Brain v2\n\n- Safe write route active.");
@@ -583,27 +1365,109 @@ describe("App", () => {
         content: "# Wiki Brain v2\n\n- Safe write route active.",
       });
     });
-    await waitFor(() => {
-      expect(appendWikiLogMock).toHaveBeenCalledWith({
-        eventType: "wiki_write",
-        title: "Promoted wiki query result to draft",
-        summary: "Created draft from wiki/notes/wiki-brain-v2.md",
-        details: {
-          sourcePath: "wiki/sources/2026-05-05-client-meeting-notes.md",
-          query: "raw sources",
-          relatedPages: 1,
-          contradictions: 1,
-        },
-      });
-    });
+    expect(appendWikiLogMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: /run wiki lint/i }));
     expect(await screen.findByText(/Fix the Raw path reference or restore the missing raw source\./i)).toBeInTheDocument();
   });
 
+  it("runs a wiki dream and saves the approved report", async () => {
+    const user = userEvent.setup();
+    const dreamReport = [
+      "# Dream Report",
+      "",
+      "Suggested filename: wiki/dreams/2026-05-11-dream-report.md",
+      "",
+      "## Summary",
+      "",
+      "- Grounded paths reviewed.",
+      "",
+      "## Proposed actions",
+      "",
+      "1. Keep the report as a proposed maintenance page.",
+    ].join("\n");
+
+    startSkillOrchestrationMock.mockResolvedValueOnce({ runId: "dream-run-1" });
+    getOrchestrationStatusMock.mockResolvedValueOnce({
+      orchestrationRunId: "dream-run-1",
+      skillId: "wiki-dream-loop",
+      goal: "Periodic curator pass — propose wiki maintenance but apply nothing.",
+      status: "completed",
+      steps: [
+        {
+          stepId: "draft-report",
+          label: "Draft the dream report",
+          phase: "wiki",
+          agentRole: "wiki-curator",
+          agentName: "Wiki Curator",
+          runId: "dream-draft-run",
+          status: "completed",
+          isActive: false,
+        },
+      ],
+      activeStep: null,
+      nextStep: null,
+    });
+    listRunsMock.mockResolvedValue([
+      {
+        id: "dream-draft-run",
+        type: "manual",
+        status: "completed",
+        output: {
+          response: dreamReport,
+        },
+        logs: [],
+        createdAt: "2026-05-11T00:00:00.000Z",
+        updatedAt: "2026-05-11T00:00:00.000Z",
+      },
+    ]);
+    writeWikiPageMock.mockResolvedValueOnce({
+      path: "wiki/dreams/2026-05-11-dream-report.md",
+      content: dreamReport,
+      ready: true,
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: /dream now/i }));
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("OPENAI execution is active"));
+    await waitFor(() => {
+      expect(startSkillOrchestrationMock).toHaveBeenCalledWith({
+        skillId: "wiki-dream-loop",
+        goal: "Periodic curator pass — propose wiki maintenance but apply nothing.",
+        context: "Triggered from the Wiki view. Save only the report after explicit operator approval.",
+      });
+    });
+
+    expect(await screen.findByText(/Grounded paths reviewed\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Report path: wiki\/dreams\/2026-05-11-dream-report\.md/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /save report/i }));
+    await waitFor(() => {
+      expect(writeWikiPageMock).toHaveBeenCalledWith({
+        path: "wiki/dreams/2026-05-11-dream-report.md",
+        content: dreamReport,
+      });
+    });
+    expect(await screen.findByText(/Saved: wiki\/dreams\/2026-05-11-dream-report\.md/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /accept/i }));
+    await waitFor(() => {
+      expect(recordDreamDecisionMock).toHaveBeenCalledWith({
+        reportPath: "wiki/dreams/2026-05-11-dream-report.md",
+        proposal: "Keep the report as a proposed maintenance page.",
+        decision: "accepted",
+      });
+    });
+    expect(await screen.findByText(/Decision saved: accepted/i)).toBeInTheDocument();
+  });
+
   it("runs codex worker panel actions", async () => {
     const user = userEvent.setup();
     render(<App />);
+
+    expect(await screen.findByText(/Codex adapter: fake · fake-safe/i)).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: /create run/i }));
     expect(window.confirm).toHaveBeenCalledWith(

@@ -1,7 +1,7 @@
 # Next Iteration Plan — Claude Platform Alignment
 
 **Date:** 2026-05-06
-**Status (2026-05-11):** P1, P2, P3 (a/b/c), and P4 are **complete** on `feat/multi-provider-executors`. P5 (Codex Worker Evidence Pass v1.1) remains deferred. New candidates for the next iteration live in `docs/roadmap.md` under "Now planning" — top pick is **P2.b — grounding the Wiki Dream**.
+**Status (2026-05-11):** P1, P2, P2.b, P2.c, P3 (a/b/c), and P4 are **complete**. P5 (Codex Worker Evidence Pass v1.1) remains deferred. New candidates for the next iteration live in `docs/roadmap.md` under "Now planning" — top pick is memory artifact hygiene before another feature slice.
 **Supersedes:** Priority order in `docs/next-work-plan.md` (kept for history; do not delete).
 
 ## Context

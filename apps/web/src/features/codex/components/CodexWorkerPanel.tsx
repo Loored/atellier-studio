@@ -11,6 +11,8 @@ export function CodexWorkerPanel() {
     runId,
     runStatus,
     isOpenAiExecution,
+    isRealCodexExecution,
+    executionAdapter,
     executorModel,
     modelProfile,
     runLogPath,
@@ -31,6 +33,7 @@ export function CodexWorkerPanel() {
     plan,
     approve,
     executeNext,
+    retry,
     cancel,
     finalize,
     openRunLog,
@@ -72,6 +75,20 @@ export function CodexWorkerPanel() {
         <p className="mt-0 mb-3 text-xs text-ink-muted">
           Status: <span className="text-ink">{runStatus}</span>
           {finalizedAtLabel ? <span> · Finalized at: <span className="text-ink">{finalizedAtLabel}</span></span> : null}
+        </p>
+      ) : null}
+      <p
+        className={`mt-0 mb-3 inline-flex rounded-md border px-2.5 py-1 text-[0.72rem] font-bold uppercase tracking-[0.08em] ${
+          isRealCodexExecution
+            ? "border-orange/35 bg-orange/10 text-orange"
+            : "border-[var(--border-card)] bg-black/20 text-ink-muted"
+        }`}
+      >
+        Codex adapter: {executionAdapter.mode} · {executionAdapter.label}
+      </p>
+      {isRealCodexExecution ? (
+        <p className="mt-0 mb-3 border border-orange/35 rounded-lg px-2.5 py-2 text-[0.78rem] text-orange bg-orange/10">
+          Real execution is enabled. Only allowlisted commands run, implementation requires step approval, and Codex stays inside the configured workspace-write sandbox.
         </p>
       ) : null}
       {isOpenAiExecution ? (
@@ -143,6 +160,11 @@ export function CodexWorkerPanel() {
                   Approve step
                 </button>
               ) : null}
+              {step.status === "failed" || step.status === "blocked" ? (
+                <button type="button" className="icon-only-button" onClick={() => void retry(step.id)} title="Retry failed or blocked step">
+                  Retry step
+                </button>
+              ) : null}
             </div>
             <div className="mt-1 text-xs text-ink-faint">
               <span className="uppercase tracking-[0.08em]">risk</span>: {step.riskLevel}
@@ -173,6 +195,9 @@ export function CodexWorkerPanel() {
                 <p className="m-0 mt-1">Captured: <span className="text-ink">{new Date(step.evidence.capturedAt).toLocaleString()}</span></p>
                 <p className="m-0 mt-1">Working dir: <span className="text-ink">{step.evidence.workingDirectory}</span></p>
                 <p className="m-0 mt-1">Command: <span className="text-ink">{step.evidence.command}</span></p>
+                {step.evidence.durationMs !== undefined ? (
+                  <p className="m-0 mt-1">Duration: <span className="text-ink">{step.evidence.durationMs} ms</span></p>
+                ) : null}
                 {step.evidence.notes.length > 0 ? (
                   <ul className="mt-1 mb-0 pl-4">
                     {step.evidence.notes.map((note) => (
@@ -187,6 +212,9 @@ export function CodexWorkerPanel() {
                     {step.evidence.artifacts.map((artifact) => (
                       <p key={`${artifact.label}-${artifact.path}`} className="m-0">
                         {artifact.label}: <span className="text-ink">{artifact.path}</span>
+                        {artifact.byteSize !== undefined ? (
+                          <span> · <span className="text-ink">{artifact.byteSize}</span> bytes</span>
+                        ) : null}
                       </p>
                     ))}
                   </div>
@@ -204,8 +232,12 @@ export function CodexWorkerPanel() {
           {finalizeEvidence ? (
             <p className="mb-2 text-xs text-ink-muted">
               Finalize evidence: <span className="text-ink">{finalizeEvidence.completedSteps}/{finalizeEvidence.totalSteps}</span> completed steps,{" "}
+              <span className="text-ink">{finalizeEvidence.failedSteps ?? 0}</span> failed,{" "}
+              <span className="text-ink">{finalizeEvidence.blockedSteps ?? 0}</span> blocked,{" "}
               <span className="text-ink">{finalizeEvidence.changedFiles.length}</span> changed file(s),{" "}
-              <span className="text-ink">{finalizeEvidence.testEvidence.length}</span> test evidence item(s)
+              <span className="text-ink">{finalizeEvidence.testEvidence.length}</span> test evidence item(s),{" "}
+              <span className="text-ink">{finalizeEvidence.artifactCount ?? 0}</span> artifact(s),{" "}
+              <span className="text-ink">{finalizeEvidence.totalDurationMs ?? 0}</span> ms total
             </p>
           ) : null}
           <button type="button" className="icon-only-button" onClick={() => void openRunLog()}>

@@ -7,9 +7,15 @@ export type CodexWorkerProfile = (typeof CODEX_WORKER_PROFILES)[number];
 export const CODEX_WORKER_STEP_STATUSES = ["pending", "approved", "running", "completed", "failed", "blocked"] as const;
 export type CodexWorkerStepStatus = (typeof CODEX_WORKER_STEP_STATUSES)[number];
 
+export type CodexWorkerExecutionAdapter = {
+  mode: "fake" | "real";
+  label: string;
+};
+
 export type CodexWorkerStepEvidenceArtifact = {
   label: string;
   path: string;
+  byteSize?: number;
 };
 
 export type CodexWorkerStepEvidence = {
@@ -17,6 +23,7 @@ export type CodexWorkerStepEvidence = {
   capturedAt: string;
   command: string;
   workingDirectory: string;
+  durationMs?: number;
   notes: string[];
   artifacts: CodexWorkerStepEvidenceArtifact[];
 };
@@ -24,6 +31,10 @@ export type CodexWorkerStepEvidence = {
 export type CodexWorkerFinalizeEvidence = {
   completedSteps: number;
   totalSteps: number;
+  failedSteps?: number;
+  blockedSteps?: number;
+  totalDurationMs?: number;
+  artifactCount?: number;
   changedFiles: string[];
   testEvidence: string[];
 };
@@ -36,6 +47,7 @@ export type CodexWorkerStep = {
   riskLevel: "low" | "medium" | "high";
   needsApproval: boolean;
   status: CodexWorkerStepStatus;
+  executionAttempt?: number;
   approvedAt?: string;
   startedAt?: string;
   finishedAt?: string;

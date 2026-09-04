@@ -3,6 +3,7 @@
 ## Source
 
 - path: wiki/log.md
+- Raw path: wiki/log.md
 
 ## Notes
 

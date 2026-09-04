@@ -1,14 +1,28 @@
 import type { Agent, AgentRole } from "./agent";
+import type { ExecutorMode, ModelProfile } from "./health";
 import type { AgentMessage } from "./message";
 import type { Run } from "./run";
 
 export const AGENT_INSTRUCTION_MAX_LENGTH = 2000;
 
+export type AgentValidationProfile =
+  | AgentRole
+  | "artifact-builder"
+  | "runtime"
+  | "orchestration";
+
 export type OrchestrationStepRef = {
   orchestrationRunId: string;
+  stepId: string;
   label: string;
   phase: string;
   nextAgentName?: string;
+  validationProfile?: AgentValidationProfile;
+  logicalStepId?: string;
+  repairAttempt?: number;
+  repairAttemptLimit?: number;
+  repairKind?: "deterministic" | "semantic";
+  contextReceiptHash?: string;
 };
 
 export type AgentValidationSeverity = "info" | "warn" | "error";
@@ -21,6 +35,7 @@ export type AgentValidationIssue = {
 
 export type AgentValidationResult = {
   role: AgentRole;
+  profile?: AgentValidationProfile;
   passed: boolean;
   issues: AgentValidationIssue[];
   verifiedRepoFiles: string[];
@@ -33,6 +48,8 @@ export type AgentValidationResult = {
 export type RunAgentInput = {
   instruction: string;
   context?: string;
+  executorModeOverride?: ExecutorMode;
+  modelProfileOverride?: ModelProfile;
   handoffAgentId?: string;
   handoffInstruction?: string;
   recordDeliverable?: boolean;

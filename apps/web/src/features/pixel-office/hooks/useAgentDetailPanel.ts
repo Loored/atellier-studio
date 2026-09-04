@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AGENT_STATUSES, type AgentRunStreamEvent } from "@atellier/shared";
-import type { Agent, Run, RunAgentResult } from "@atellier/shared";
+import type { Agent, ExecutorMode, Run, RunAgentResult } from "@atellier/shared";
 import {
   useAgentMessagesApi,
   useAgentsApi,
@@ -9,6 +9,7 @@ import {
   useUpdateAgentStatusApi,
 } from "../../../api/hooks/agents/useAgentsApi";
 import { useRunsApi } from "../../../api/hooks/runs/useRunsApi";
+import { useHealthApi } from "../../../api/hooks/system/useSystemApi";
 
 type TerminalLineTone = "info" | "success" | "error" | "muted";
 
@@ -27,6 +28,7 @@ export function useAgentDetailPanel(agent: Agent) {
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
   const [streamingResponse, setStreamingResponse] = useState("");
   const [streamingStatus, setStreamingStatus] = useState<"idle" | "queued" | "running" | "finalizing">("idle");
+  const [executorModeOverride, setExecutorModeOverride] = useState<ExecutorMode | "">("");
   const [latestStreamResult, setLatestStreamResult] = useState<RunAgentResult | null>(null);
   const [instructionsDraft, setInstructionsDraft] = useState(agent.instructions ?? "");
   const runAgentStream = useRunAgentStreamApi();
@@ -34,6 +36,9 @@ export function useAgentDetailPanel(agent: Agent) {
   const updateAgentInstructions = useUpdateAgentInstructionsApi();
   const { data: agentList = [] } = useAgentsApi();
   const { data: runList = [] } = useRunsApi();
+  const { data: healthStatus } = useHealthApi();
+  const availableExecutorModes: ExecutorMode[] = healthStatus?.availableExecutorModes
+    ?? [healthStatus?.executorMode ?? "mock"];
   const handoffCandidateList = agentList.filter((candidate) => candidate.id !== agent.id);
   const {
     data: messageList = [],
@@ -102,6 +107,7 @@ export function useAgentDetailPanel(agent: Agent) {
         agentId: agent.id,
         input: {
           instruction: trimmedInstruction,
+          executorModeOverride: executorModeOverride || undefined,
           handoffAgentId: options?.handoffTo || handoffAgentId || undefined,
           handoffInstruction: options?.handoffNote || handoffInstruction.trim() || undefined,
         },
@@ -317,6 +323,7 @@ export function useAgentDetailPanel(agent: Agent) {
     setHandoffAgentId,
     setHandoffInstruction,
     setInstruction,
+    setExecutorModeOverride,
     setInstructionsDraft,
     setTerminalCommand,
     handleSaveInstructions,
@@ -324,6 +331,8 @@ export function useAgentDetailPanel(agent: Agent) {
     handleRunTerminalCommand,
     handleSendInstruction,
     handleToggleTerminal,
+    executorModeOverride,
+    availableExecutorModes,
     latestRun,
     latestValidation,
     latestResponse,
@@ -343,6 +352,7 @@ function readRunValidation(run: Run | null) {
     | {
         validation?: {
           role?: string;
+          profile?: string;
           passed?: boolean;
           issues?: Array<{ code?: string; message?: string; severity?: string }>;
           verifiedRepoFiles?: string[];

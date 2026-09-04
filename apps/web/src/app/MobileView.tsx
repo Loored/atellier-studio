@@ -47,7 +47,9 @@ const STATUS_LABEL: Record<string, string> = {
   done:          "Completado",
 };
 
-type MobileTab = "agentes" | "actividad" | "config";
+import { KnowledgeGraphView } from "../features/knowledge/KnowledgeGraphView";
+
+type MobileTab = "agentes" | "actividad" | "grafo" | "config";
 
 export function MobileView() {
   const [tab, setTab] = useState<MobileTab>("agentes");
@@ -138,6 +140,12 @@ export function MobileView() {
           </>
         )}
 
+        {tab === "grafo" && (
+          <div className="mobile-graph-wrapper">
+            <KnowledgeGraphView />
+          </div>
+        )}
+
         {tab === "config" && (
           <>
             <div className="mobile-section-label">CONFIGURACIÓN</div>
@@ -165,9 +173,9 @@ export function MobileView() {
 
       {/* Bottom nav */}
       <nav className="mobile-nav">
-        {(["agentes", "actividad", "config"] as MobileTab[]).map((t) => {
-          const icons: Record<MobileTab, string> = { agentes: "🤖", actividad: "⚡", config: "⚙️" };
-          const labels: Record<MobileTab, string> = { agentes: "Agentes", actividad: "Actividad", config: "Config" };
+        {(["agentes", "actividad", "grafo", "config"] as MobileTab[]).map((t) => {
+          const icons: Record<MobileTab, string> = { agentes: "🤖", actividad: "⚡", grafo: "🕸️", config: "⚙️" };
+          const labels: Record<MobileTab, string> = { agentes: "Agentes", actividad: "Actividad", grafo: "Grafo", config: "Config" };
           return (
             <button
               key={t}

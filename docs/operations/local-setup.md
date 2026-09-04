@@ -48,9 +48,47 @@ brew services start colima
 - MongoDB container: `atellier-mongo`
 - Mongo port: `localhost:27017`
 - API: `http://127.0.0.1:4000`
-- Web dev server has used: `http://127.0.0.1:5174/`
+- Web: `http://127.0.0.1:5174/`
 
 Prefer `127.0.0.1` over `localhost` in web/API defaults because this machine can resolve `localhost` to IPv6 while the API is reachable on IPv4 loopback.
+
+## Recommended Startup
+
+From the repository root:
+
+```bash
+./scripts/dev-local
+```
+
+This executable only requires `node` on `PATH`. It loads the repository `.env` while preserving explicit shell overrides and prefers the pinned package manager through `corepack pnpm`, so a missing global `pnpm` command is not a blocker when Corepack is available.
+
+Startup sequence:
+
+1. Load `.env`, then validate Node 22+, pinned pnpm access, installed dependencies, no existing repository worker, and free API/Web ports.
+2. Validate Docker CLI and Compose; start Colima only if the Docker daemon is offline.
+3. Run `docker compose up -d mongo` and wait for a real Mongo ping.
+4. Start the Mongo-backed API, standalone durable worker, and Vite on fixed local ports.
+5. Wait for API `/health` and the Vite HTML response before reporting readiness.
+
+Safe preflight without starting services:
+
+```bash
+./scripts/dev-local --check
+```
+
+Alternative when `pnpm` is already available:
+
+```bash
+pnpm dev:local
+```
+
+The launcher fails closed when a configured port is occupied or an Atellier worker for this repository already exists. It reports process IDs and never kills them. Override `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT`, or `MONGO_URI` when an isolated local run is needed. `Ctrl+C` signals only child processes started by this launcher, waits for the worker's graceful shutdown, and leaves Mongo running.
+
+If dependencies are missing, install them explicitly; the launcher never changes the dependency tree:
+
+```bash
+corepack pnpm install --frozen-lockfile
+```
 
 ## Runtime Modes
 
@@ -68,13 +106,42 @@ AGENT_EXECUTOR_MODE=openai OPENAI_API_KEY=<YOUR_OPENAI_API_KEY> pnpm --filter @a
 
 Optional model and policy controls:
 
+For local Ollama execution, set `OLLAMA_MODEL_PROFILE` to select the profile model. The safe Mac default maps `cheap`, `standard`, and `deep` to `qwen3.5:4b`, avoiding VRAM pressure when orchestration steps overlap. Larger models can be opted into by changing the profile-specific variables. Those variables take precedence over the legacy `OLLAMA_MODEL` fallback. Role overrides remain available for specialist agents.
+
+`OLLAMA_CONTEXT_TOKENS=8192` is the local default for Context Receipt runs. It is sent with each Ollama request, so it does not require changing global Ollama server settings. Keep the setting at 8192 on the local Mac unless a measured run shows that a larger window is needed.
+
+Atellier sends `reasoning_effort: "none"` to Ollama for its bounded structured steps. This prevents Qwen's default hidden reasoning trace from consuming the limited output budget before it emits the actual plan, QA result, or wiki artifact.
+
 ```bash
 OPENAI_MODEL=gpt-4.1-mini
 AGENT_MAX_HANDOFF_DEPTH=1
-AGENT_EXECUTION_TIMEOUT_MS=45000
+AGENT_EXECUTION_TIMEOUT_MS=240000
 ```
 
+Keep the 120-second default for source-grounded local runs that must return a complete document; shorter limits can interrupt Ollama before the artifact is reviewable.
+
 Current product risk: real execution can burn quota. Future work should make executor mode, model, and model profile highly visible in UI before running agents.
+
+## Real orchestration smoke runner
+
+With the API and Web already running against a non-mock executor:
+
+```bash
+pnpm --filter @atellier/api exec tsx src/test/live-flow.ts
+```
+
+The default build goal is a bounded three-day operating plan. The runner reads the completed parent run and reports operational evidence rather than treating `status: completed` as success by itself. A build loop succeeds only when readiness is `ready-for-human-review`, aggregate validation passes, and the persisted QA checklist is complete.
+
+Inspect an existing run without starting another LLM execution:
+
+```bash
+RUN_ID=<orchestration-run-id> OUTPUT_FORMAT=json \
+  pnpm --filter @atellier/api exec tsx src/test/live-flow.ts
+```
+
+Existing-run inspection only needs a reachable API and remains available when the current executor is `mock`; starting a new smoke run still requires a real configured executor.
+
+Exit codes are stable for automation: `0` ready/success, `1` failed or unexpected error, `2` needs human input, and `3` polling timeout. JSON mode suppresses progress output and prints one final result with readiness, step counts, validation, QA checklist counts, repair summaries, and blockers.
 
 ## Validation
 

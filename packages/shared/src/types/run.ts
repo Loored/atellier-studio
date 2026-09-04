@@ -1,10 +1,59 @@
+import type {
+  CurateReviewLearningInput,
+  ResolveReviewLearningSignalInput,
+  ReviewLearningRecord,
+} from "./review-learning";
+import type {
+  AgentMemoryContextReceipt,
+  AutomatedContextReceiptAssessment,
+  ContextReceiptEvaluation,
+} from "./agent-memory-context";
+
 export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint", "orchestration"] as const;
 
 export type RunType = (typeof RUN_TYPES)[number];
 
-export const RUN_STATUSES = ["queued", "running", "failed", "completed", "blocked"] as const;
+export const RUN_STATUSES = ["queued", "running", "failed", "completed", "blocked", "cancelled"] as const;
 
 export type RunStatus = (typeof RUN_STATUSES)[number];
+
+export const RUN_EXECUTION_KINDS = ["skill-orchestration"] as const;
+
+export type RunExecutionKind = (typeof RUN_EXECUTION_KINDS)[number];
+
+export const RUN_EXECUTION_PHASES = [
+  "queued",
+  "running",
+  "recovering",
+  "finalizing",
+  "blocked",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+export type RunExecutionPhase = (typeof RUN_EXECUTION_PHASES)[number];
+
+export type RunExecution = {
+  schemaVersion: 1;
+  kind: RunExecutionKind;
+  phase: RunExecutionPhase;
+  definitionHash: string;
+  definitionSnapshot: unknown;
+  idempotencyKey: string;
+  attempt: number;
+  maxAttempts: number;
+  nextEventSequence: number;
+  availableAt: string;
+  leaseOwner?: string;
+  leaseExpiresAt?: string;
+  heartbeatAt?: string;
+  cancelRequestedAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  lastError?: string;
+  currentStepId?: string;
+};
 
 export const RUN_LOG_LEVELS = ["info", "warn", "error"] as const;
 
@@ -22,6 +71,14 @@ export type RunLogEntry = {
   message: string;
 };
 
+export type RunMemoryCapture = {
+  wikiPath: string;
+  logPath: string;
+  summary: string;
+  capturedAt: string;
+  learning?: ReviewLearningRecord;
+};
+
 export type Run = {
   id: string;
   taskId?: string;
@@ -30,8 +87,13 @@ export type Run = {
   status: RunStatus;
   reviewStatus?: RunReviewStatus;
   deliverablePath?: string;
+  memory?: RunMemoryCapture;
+  contextReceipt?: AgentMemoryContextReceipt;
+  contextEvaluation?: ContextReceiptEvaluation;
+  automatedContextAssessment?: AutomatedContextReceiptAssessment;
   input?: unknown;
   output?: unknown;
+  execution?: RunExecution;
   logs: RunLogEntry[];
   createdAt: string;
   updatedAt: string;
@@ -43,6 +105,13 @@ export type CreateRunInput = {
   type: RunType;
   status?: RunStatus;
   input?: unknown;
+  execution?: RunExecution;
+};
+
+export type ListRunsInput = {
+  type?: RunType;
+  statuses?: RunStatus[];
+  limit?: number;
 };
 
 export type AppendRunLogInput = {
@@ -69,5 +138,21 @@ export type CaptureRunMemoryInput = {
 export type CaptureRunMemoryResponse = {
   run: Run;
   wikiPath: string;
+  logPath: string;
+};
+
+export type CurateRunLearningInput = CurateReviewLearningInput;
+
+export type CurateRunLearningResponse = {
+  run: Run;
+  roleMemoryPath: string;
+  logPath: string;
+};
+
+export type ResolveRunLearningSignalInput = ResolveReviewLearningSignalInput;
+
+export type ResolveRunLearningSignalResponse = {
+  run: Run;
+  roleMemoryPath: string;
   logPath: string;
 };
