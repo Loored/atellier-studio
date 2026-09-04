@@ -1,8 +1,6 @@
 # Atellier Studio
 
-Atellier Studio is a private local-first AI operating system for personal and mini-agency style work.
-
-It is not a game, not a public SaaS MVP, and not a generic task manager. The current stage is the operational spine plus agent orchestration, deliverables, review UI, and durable wiki memory.
+Atellier Studio is a local-first AI orchestration workspace with durable agent workflows, MCP tooling, multi-model execution, knowledge memory and a React/TypeScript interface.
 
 ## Current Stage
 
