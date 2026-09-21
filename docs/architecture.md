@@ -19,10 +19,10 @@ MongoDB stores operational state. Markdown stores inspectable memory.
 
 ## Current stage
 
-The project has moved beyond Milestone 0 into:
+The project has moved beyond Milestone 0 into durable local orchestration with trust-aware Wiki memory:
 
 ```txt
-Operational Spine + Agent Orchestration + Deliverables + Review UI
+Operational Spine + Durable Runtime + Evidence-Gated Review + Trust-Aware Wiki Memory
 ```
 
 The core loop is:
@@ -47,7 +47,4 @@ The next architecture work should follow the Karpathy-style agentic system patte
 
 ## Near-term priorities
 
-1. Codex Worker evidence pass (per-step output and finalize evidence surfaces).
-2. Wiki Brain v2 (safe write/update routes and reusable memory capture).
-3. Orchestration reliability and template modularization.
-4. MCP after the above is stable.
+See [`docs/operational-status.md`](operational-status.md). The immediate work is memory integrity and QA observability; MCP and the controlled Codex Worker adapter are already shipped and should be hardened rather than broadly expanded.

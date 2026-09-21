@@ -1,7 +1,7 @@
 # Next Work Plan
 
-> **⚠️ SUPERSEDED on 2026-05-06.**
-> The active plan is now [`docs/next-iteration-plan-2026-05-06.md`](next-iteration-plan-2026-05-06.md), which reorders priorities after the *Code with Claude 2026* keynote (Auto Dream, Cowork, Opus 4.7, Skills 2.0) and adds the Anthropic executor mode.
+> **⚠️ HISTORICAL.**
+> This May 2026 plan is retained only as context. The active plan is [`docs/operational-status.md`](operational-status.md), with [`docs/roadmap.md`](roadmap.md) as the strategic record.
 > This file is kept as historical context — do not start work from here.
 
 This plan combines `docs/current-state-and-next-steps.md`, Claude's Tailwind handoff, and the Karpathy agentic-system synthesis from `atelier/wiki/sources/2026-05-05-karpathy-agentes-llm.md`.

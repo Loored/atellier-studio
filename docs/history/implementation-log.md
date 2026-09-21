@@ -2,6 +2,13 @@
 
 Long chronological implementation memory moved out of `CODEX_MEMORY.md` so future Codex sessions can load active context cheaply and open this file only when history matters.
 
+## 2026-08-24 to 2026-09-04 — Durable operations and memory quality
+
+- Shipped durable Mongo-backed orchestration recovery, bounded deterministic and semantic repair, Context Receipt, receipt evaluation, memory trust, trust-aware retrieval, reflection review/promotion, and historical orchestration recovery.
+- Added safe local Ollama profile routing. The Mac-safe configuration keeps all active profiles on `qwen3.5:4b` until measured evidence justifies a larger model.
+- A ten-run Context Receipt campaign improved automatic source traceability to 7 supported, 1 partial, and 2 unverified receipts. The remaining quality bottleneck is small-model QA checklist completeness and semantic-repair closure.
+- Audited repository truth. Began a follow-up hygiene slice to separate local generated artifacts from curated memory, compact active session memory, and align planning/task documents around the QA-observability sequence.
+
 ## 2026-05-04 - Milestone 0 spine
 
 - Created pnpm monorepo with `apps/api`, `apps/web`, and `packages/shared`.
