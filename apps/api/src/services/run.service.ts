@@ -36,6 +36,11 @@ import {
   type ReviewLearningRecord,
   type ReviewLearningSignalResolution,
   type TaskStatus,
+  type ToolInvocation,
+  type AgentRunEvaluation,
+  type EvaluationLedgerSummary,
+  type LearningCandidate,
+  type ExecutionBudgetReceipt,
 } from "@atellier/shared";
 import { RunModel } from "../db/models/Run";
 import { extractContextReceiptSourceCitations } from "./agent-response-validator";
@@ -48,6 +53,7 @@ import type { TaskService } from "./task.service";
 export type RunExecutionUpdate = {
   status?: RunStatus;
   phase?: RunExecutionPhase;
+  retryGeneration?: number;
   attempt?: number;
   availableAt?: string;
   leaseOwner?: string | null;
@@ -58,6 +64,12 @@ export type RunExecutionUpdate = {
   finishedAt?: string | null;
   lastError?: string | null;
   currentStepId?: string | null;
+};
+
+export type ExpiredExecutionRecovery = {
+  run: Run;
+  reason: "cancellation-requested" | "attempts-exhausted";
+  childRuns: Run[];
 };
 
 export class RunService {
@@ -156,6 +168,35 @@ export class RunService {
       return run ? toJsonRecord<Run>(run) : null;
     }
     return this.records.get(id) ?? null;
+  }
+
+  async bindExecutionBudget(id: string, receipt: ExecutionBudgetReceipt): Promise<Run | null> {
+    const maxAttempts = Math.max(1, receipt.limits.maxRetries + 1);
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findOneAndUpdate(
+        { _id: id, type: "orchestration", status: "queued", "execution.attempt": 0 },
+        {
+          $set: {
+            "input.controlBudgetReceiptId": receipt.id,
+            "input.controlBundleFingerprint": receipt.bundleFingerprint,
+            "execution.maxAttempts": maxAttempts,
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+    const current = this.records.get(id);
+    if (!current || current.type !== "orchestration" || current.status !== "queued" || current.execution?.attempt !== 0) return null;
+    const next: Run = {
+      ...current,
+      input: { ...(current.input as Record<string, unknown>), controlBudgetReceiptId: receipt.id, controlBundleFingerprint: receipt.bundleFingerprint },
+      execution: { ...current.execution, maxAttempts },
+      updatedAt: new Date().toISOString(),
+    };
+    this.records.set(id, next);
+    return next;
   }
 
   async ensureContextReceipt(
@@ -429,6 +470,128 @@ export class RunService {
     return settled;
   }
 
+  async reconcileExpiredOrchestrationExecutions(): Promise<ExpiredExecutionRecovery[]> {
+    const recovered: ExpiredExecutionRecovery[] = [];
+    const recoverOne = async (
+      reason: ExpiredExecutionRecovery["reason"],
+    ): Promise<Run | null> => {
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const status: RunStatus = reason === "cancellation-requested" ? "cancelled" : "failed";
+      const message = reason === "cancellation-requested"
+        ? "Cancellation completed after the prior worker lease expired."
+        : "Execution attempts exhausted before the prior worker lease expired.";
+
+      if (this.storageMode === "mongo") {
+        const reasonQuery = reason === "cancellation-requested"
+          ? { "execution.cancelRequestedAt": { $exists: true } }
+          : {
+              "execution.cancelRequestedAt": { $exists: false },
+              $expr: { $gte: ["$execution.attempt", "$execution.maxAttempts"] },
+            };
+        const run = await RunModel.findOneAndUpdate(
+          {
+            type: "orchestration",
+            status: "running",
+            "execution.kind": "skill-orchestration",
+            "execution.leaseExpiresAt": { $lte: nowIso },
+            ...reasonQuery,
+          },
+          {
+            $set: {
+              status,
+              "execution.phase": status,
+              "execution.finishedAt": nowIso,
+              "execution.lastError": message,
+              updatedAt: now,
+            },
+            $unset: {
+              "execution.leaseOwner": "",
+              "execution.leaseExpiresAt": "",
+              "execution.heartbeatAt": "",
+              "execution.currentStepId": "",
+            },
+          },
+          { new: true },
+        );
+        return run ? toJsonRecord<Run>(run) : null;
+      }
+
+      const current = [...this.records.values()].find((candidate) =>
+        candidate.type === "orchestration"
+        && candidate.status === "running"
+        && candidate.execution?.kind === "skill-orchestration"
+        && Boolean(candidate.execution.leaseExpiresAt)
+        && candidate.execution!.leaseExpiresAt! <= nowIso
+        && (reason === "cancellation-requested"
+          ? Boolean(candidate.execution.cancelRequestedAt)
+          : !candidate.execution.cancelRequestedAt
+            && candidate.execution.attempt >= candidate.execution.maxAttempts),
+      );
+      if (!current?.execution) return null;
+      const execution = {
+        ...current.execution,
+        phase: status,
+        finishedAt: nowIso,
+        lastError: message,
+      };
+      delete execution.leaseOwner;
+      delete execution.leaseExpiresAt;
+      delete execution.heartbeatAt;
+      delete execution.currentStepId;
+      const next = { ...current, status, execution, updatedAt: nowIso };
+      this.records.set(next.id, next);
+      return next;
+    };
+
+    for (const reason of ["cancellation-requested", "attempts-exhausted"] as const) {
+      while (true) {
+        const run = await recoverOne(reason);
+        if (!run) break;
+        const childRuns = await this.settleInterruptedOrchestrationStepRuns(
+          run.id,
+          reason === "cancellation-requested" ? "cancelled" : "failed",
+        );
+        recovered.push({ run, reason, childRuns });
+      }
+    }
+    return recovered;
+  }
+
+  private async settleInterruptedOrchestrationStepRuns(
+    orchestrationRunId: string,
+    status: "cancelled" | "failed",
+  ): Promise<Run[]> {
+    const now = new Date();
+    const message = status === "cancelled"
+      ? "Cancelled after the parent orchestration cancellation was recovered."
+      : "Superseded after the parent orchestration exhausted its durable attempts.";
+    const logEntry: RunLogEntry = { timestamp: now.toISOString(), level: "warn", message };
+
+    if (this.storageMode === "mongo") {
+      const candidates = toJsonRecord<Run[]>(await RunModel.find({
+        "input.orchestrationRunId": orchestrationRunId,
+        status: { $in: ["queued", "running"] },
+      }));
+      if (!candidates.length) return [];
+      await RunModel.updateMany(
+        { _id: { $in: candidates.map((run) => run.id) }, status: { $in: ["queued", "running"] } },
+        { $set: { status, updatedAt: now }, $push: { logs: logEntry } },
+      );
+      return toJsonRecord<Run[]>(await RunModel.find({ _id: { $in: candidates.map((run) => run.id) }, status }));
+    }
+
+    const settled: Run[] = [];
+    for (const [id, run] of this.records) {
+      const input = run.input as Record<string, unknown> | undefined;
+      if (input?.orchestrationRunId !== orchestrationRunId || !["queued", "running"].includes(run.status)) continue;
+      const next = { ...run, status, logs: [...run.logs, logEntry], updatedAt: now.toISOString() };
+      this.records.set(id, next);
+      settled.push(next);
+    }
+    return settled;
+  }
+
   async create(input: CreateRunInput): Promise<Run> {
     if (this.storageMode === "mongo") {
       const run = await RunModel.create({
@@ -487,6 +650,277 @@ export class RunService {
     };
     this.records.set(id, next);
     return next;
+  }
+
+  async recordToolInvocation(id: string, invocation: ToolInvocation): Promise<Run | null> {
+    if (this.storageMode === "mongo") {
+      const run = await RunModel.findByIdAndUpdate(
+        id,
+        {
+          $push: { toolInvocations: { $each: [invocation], $slice: -50 } },
+          $set: { updatedAt: new Date() },
+        },
+        { new: true },
+      );
+      return run ? toJsonRecord<Run>(run) : null;
+    }
+
+    const current = this.records.get(id);
+    if (!current) return null;
+    const next: Run = {
+      ...current,
+      toolInvocations: [...(current.toolInvocations ?? []), structuredClone(invocation)].slice(-50),
+      updatedAt: toIso(new Date()),
+    };
+    this.records.set(id, next);
+    return next;
+  }
+
+  async recordEvaluation(id: string, evaluation: AgentRunEvaluation): Promise<Run | null> {
+    if (this.storageMode === "mongo") {
+      const current = await RunModel.findById(id);
+      if (!current) return null;
+      const currentRun = toJsonRecord<Run>(current);
+      const existing = this.findRecordedEvaluation(currentRun, evaluation.evaluationId);
+      if (existing) {
+        this.assertMatchingEvaluation(existing, evaluation);
+        return currentRun;
+      }
+      const run = await RunModel.findOneAndUpdate(
+        { _id: id, "evaluationLedger.evaluationId": { $ne: evaluation.evaluationId } },
+        {
+          $push: { evaluationLedger: evaluation },
+          $set: { evaluation, updatedAt: new Date() },
+        },
+        { new: true },
+      );
+      if (run) return toJsonRecord<Run>(run);
+      const retried = await this.getById(id);
+      if (!retried) return null;
+      const retriedEvaluation = this.findRecordedEvaluation(retried, evaluation.evaluationId);
+      if (!retriedEvaluation) throw new Error("Evaluation could not be persisted.");
+      this.assertMatchingEvaluation(retriedEvaluation, evaluation);
+      return retried;
+    }
+    const current = this.records.get(id);
+    if (!current) return null;
+    const existing = this.findRecordedEvaluation(current, evaluation.evaluationId);
+    if (existing) {
+      this.assertMatchingEvaluation(existing, evaluation);
+      return current;
+    }
+    const next = {
+      ...current,
+      evaluationLedger: [...(current.evaluationLedger ?? []), structuredClone(evaluation)],
+      evaluation: structuredClone(evaluation),
+      updatedAt: toIso(new Date()),
+    };
+    this.records.set(id, next);
+    return next;
+  }
+
+  /**
+   * Records one immutable terminal receipt for a durable orchestration attempt.
+   *
+   * The parent run owns the durable execution envelope, so this is deliberately
+   * separate from the child-agent receipt written by AgentRunService. A retry
+   * receives a new attempt-scoped evaluation id; replaying the same terminal
+   * transition is idempotent through recordEvaluation.
+   */
+  async recordTerminalOrchestrationEvaluation(id: string): Promise<Run | null> {
+    const run = await this.getById(id);
+    if (!run || run.type !== "orchestration" || !run.execution || !this.isEvaluationTerminalStatus(run.status)) {
+      return run;
+    }
+
+    const terminalStatus = run.status;
+    const readiness = this.orchestrationReadiness(run.output);
+    const needsHuman = terminalStatus === "blocked"
+      || readiness === "needs-human"
+      || readiness === "changes-required";
+    const validationPassed = terminalStatus === "completed"
+      && readiness !== "needs-human"
+      && readiness !== "changes-required";
+    const outcome = terminalStatus === "cancelled"
+      ? "cancelled" as const
+      : terminalStatus === "failed"
+        ? "failed" as const
+        : needsHuman
+          ? "needs-human" as const
+          : validationPassed
+            ? "passed" as const
+            : "failed" as const;
+    const toolInvocations = this.countToolInvocations(run.toolInvocations ?? []);
+    const childRuns = await this.listByOrchestrationRunId(run.id);
+    const mostRecentChildEvaluation = childRuns
+      .flatMap((child) => this.evaluationsForRun(child))
+      .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt))[0];
+    const startedAt = run.execution.startedAt ?? run.createdAt;
+    const completedAt = run.execution.finishedAt ?? run.updatedAt;
+    const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(startedAt));
+    const error = terminalStatus === "cancelled"
+      ? { kind: "cancelled" as const, message: "Orchestration cancelled at a safe boundary." }
+      : terminalStatus === "failed"
+        ? { kind: "executor" as const, message: run.execution.lastError ?? "Orchestration execution failed." }
+        : terminalStatus === "blocked"
+          ? { kind: "validation" as const, message: run.execution.lastError ?? "Orchestration is blocked pending human input." }
+          : undefined;
+    const retryGeneration = run.execution.retryGeneration ?? 0;
+    const evaluationId = `orchestration-terminal:${run.id}:generation:${retryGeneration}:attempt:${run.execution.attempt}`;
+    const fingerprintSource = {
+      runId: run.id,
+      terminalStatus,
+      outcome,
+      validationPassed,
+      needsHuman,
+      executorMode: mostRecentChildEvaluation?.executorMode ?? "mock",
+      modelProfile: mostRecentChildEvaluation?.modelProfile ?? "standard",
+      resolvedModel: mostRecentChildEvaluation?.resolvedModel,
+      readiness,
+      contextReceiptHash: run.contextReceipt?.stableHash,
+      toolInvocations,
+      startedAt,
+      completedAt,
+      durationMs,
+      error,
+      retryGeneration,
+    };
+    return this.recordEvaluation(run.id, {
+      schemaVersion: 2,
+      evaluationId,
+      fingerprint: createHash("sha256").update(JSON.stringify(fingerprintSource)).digest("hex"),
+      runId: run.id,
+      terminalStatus,
+      outcome,
+      validationPassed,
+      needsHuman,
+      executorMode: mostRecentChildEvaluation?.executorMode ?? "mock",
+      modelProfile: mostRecentChildEvaluation?.modelProfile ?? "standard",
+      ...(mostRecentChildEvaluation?.resolvedModel ? { resolvedModel: mostRecentChildEvaluation.resolvedModel } : {}),
+      agentRole: "orchestration",
+      orchestration: { runId: run.id },
+      ...(run.contextReceipt?.stableHash ? { contextReceiptHash: run.contextReceipt.stableHash } : {}),
+      toolInvocations,
+      startedAt,
+      completedAt,
+      durationMs,
+      ...(error ? { error } : {}),
+      recordedAt: new Date().toISOString(),
+    });
+  }
+
+  async summarizeEvaluations(): Promise<EvaluationLedgerSummary> {
+    const runs = this.storageMode === "mongo"
+      ? toJsonRecord<Run[]>(await RunModel.find({
+        $or: [
+          { "evaluationLedger.0": { $exists: true } },
+          { evaluation: { $exists: true } },
+        ],
+      }).sort({ updatedAt: -1 }).limit(500))
+      : [...this.records.values()].filter((run) => this.evaluationsForRun(run).length > 0);
+    const summary: EvaluationLedgerSummary = {
+      total: 0,
+      outcomes: { passed: 0, "needs-human": 0, failed: 0, cancelled: 0 },
+      toolInvocations: { succeeded: 0, denied: 0, failed: 0 },
+      generatedAt: new Date().toISOString(),
+    };
+    for (const run of runs) {
+      for (const evaluation of this.evaluationsForRun(run)) {
+        summary.total += 1;
+        summary.outcomes[evaluation.outcome] += 1;
+        summary.toolInvocations.succeeded += evaluation.toolInvocations.succeeded;
+        summary.toolInvocations.denied += evaluation.toolInvocations.denied;
+        summary.toolInvocations.failed += evaluation.toolInvocations.failed;
+      }
+    }
+    return summary;
+  }
+
+  /**
+   * Resolves one immutable terminal receipt by its owning run and evaluation ID.
+   * Governance services use the exact receipt, rather than aggregated counters,
+   * when they need to compare a baseline with a shadow result.
+   */
+  async getEvaluationReceipt(runId: string, evaluationId: string): Promise<AgentRunEvaluation | null> {
+    const run = await this.getById(runId);
+    if (!run) return null;
+    return this.evaluationsForRun(run).find((evaluation) => evaluation.evaluationId === evaluationId) ?? null;
+  }
+
+  async listLearningCandidates(): Promise<LearningCandidate[]> {
+    const evidence = await this.summarizeEvaluations();
+    const candidates: LearningCandidate[] = [];
+    const addCandidate = (id: string, title: string, rationale: string) => {
+      candidates.push({
+        id,
+        evidenceDigest: this.learningCandidateEvidenceDigest({ id, title, rationale, evidence }),
+        title,
+        rationale,
+        evidence,
+        status: "pending-review",
+      });
+    };
+    if (evidence.outcomes.failed > 0) addCandidate("validation-failures", "Review validation failures", `${evidence.outcomes.failed} evaluated run(s) failed validation; inspect evidence before changing prompts or policies.`);
+    if (evidence.outcomes["needs-human"] > 0) addCandidate("human-review-pressure", "Review human handoff pressure", `${evidence.outcomes["needs-human"]} run(s) required human review; assess whether the boundary or output contract needs clarification.`);
+    if (evidence.toolInvocations.denied > 0 || evidence.toolInvocations.failed > 0) addCandidate("tool-harness-friction", "Review Tool Harness friction", `${evidence.toolInvocations.denied + evidence.toolInvocations.failed} tool request(s) were denied or failed; inspect receipts before expanding any capability.`);
+    return Promise.all(candidates.map(async (candidate) => {
+      const history = await this.wikiService.listLearningCandidateDecisions(candidate.id);
+      const decision = history.find((item) => item.evidenceDigest === candidate.evidenceDigest);
+      if (!decision) return history.length ? { ...candidate, history } : candidate;
+      const status = decision.decision === "accepted"
+        ? "accepted-for-experiment" as const
+        : decision.decision;
+      return { ...candidate, status, decision, history };
+    }));
+  }
+
+  async getLearningCandidate(candidateId: string): Promise<LearningCandidate | null> {
+    const normalizedId = candidateId.trim();
+    if (!normalizedId) return null;
+    return (await this.listLearningCandidates()).find((candidate) => candidate.id === normalizedId) ?? null;
+  }
+
+  private learningCandidateEvidenceDigest(input: Omit<LearningCandidate, "evidenceDigest" | "status">): string {
+    const canonicalEvidence = {
+      total: input.evidence.total,
+      outcomes: input.evidence.outcomes,
+      toolInvocations: input.evidence.toolInvocations,
+    };
+    return createHash("sha256")
+      .update(JSON.stringify({ id: input.id, title: input.title, rationale: input.rationale, evidence: canonicalEvidence }))
+      .digest("hex");
+  }
+
+  private evaluationsForRun(run: Run): AgentRunEvaluation[] {
+    if (run.evaluationLedger?.length) return run.evaluationLedger;
+    return run.evaluation ? [run.evaluation] : [];
+  }
+
+  private isEvaluationTerminalStatus(status: RunStatus): status is AgentRunEvaluation["terminalStatus"] {
+    return status === "completed" || status === "failed" || status === "blocked" || status === "cancelled";
+  }
+
+  private orchestrationReadiness(output: unknown): string | undefined {
+    if (!output || typeof output !== "object") return undefined;
+    const readiness = (output as Record<string, unknown>).readiness;
+    return typeof readiness === "string" ? readiness : undefined;
+  }
+
+  private countToolInvocations(invocations: ToolInvocation[]): AgentRunEvaluation["toolInvocations"] {
+    return invocations.reduce((counts, invocation) => {
+      counts[invocation.status] += 1;
+      return counts;
+    }, { succeeded: 0, denied: 0, failed: 0 });
+  }
+
+  private findRecordedEvaluation(run: Run, evaluationId: string): AgentRunEvaluation | undefined {
+    return this.evaluationsForRun(run).find((evaluation) => evaluation.evaluationId === evaluationId);
+  }
+
+  private assertMatchingEvaluation(existing: AgentRunEvaluation, incoming: AgentRunEvaluation): void {
+    if (existing.fingerprint !== incoming.fingerprint) {
+      throw new Error("Terminal evaluation already exists with different evidence.");
+    }
   }
 
   async complete(
@@ -639,7 +1073,11 @@ export class RunService {
           "execution.cancelRequestedAt": { $exists: false },
           $or: [
             { status: "queued", "execution.availableAt": { $lte: nowIso } },
-            { status: "running", "execution.leaseExpiresAt": { $lte: nowIso } },
+            {
+              status: "running",
+              "execution.leaseExpiresAt": { $lte: nowIso },
+              $expr: { $lt: ["$execution.attempt", "$execution.maxAttempts"] },
+            },
           ],
         },
         {
@@ -667,7 +1105,8 @@ export class RunService {
           return (run.execution?.availableAt ?? nowIso) <= nowIso;
         }
         return run.status === "running" && Boolean(run.execution?.leaseExpiresAt)
-          && (run.execution?.leaseExpiresAt ?? nowIso) <= nowIso;
+          && (run.execution?.leaseExpiresAt ?? nowIso) <= nowIso
+          && run.execution!.attempt < run.execution!.maxAttempts;
       })
       .sort((a, b) => {
         const availability = (a.execution?.availableAt ?? a.createdAt)

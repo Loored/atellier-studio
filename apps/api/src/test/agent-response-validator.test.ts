@@ -4,17 +4,75 @@ import {
   extractContextReceiptSourceCitations,
   extractQaChecklist,
   findMissingQaCriteria,
+  findQaCriteriaWithoutEvidence,
   extractQaFeedbackSignature,
   extractQaVerdict,
   extractRequestedArtifact,
   isQaFeedbackRepeated,
   mergeRequestedArtifactResponses,
   mergeSemanticRequestedArtifactResponses,
+  normalizeRequestedArtifactHeading,
   qaChecklistCoversCriteria,
   validateAgentResponse,
 } from "../services/agent-response-validator";
 
 describe("agent response validator", () => {
+  it("normalizes an explicitly introduced artifact when a light model omits only its contract heading", () => {
+    const response = [
+      "I corrected the missing fields.",
+      "Here is the corrected artifact:",
+      "",
+      "# Three-day plan",
+      "",
+      "### Day 1",
+      "Objective: Verify the flow.",
+      "",
+      "## Risk Assessment",
+      "None.",
+    ].join("\n");
+
+    const normalized = normalizeRequestedArtifactHeading(response);
+
+    expect(normalized).toContain("## Requested Artifact\n\n# Three-day plan");
+    expect(extractRequestedArtifact(normalized)).toContain("### Day 1");
+  });
+
+  it("does not invent an artifact heading from incidental prose", () => {
+    const response = "The requested artifact should eventually contain a plan.";
+
+    expect(normalizeRequestedArtifactHeading(response)).toBe(response);
+    expect(extractRequestedArtifact(response)).toBeNull();
+    expect(validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      response,
+    }).issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "artifact-builder.missing_section.requested-artifact",
+        severity: "error",
+      }),
+    ]));
+  });
+
+  it("normalizes an exact numbered artifact shape without relying on model preamble", () => {
+    const response = [
+      "## Three-day plan",
+      "### Day 1: First",
+      "Objective: One.",
+      "### Day 2: Second",
+      "Objective: Two.",
+      "### Day 3: Third",
+      "Objective: Three.",
+    ].join("\n");
+
+    const normalized = normalizeRequestedArtifactHeading(
+      response,
+      "Goal: Create a practical 3-day plan with exactly 3 explicit Day entries.",
+    );
+
+    expect(normalized).toMatch(/^## Requested Artifact\n\n## Three-day plan/);
+  });
+
   it("extracts only explicit Sources Used declarations", () => {
     const response = [
       "## Requested Artifact",
@@ -31,6 +89,103 @@ describe("agent response validator", () => {
       "raw/brief.md",
       "wiki/role-memory/builder.md",
     ]);
+  });
+
+  it("validates artifact source authority from Sources Used rather than incidental prose paths", () => {
+    const response = [
+      "## Summary", "Prepared.",
+      "## Requested Artifact",
+      "The workflow may mention wiki/workflows/daily-use-operational-loop.md as contextual memory.",
+      "### Sources Used", "- raw/brief.md",
+      "## Risk Assessment", "Low.",
+      "## Blockers", "None.",
+      "## QA Handoff", "Review.",
+    ].join("\n");
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      response,
+      verifiedRepoFiles: ["raw/brief.md"],
+    });
+
+    expect(validation.passed).toBe(true);
+    expect(validation.referencedFiles).toContain("wiki/workflows/daily-use-operational-loop.md");
+    expect(validation.invalidReferencedFiles).toEqual([]);
+  });
+
+  it("rejects an unverified path explicitly declared in artifact Sources Used", () => {
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      response: [
+        "## Summary", "Prepared.", "## Requested Artifact", "Plan content.",
+        "### Sources Used", "- wiki/unverified.md",
+        "## Risk Assessment", "Low.", "## Blockers", "None.", "## QA Handoff", "Review.",
+      ].join("\n"),
+      verifiedRepoFiles: ["raw/brief.md"],
+    });
+
+    expect(validation.passed).toBe(false);
+    expect(validation.invalidReferencedFiles).toEqual(["wiki/unverified.md"]);
+  });
+
+  it("treats exact no-file sentinels as absence instead of unverified paths", () => {
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      instruction: "Create a concise operating note.",
+      verifiedRepoFiles: ["wiki/verified.md"],
+      response: [
+        "## Summary", "Prepared from the operator goal.",
+        "## Requested Artifact", "A self-contained operating note.",
+        "### Sources Used", "- none",
+        "## Candidate Files", "- N/A",
+        "## Risk Assessment", "No material risk.",
+        "## Blockers", "None.",
+        "## QA Handoff", "Review the note.",
+      ].join("\n\n"),
+    });
+
+    expect(validation.invalidReferencedFiles).toEqual([]);
+    expect(validation.referencedFiles).toEqual([]);
+    expect(validation.passed).toBe(true);
+  });
+
+  it("ends a no-source declaration before later Markdown day-field bullets", () => {
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      instruction: "Create a complete 1-day plan with Objective and Actions.",
+      verifiedRepoFiles: ["wiki/verified.md"],
+      response: [
+        "## Summary", "Prepared.",
+        "## Requested Artifact", "### Sources Used", "- none", "",
+        "### Day 1: Review", "- **Objective:** Review a bounded task.", "- **Actions:** Record the run.",
+        "## Risk Assessment", "Low.", "## Blockers", "None.", "## QA Handoff", "Review.",
+      ].join("\n"),
+    });
+    expect(validation.invalidReferencedFiles).toEqual([]);
+    expect(validation.passed).toBe(true);
+  });
+
+  it("does not weaken unverified-path checks for values containing sentinel words", () => {
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      instruction: "Create a concise operating note.",
+      verifiedRepoFiles: ["wiki/verified.md"],
+      response: [
+        "## Summary", "Prepared.",
+        "## Requested Artifact", "A self-contained operating note.",
+        "### Sources Used", "- wiki/none.md",
+        "## Risk Assessment", "No material risk.",
+        "## Blockers", "None.",
+        "## QA Handoff", "Review the note.",
+      ].join("\n\n"),
+    });
+
+    expect(validation.invalidReferencedFiles).toEqual(["wiki/none.md"]);
+    expect(validation.passed).toBe(false);
   });
 
   it("extracts acceptance evidence and detects materially repeated QA findings", () => {
@@ -124,6 +279,32 @@ describe("agent response validator", () => {
     expect(findMissingQaCriteria([
       { criterion: "Artifact is complete" },
     ], criteria)).toEqual(["Human boundary is explicit."]);
+  });
+
+  it("matches conservative criterion paraphrases without hiding missing evidence", () => {
+    const criteria = [
+      "The API endpoint returns a 200 status.",
+      "The response includes the current project identifier.",
+    ];
+    const checklist = extractQaChecklist([
+      "Acceptance Checklist:",
+      "- [PASS] The API returns 200 — Evidence: The request completed with HTTP 200.",
+      "- [PASS] The response contains the project identifier.",
+    ].join("\n"));
+
+    expect(findMissingQaCriteria(checklist, criteria)).toEqual([]);
+    expect(findQaCriteriaWithoutEvidence(checklist, criteria)).toEqual([
+      "The response includes the current project identifier.",
+    ]);
+    expect(qaChecklistCoversCriteria(checklist, criteria)).toBe(false);
+  });
+
+  it("uses stable AC identifiers even when a lightweight model paraphrases heavily", () => {
+    const checklist = extractQaChecklist([
+      "Acceptance Checklist:",
+      "- [PASS] AC-1: Everything requested works — Evidence: HTTP 200 was observed.",
+    ].join("\n"));
+    expect(qaChecklistCoversCriteria(checklist, ["The API endpoint returns a 200 status."])).toBe(true);
   });
 
   it("combines checklist entries emitted in a targeted completion response", () => {
@@ -465,6 +646,73 @@ describe("agent response validator", () => {
     }));
   });
 
+  it("accepts required daily fields rendered as standalone Markdown labels without colons", () => {
+    const day = (number: number) => [
+      `#### Day ${number}: Operational step`,
+      "**Objective**", "Complete the objective.",
+      "**Actions**", "1. Perform one bounded action.",
+      "**Expected Evidence**", "- A durable run record exists.",
+      "**Acceptance Signal**", "The record is reviewable.",
+      "**Risks**", "- The action may require human input.",
+      "**Human Approval Boundary**", "A human approves before memory capture.",
+    ].join("\n");
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      instruction: "Goal: Create a 3-day plan. Each day must include objective, actions, expected evidence, acceptance signal, risks, and human approval boundary.",
+      response: [
+        "## Summary", "Prepared.", "## Requested Artifact",
+        day(1), day(2), day(3),
+        "### Sources Used", "- none",
+        "## Risk Assessment", "Risks are explicit per day.",
+        "## Blockers", "None.", "## QA Handoff", "Review all fields.",
+      ].join("\n\n"),
+    });
+
+    expect(validation.issues).not.toContainEqual(expect.objectContaining({
+      code: "artifact-builder.incomplete_daily_fields",
+    }));
+    expect(validation.passed).toBe(true);
+  });
+
+  it("rejects extra day entries when the operator requests a shorter plan", () => {
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      instruction: "Goal: Create a complete 3-day operating plan.",
+      response: [
+        "## Summary", "Prepared.", "## Requested Artifact",
+        "### Day 1", "Work.", "### Day 2", "Review.", "### Day 3", "Close.", "### Day 4", "Out of scope.",
+        "## Risk Assessment", "Low.", "## Blockers", "None.", "## QA Handoff", "Review.",
+      ].join("\n"),
+    });
+
+    expect(validation.passed).toBe(false);
+    expect(validation.issues).toContainEqual(expect.objectContaining({
+      code: "artifact-builder.unexpected_enumerated_artifact",
+      message: expect.stringContaining("unexpected: 4"),
+    }));
+  });
+
+  it("enforces a Spanish operator goal that uses an imperative verb", () => {
+    const validation = validateAgentResponse({
+      role: "builder",
+      profile: "artifact-builder",
+      instruction: "Goal: Crea un plan operativo completo de 3 días.",
+      response: [
+        "## Summary", "Prepared.", "## Requested Artifact",
+        "### Day 1", "Work.", "### Day 2", "Review.", "### Day 3", "Close.", "### Day 4", "Out of scope.",
+        "## Risk Assessment", "Low.", "## Blockers", "None.", "## QA Handoff", "Review.",
+      ].join("\n"),
+    });
+
+    expect(validation.passed).toBe(false);
+    expect(validation.issues).toContainEqual(expect.objectContaining({
+      code: "artifact-builder.unexpected_enumerated_artifact",
+      message: expect.stringContaining("unexpected: 4"),
+    }));
+  });
+
   it("does not treat a technical duration setting as a numbered plan artifact", () => {
     const response = [
       "## Summary",
@@ -625,6 +873,19 @@ describe("agent response validator", () => {
 
     expect(validation.passed).toBe(false);
     expect(validation.issues.some((issue) => issue.code === "qa.claims_implementation")).toBe(true);
+  });
+
+  it("flags QA responses that reproduce the artifact instead of evaluating it", () => {
+    const validation = validateAgentResponse({
+      role: "qa",
+      response: [
+        "Verdict: APPROVED", "Acceptance Checklist:", "- [PASS] Complete. — Evidence: Present.",
+        "Findings:", "### Day 1", "Rewritten plan content.", "Recommendation:", "Ship it.",
+      ].join("\n"),
+    });
+
+    expect(validation.passed).toBe(false);
+    expect(validation.issues).toContainEqual(expect.objectContaining({ code: "qa.rewrites_artifact" }));
   });
 
   it("accepts a pm response with the required sections", () => {

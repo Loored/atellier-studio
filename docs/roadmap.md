@@ -1,7 +1,16 @@
 # Roadmap
 
-**Last updated:** 2026-08-31 — QA semantic-feedback classification hardened on `codex/reflection-trust-hardening`.
-**Active plan:** Evaluate the frozen memory-context receipt against labeled real tasks before changing retrieval authority, budgets, or promotion policy.
+**Last updated:** 2026-09-16 — goal-quality and bounded autonomy work in progress.
+**Active plan:** [`docs/autonomous-improvement-roadmap.md`](autonomous-improvement-roadmap.md) and [`docs/operational-status.md`](operational-status.md). Evaluation quality must precede autonomous promotion.
+
+## Active sequence
+
+1. Protect operator-goal constraints and corroborate substantive quality on diverse tasks.
+2. Expose bounded, role-allowed read tools and exact current-run evidence.
+3. Calibrate a protected independent evaluation and reserved holdout before automation.
+4. Only then connect learning, shadow experiments, authorized reversible canaries, and supervised self-improvement.
+
+The sections below are retained as shipment history and strategic context.
 
 ## Strategic stance
 

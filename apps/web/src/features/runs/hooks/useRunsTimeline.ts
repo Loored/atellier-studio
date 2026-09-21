@@ -24,6 +24,7 @@ import {
   useUnlinkRunDeliverableApi,
   useUpdateRunReviewApi,
 } from "../../../api/hooks/runs/useRunsApi";
+import { readRunRecoveryNotice } from "../run-recovery";
 
 type RunLearningDraft = {
   role: AgentRole;
@@ -84,6 +85,9 @@ export function useRunsTimeline() {
             run.status,
             run.reviewStatus ?? "",
             run.deliverablePath ?? "",
+            readRunRecoveryNotice(run)?.title ?? "",
+            readRunRecoveryNotice(run)?.detail ?? "",
+            run.execution?.lastError ?? "",
             relatedAgent?.name ?? "",
             relatedAgent?.role ?? "",
             run.taskId ? taskList.find((task) => task.id === run.taskId)?.title ?? "" : "",

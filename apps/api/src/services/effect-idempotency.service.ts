@@ -24,6 +24,32 @@ export class EffectIdempotencyService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
+  async reconcile<TResult>(
+    input: Required<Pick<ExecuteToolEffectInput, "toolName" | "idempotencyKey" | "fingerprint">>,
+    result: TResult,
+    staleAfterMs = 30_000,
+  ): Promise<EffectExecutionRecord<TResult> | null> {
+    const toolName = requireNonEmpty(input.toolName, "toolName");
+    const idempotencyKey = requireNonEmpty(input.idempotencyKey, "idempotencyKey");
+    const fingerprint = requireNonEmpty(input.fingerprint, "fingerprint");
+    const current = await this.repository.findByKey(idempotencyKey);
+    if (!current) return null;
+    if (current.toolName !== toolName || current.fingerprint !== fingerprint) {
+      throw new EffectIdempotencyConflictError(
+        `Idempotency key ${idempotencyKey} is already bound to a different effect fingerprint.`,
+      );
+    }
+    if (current.status === "completed") return current as EffectExecutionRecord<TResult>;
+    if (current.status === "in-progress") {
+      const updatedAt = new Date(current.updatedAt).getTime();
+      if (!Number.isFinite(updatedAt) || this.now().getTime() - updatedAt < staleAfterMs) return null;
+    }
+    const completedAt = this.now().toISOString();
+    const reconciled = await this.repository.reconcile(current.id, current.status, result, completedAt);
+    if (!reconciled) return null;
+    return reconciled as EffectExecutionRecord<TResult>;
+  }
+
   async execute<TResult>(
     input: ExecuteToolEffectInput,
     operation: () => Promise<TResult>,
@@ -35,7 +61,8 @@ export class EffectIdempotencyService {
       );
     }
 
-    if (input.classification !== "irreversible") {
+    const hasIdempotencyFields = input.idempotencyKey !== undefined || input.fingerprint !== undefined;
+    if (input.classification !== "irreversible" && !hasIdempotencyFields) {
       return { disposition: "executed", result: await operation() };
     }
 
@@ -50,7 +77,7 @@ export class EffectIdempotencyService {
     const startedAt = this.now().toISOString();
     const claim = await this.repository.claim({
       toolName,
-      classification: "irreversible",
+      classification: input.classification,
       idempotencyKey,
       fingerprint,
       startedAt,

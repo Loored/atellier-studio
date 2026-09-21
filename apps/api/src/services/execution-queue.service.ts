@@ -1,6 +1,7 @@
 import type { Run, RunExecutionPhase } from "@atellier/shared";
 import { RunEventService } from "./run-event.service";
 import { RunService } from "./run.service";
+import { AgentService } from "./agent.service";
 
 export type ExecutionQueueOptions = {
   leaseMs?: number;
@@ -15,6 +16,7 @@ export class ExecutionQueueService {
     private readonly runs: RunService,
     private readonly events: RunEventService,
     options: ExecutionQueueOptions = {},
+    private readonly agents?: AgentService,
   ) {
     this.leaseMs = Math.max(options.leaseMs ?? 30_000, 1_000);
     this.retryBaseDelayMs = Math.max(options.retryBaseDelayMs ?? 1_000, 0);
@@ -61,8 +63,34 @@ export class ExecutionQueueService {
         phase: "completed",
         message: "Orchestration execution completed by terminal-state reconciliation.",
       });
+      await this.runs.recordTerminalOrchestrationEvaluation(run.id);
     }
     return reconciled.length;
+  }
+
+  async reconcileExpiredExecutions(): Promise<number> {
+    const recoveries = await this.runs.reconcileExpiredOrchestrationExecutions();
+    for (const recovery of recoveries) {
+      const cancelled = recovery.reason === "cancellation-requested";
+      await this.events.append(recovery.run.id, {
+        type: cancelled ? "cancelled" : "failed",
+        phase: cancelled ? "cancelled" : "failed",
+        message: recovery.run.execution?.lastError,
+        payload: {
+          recoveryReason: recovery.reason,
+          attempt: recovery.run.execution?.attempt,
+          maxAttempts: recovery.run.execution?.maxAttempts,
+          settledChildRuns: recovery.childRuns.length,
+        },
+      });
+      await this.runs.recordTerminalOrchestrationEvaluation(recovery.run.id);
+      for (const childRun of recovery.childRuns) {
+        if (childRun.agentId) {
+          await this.agents?.resetAfterInterruptedRun(childRun.agentId, childRun.id);
+        }
+      }
+    }
+    return recoveries.length;
   }
 
   async heartbeat(runId: string, workerId: string): Promise<boolean> {
@@ -159,7 +187,7 @@ export class ExecutionQueueService {
       phase: "completed",
       message: "Orchestration execution completed.",
     });
-    return run;
+    return (await this.runs.recordTerminalOrchestrationEvaluation(run.id)) ?? run;
   }
 
   async requestCancel(runId: string): Promise<Run> {
@@ -182,7 +210,7 @@ export class ExecutionQueueService {
         phase: "cancelled",
         message: "Queued orchestration cancelled before execution.",
       });
-      return run;
+      return (await this.runs.recordTerminalOrchestrationEvaluation(run.id)) ?? run;
     }
 
     if (current.status === "running") {
@@ -212,6 +240,7 @@ export class ExecutionQueueService {
     const run = await this.runs.updateExecution(runId, {
       status: "queued",
       phase: "queued",
+      retryGeneration: (current.execution?.retryGeneration ?? 0) + 1,
       attempt: 0,
       availableAt: new Date().toISOString(),
       leaseOwner: null,
@@ -252,7 +281,7 @@ export class ExecutionQueueService {
       phase: "cancelled",
       message: "Orchestration cancelled at a safe step boundary.",
     });
-    return run;
+    return (await this.runs.recordTerminalOrchestrationEvaluation(run.id)) ?? run;
   }
 
   async handleFailure(runId: string, workerId: string, error: unknown): Promise<Run> {
@@ -310,7 +339,7 @@ export class ExecutionQueueService {
       message,
       payload: { attempt, maxAttempts },
     });
-    return run;
+    return (await this.runs.recordTerminalOrchestrationEvaluation(run.id)) ?? run;
   }
 
   private async requireExecutionRun(runId: string): Promise<Run> {

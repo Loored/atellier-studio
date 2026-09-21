@@ -19,6 +19,7 @@ import {
   REVIEW_LEARNING_SIGNALS,
   RUN_REVIEW_STATUSES,
   type AgentRole,
+  type BuildOrchestrationOutput,
   type ReviewLearningResolutionOutcome,
   type ReviewLearningSignal,
   type Run,
@@ -580,43 +581,15 @@ export function ReviewView() {
   );
 }
 
-type OrchestrationReviewOutput = {
-  artifact?: { content?: string; sourceRunId?: string; stepId?: string };
-  repair?: { finalStepId?: string };
-  qaRetry?: {
-    attemptsUsed?: number;
-    maxAttempts?: number;
-    exhausted?: boolean;
-    finalStepId?: string;
-  };
-  qaChecklist?: {
-    complete?: boolean;
-    qaStepId?: string;
-    items?: Array<{ criterion?: string; status?: "pass" | "fail"; evidence?: string }>;
-  };
-  repeatedFeedback?: {
-    detected?: boolean;
-    firstQaStepId?: string;
-    repeatedQaStepId?: string;
-  };
-  semanticRepair?: {
-    attemptsUsed?: number;
-    maxAttempts?: number;
-    exhausted?: boolean;
-    finalStepId?: string;
-    lastValidArtifactStepId?: string;
-    lastQaStepId?: string;
-  };
-};
-
 function OrchestrationArtifactReview({ run }: { run: Run }) {
-  const output = run.output as OrchestrationReviewOutput | undefined;
+  const output = run.output as BuildOrchestrationOutput | undefined;
   const artifact = output?.artifact;
   const qaRetry = output?.qaRetry;
+  const qaChecklistCompletion = output?.qaChecklistCompletion;
   const qaChecklist = output?.qaChecklist;
   const repeatedFeedback = output?.repeatedFeedback;
   const semantic = output?.semanticRepair;
-  if (!artifact?.content && !qaRetry && !semantic) return null;
+  if (!artifact?.content && !qaRetry && !qaChecklistCompletion && !semantic) return null;
 
   return (
     <div className="mt-2 ml-6 rounded-lg border border-purple/20 bg-purple/[0.04] px-3 py-2.5">
@@ -627,6 +600,9 @@ function OrchestrationArtifactReview({ run }: { run: Run }) {
         {semantic?.lastQaStepId ? <span>Last QA: <b className="text-ink">{semantic.lastQaStepId}</b></span> : null}
         {qaRetry?.attemptsUsed ? (
           <span>{qaRetry.attemptsUsed}/{qaRetry.maxAttempts ?? 2} QA format retries</span>
+        ) : null}
+        {qaChecklistCompletion?.attemptsUsed ? (
+          <span>{qaChecklistCompletion.attemptsUsed}/{qaChecklistCompletion.maxAttempts} QA checklist completion</span>
         ) : null}
         {semantic?.attemptsUsed ? (
           <span>{semantic.attemptsUsed}/{semantic.maxAttempts ?? 3} semantic attempts</span>
@@ -640,6 +616,11 @@ function OrchestrationArtifactReview({ run }: { run: Run }) {
       {qaRetry?.exhausted ? (
         <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
           QA format retries exhausted. The artifact remains reviewable, but semantic repair, approval, and memory stay blocked.
+        </p>
+      ) : null}
+      {qaChecklistCompletion?.exhausted ? (
+        <p className="m-0 mt-1.5 text-[0.7rem] text-orange">
+          QA returned a verdict but did not complete the missing checklist evidence. Approval and memory stay blocked.
         </p>
       ) : null}
       {repeatedFeedback?.detected ? (

@@ -60,8 +60,8 @@ export function useStartSkillOrchestrationApi(options: UseStartSkillOrchestratio
       ...options,
     },
     {
-      onSuccess: async (result) => {
-        await Promise.all([
+      onSuccess: (result) => {
+        void Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.all }),
           queryClient.invalidateQueries({ queryKey: queryKeys.runs.activeOrchestrations }),
           queryClient.invalidateQueries({ queryKey: queryKeys.orchestrations.status(result.runId) }),

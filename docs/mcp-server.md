@@ -75,7 +75,7 @@ Cowork's MCP integration follows the same shape — point it at the same `comman
 
 ## Tools
 
-All tools are 1:1 adapters over existing REST endpoints. The MCP layer translates schemas and surfaces tool descriptions; it does not reimplement business rules.
+All tools are 1:1 adapters over existing REST endpoints. The MCP layer translates schemas and surfaces tool descriptions; it does not reimplement business rules. `wiki_query` exposes the same `balanced`, `evidence-first`, and `trusted-only` retrieval policies as `POST /wiki/query`; the API remains the final validation and ranking authority.
 
 | Tool | REST endpoint | Purpose |
 |---|---|---|

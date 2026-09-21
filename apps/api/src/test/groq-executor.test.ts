@@ -56,7 +56,7 @@ describe("GroqAgentExecutorService", () => {
       context: "Mongo cluster v6.",
     });
 
-    expect(result).toEqual({ response: "Plan ready.", needsHuman: true });
+    expect(result).toEqual({ response: "Plan ready.", needsHuman: true, resolvedModel: "llama-3.3-70b-versatile" });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

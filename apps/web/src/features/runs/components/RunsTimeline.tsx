@@ -1,8 +1,9 @@
-import { Activity, Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
+import { Activity, AlertTriangle, Check, CircleSlash, Clock, FilePlus2, Loader2, Play, RotateCcw, ShieldCheck, TimerReset } from "lucide-react";
 import { RUN_REVIEW_STATUSES } from "@atellier/shared";
 import { RUN_LOG_MESSAGE_MAX_LENGTH } from "@atellier/shared";
 import { ValidationSummary } from "../../../components/ValidationSummary";
 import { useRunsTimeline } from "../hooks/useRunsTimeline";
+import { readRunRecoveryNotice } from "../run-recovery";
 
 export function RunsTimeline() {
   const {
@@ -125,6 +126,7 @@ export function RunsTimeline() {
           const isRunning = run.status === "running";
           const canRetry = run.type === "orchestration" && ["failed", "blocked"].includes(run.status);
           const validation = readRunValidation(run);
+          const recoveryNotice = readRunRecoveryNotice(run);
 
           return (
             <li
@@ -156,6 +158,38 @@ export function RunsTimeline() {
                 <p className="mt-2 text-[0.72rem] text-ink-muted overflow-wrap-anywhere">
                   {latestLog.level}: {latestLog.message}
                 </p>
+              ) : null}
+
+              {recoveryNotice ? (
+                <div
+                  className={`mt-2 rounded-md border px-2.5 py-2 ${
+                    recoveryNotice.tone === "pending"
+                      ? "border-orange/30 bg-orange/[0.07]"
+                      : recoveryNotice.tone === "failed"
+                        ? "border-red-400/30 bg-red-400/[0.06]"
+                        : "border-teal/25 bg-teal/[0.05]"
+                  }`}
+                  data-testid={`run-recovery-${recoveryNotice.kind}`}
+                >
+                  <div className="flex items-start gap-2">
+                    {recoveryNotice.tone === "pending" ? (
+                      <Clock size={15} className="mt-0.5 flex-shrink-0 text-orange" aria-hidden="true" />
+                    ) : recoveryNotice.tone === "failed" ? (
+                      <AlertTriangle size={15} className="mt-0.5 flex-shrink-0 text-red-400" aria-hidden="true" />
+                    ) : (
+                      <RotateCcw size={15} className="mt-0.5 flex-shrink-0 text-teal" aria-hidden="true" />
+                    )}
+                    <div className="min-w-0">
+                      <strong className="block text-[0.76rem] text-ink">{recoveryNotice.title}</strong>
+                      <p className="m-0 mt-0.5 text-[0.7rem] leading-relaxed text-ink-muted">
+                        {recoveryNotice.detail}
+                      </p>
+                      <time className="mt-1 block text-[0.66rem] text-ink-faint" dateTime={recoveryNotice.timestamp}>
+                        {formatRecoveryTimestamp(recoveryNotice.timestamp)}
+                      </time>
+                    </div>
+                  </div>
+                </div>
               ) : null}
 
               {validation ? (
@@ -290,6 +324,11 @@ export function RunsTimeline() {
       </ul>
     </section>
   );
+}
+
+function formatRecoveryTimestamp(timestamp: string): string {
+  const parsed = new Date(timestamp);
+  return Number.isNaN(parsed.getTime()) ? timestamp : parsed.toLocaleString();
 }
 
 function readRunValidation(run: {

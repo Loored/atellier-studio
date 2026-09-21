@@ -76,6 +76,28 @@ describe("live flow result", () => {
     expect(result.repairs).toContainEqual(expect.objectContaining({ kind: "qa-format", exhausted: true }));
   });
 
+  it("reports checklist completion separately from QA format retries", () => {
+    const result = evaluateLiveFlow(status(), run({
+      readiness: "needs-human",
+      validation: {
+        role: "qa", profile: "orchestration", passed: false,
+        issues: [{ code: "orchestration.qa_checklist_completion_exhausted", severity: "error", message: "QA checklist completion exhausted." }],
+        verifiedRepoFiles: [], invalidReferencedFiles: [], referencedFiles: [], candidateFiles: [], changedFiles: [],
+      },
+      qaRetry: { maxAttempts: 2, attemptsUsed: 0, resolved: false, exhausted: false, finalStepId: "qa", blockerMessages: [] },
+      qaChecklistCompletion: {
+        maxAttempts: 1, attemptsUsed: 1, resolved: false, exhausted: true,
+        finalStepId: "qa-checklist-completion-1", missingCriteria: ["Human approval boundary"],
+        blockerMessages: ["QA returned a verdict without complete checklist evidence."],
+      },
+    }));
+
+    expect(result.repairs).toContainEqual(expect.objectContaining({
+      kind: "qa-checklist-completion", attemptsUsed: 1, exhausted: true,
+    }));
+    expect(result.repairs).not.toContainEqual(expect.objectContaining({ kind: "qa-format", attemptsUsed: 1 }));
+  });
+
   it("fails closed when a build loop lacks readiness evidence", () => {
     const result = evaluateLiveFlow(status(), run({}));
 

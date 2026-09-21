@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "calibrationId": "quality-calibration-v1",
+  "fixtureHash": "ed775d343b0b772ca45a2d6ee0f0e211e6fd3423c61861ee2909f2ec65d7aaa9",
+  "status": "delegated-agent-adjudication",
+  "delegatedBy": "operator instruction to Codex on 2026-09-17",
+  "scope": "The six semantically plausible procedure/proposal fixtures are accepted as legitimate but remain unverified by the deterministic evaluator. This is not an independent human label or model-quality approval.",
+  "caseDecisions": {
+    "procedure-valid-1": "accept", "procedure-valid-2": "accept", "procedure-valid-3": "accept",
+    "proposal-valid-1": "accept", "proposal-valid-2": "accept", "proposal-valid-3": "accept"
+  }
+}

@@ -8,6 +8,8 @@ import { connectMongo, disconnectMongo } from "../db/mongo";
 import { RunModel } from "../db/models/Run";
 import { RunEventModel } from "../db/models/RunEvent";
 import { ExecutionQueueService } from "../services/execution-queue.service";
+import { AgentService } from "../services/agent.service";
+import { AgentModel } from "../db/models/Agent";
 import { RunEventService } from "../services/run-event.service";
 import { RunService } from "../services/run.service";
 import { WikiService } from "../services/wiki.service";
@@ -57,11 +59,11 @@ describeMongo("durable runtime Mongo concurrency", () => {
     mongoUri = isolatedMongoUri(configuredMongoUri!);
     await connectMongo(mongoUri);
     connected = true;
-    await Promise.all([RunModel.syncIndexes(), RunEventModel.syncIndexes()]);
+    await Promise.all([RunModel.syncIndexes(), RunEventModel.syncIndexes(), AgentModel.syncIndexes()]);
   });
 
   beforeEach(async () => {
-    await Promise.all([RunModel.deleteMany({}), RunEventModel.deleteMany({})]);
+    await Promise.all([RunModel.deleteMany({}), RunEventModel.deleteMany({}), AgentModel.deleteMany({})]);
     atelierRoot = await mkdtemp(path.join(tmpdir(), "atellier-runtime-mongo-test-"));
     wiki = new WikiService(atelierRoot);
   });
@@ -79,10 +81,11 @@ describeMongo("durable runtime Mongo concurrency", () => {
   function createHarness(): QueueHarness {
     const runs = new RunService("mongo", wiki);
     const events = new RunEventService("mongo", runs);
+    const agents = new AgentService("mongo");
     return {
       runs,
       events,
-      queue: new ExecutionQueueService(runs, events, { leaseMs: 1_000 }),
+      queue: new ExecutionQueueService(runs, events, { leaseMs: 1_000 }, agents),
     };
   }
 
@@ -207,6 +210,70 @@ describeMongo("durable runtime Mongo concurrency", () => {
     ]);
     expect(eventResponse.events.map((event) => event.sequence)).toEqual([1, 2, 3, 4]);
     expect((await workerA.runs.getById(queued.id))?.execution?.nextEventSequence).toBe(4);
+  });
+
+  it("durably cancels an expired parent and its active child exactly once", async () => {
+    const worker = createHarness();
+    const agents = new AgentService("mongo");
+    const queued = await createQueuedRun(worker);
+    expect(await worker.queue.claim("worker-old")).not.toBeNull();
+    const agent = await agents.create({ name: "Recovery agent", role: "builder" });
+    const child = await worker.runs.create({
+      agentId: agent.id,
+      type: "manual",
+      status: "running",
+      input: { orchestrationRunId: queued.id, orchestrationStepId: "build" },
+    });
+    await agents.updateStatus(agent.id, {
+      status: "executing",
+      lastRunId: child.id,
+      currentStep: { label: "Build", phase: "act", orchestrationRunId: queued.id },
+    });
+    await worker.runs.updateExecution(queued.id, {
+      cancelRequestedAt: new Date().toISOString(),
+      leaseExpiresAt: "2000-01-01T00:00:00.000Z",
+    }, "worker-old");
+
+    await expect(worker.queue.reconcileExpiredExecutions()).resolves.toBe(1);
+    await expect(worker.queue.reconcileExpiredExecutions()).resolves.toBe(0);
+
+    expect(await worker.runs.getById(queued.id)).toMatchObject({
+      status: "cancelled",
+      execution: { phase: "cancelled", lastError: expect.stringContaining("Cancellation completed") },
+    });
+    expect(await worker.runs.getById(child.id)).toMatchObject({ status: "cancelled" });
+    expect(await agents.getById(agent.id)).toMatchObject({ status: "idle", lastRunId: child.id });
+    expect((await worker.events.list(queued.id)).events.map((event) => event.type)).toEqual([
+      "queued",
+      "claimed",
+      "cancelled",
+    ]);
+  });
+
+  it("fails an expired max-attempt parent and supersedes its active child", async () => {
+    const worker = createHarness();
+    const queued = await createQueuedRun(worker);
+    expect(await worker.queue.claim("worker-old")).not.toBeNull();
+    await worker.runs.updateExecution(queued.id, {
+      attempt: 3,
+      leaseExpiresAt: "2000-01-01T00:00:00.000Z",
+    }, "worker-old");
+    const child = await worker.runs.create({
+      type: "manual",
+      status: "running",
+      input: { orchestrationRunId: queued.id, orchestrationStepId: "build" },
+    });
+
+    await expect(worker.queue.reconcileExpiredExecutions()).resolves.toBe(1);
+    expect(await worker.queue.claim("worker-new")).toBeNull();
+    expect(await worker.runs.getById(queued.id)).toMatchObject({
+      status: "failed",
+      execution: { phase: "failed", attempt: 3, maxAttempts: 3 },
+    });
+    expect(await worker.runs.getById(child.id)).toMatchObject({
+      status: "failed",
+      logs: [expect.objectContaining({ message: expect.stringContaining("Superseded") })],
+    });
   });
 
   it("allocates ordered unique event sequences under concurrent appends", async () => {

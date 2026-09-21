@@ -27,6 +27,7 @@ const SECTION_PATTERNS: Record<AgentValidationProfile, string[]> = {
 
 const IMPLEMENTATION_VERBS = ["implemented", "edited", "updated", "changed", "modified", "added", "fixed"];
 const QA_IMPLEMENTATION_CLAIM_PATTERN = /(?:^|\n)\s*(?:[-*]\s*)?(?:(?:i|we)\s+)?(?:implemented|edited|updated|changed|modified|added|fixed)\b/i;
+const QA_ARTIFACT_REWRITE_PATTERN = /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?(?:requested artifact|(?:day|día)\s+\d+)(?:\*\*)?\b/im;
 
 export function validateAgentResponse(input: ValidationInput): AgentValidationResult {
   const response = input.response.trim();
@@ -38,9 +39,15 @@ export function validateAgentResponse(input: ValidationInput): AgentValidationRe
   const candidateFiles = extractSectionFiles(response, "candidate files");
   const referencedFiles = extractReferencedFiles(response);
   const validatesFileReferences = ["builder", "artifact-builder", "runtime"].includes(profile);
-  const filesToValidate = validatesFileReferences
-    ? dedupeSorted([...candidateFiles, ...changedFiles, ...referencedFiles])
-    : [];
+  const filesToValidate = profile === "artifact-builder"
+    ? dedupeSorted([
+        ...candidateFiles,
+        ...changedFiles,
+        ...extractContextReceiptSourceCitations(response),
+      ])
+    : validatesFileReferences
+      ? dedupeSorted([...candidateFiles, ...changedFiles, ...referencedFiles])
+      : [];
   const invalidReferencedFiles = verifiedRepoFiles.length > 0
     ? filesToValidate.filter((candidate) => !verifiedFileKeys.has(canonicalFileKey(candidate)))
     : [];
@@ -78,6 +85,13 @@ export function validateAgentResponse(input: ValidationInput): AgentValidationRe
     const instruction = input.instruction ?? "";
     const expectedDayCount = extractExpectedDayCount(instruction);
     const requestedArtifact = extractRequestedArtifact(response);
+    if (!requestedArtifact && !issues.some((issue) => issue.code === "artifact-builder.missing_section.requested-artifact")) {
+      issues.push({
+        code: "artifact-builder.missing_section.requested-artifact",
+        severity: "error",
+        message: "Missing expected requested artifact section.",
+      });
+    }
     if (expectedDayCount && requestedArtifact) {
       const explicitDays = extractExplicitDayNumbers(requestedArtifact);
       const missingDays = Array.from(
@@ -89,6 +103,16 @@ export function validateAgentResponse(input: ValidationInput): AgentValidationRe
           code: "artifact-builder.incomplete_enumerated_artifact",
           severity: "error",
           message: `Requested Artifact must include explicit Day 1 through Day ${expectedDayCount} entries; missing: ${missingDays.join(", ")}.`,
+        });
+      }
+      const unexpectedDays = [...explicitDays]
+        .filter((day) => day > expectedDayCount)
+        .sort((left, right) => left - right);
+      if (unexpectedDays.length > 0) {
+        issues.push({
+          code: "artifact-builder.unexpected_enumerated_artifact",
+          severity: "error",
+          message: `Requested Artifact must contain exactly Day 1 through Day ${expectedDayCount}; unexpected: ${unexpectedDays.join(", ")}.`,
         });
       }
       const requiredFields = extractRequiredDayFields(instruction);
@@ -127,6 +151,13 @@ export function validateAgentResponse(input: ValidationInput): AgentValidationRe
         code: "qa.claims_implementation",
         severity: "error",
         message: "QA output should not claim implementation changes.",
+      });
+    }
+    if (QA_ARTIFACT_REWRITE_PATTERN.test(response)) {
+      issues.push({
+        code: "qa.rewrites_artifact",
+        severity: "error",
+        message: "QA output must evaluate the latest artifact and must not reproduce or rewrite it.",
       });
     }
     if (!extractQaVerdict(response)) {
@@ -204,6 +235,31 @@ export function extractRequestedArtifact(response: string): string | null {
 
   const artifact = content.join("\n").trim();
   return artifact || null;
+}
+
+export function normalizeRequestedArtifactHeading(response: string, instruction = ""): string {
+  if (extractRequestedArtifact(response)) return response;
+
+  const lines = response.split(/\r?\n/);
+  const introductionIndex = lines.findIndex((line) =>
+    /(?:here (?:is|are)|below is|following is).{0,80}(?:corrected|requested|complete)?\s*artifact\s*:?\s*$/i.test(
+      line.replace(/\*\*|__/g, "").trim(),
+    ),
+  );
+  const expectedDayCount = extractExpectedDayCount(instruction);
+  const hasExactDayShape = Boolean(expectedDayCount) && Array.from(
+    { length: expectedDayCount ?? 0 },
+    (_, index) => index + 1,
+  ).every((day) => new RegExp(`^(?:#{1,6}\\s*)?(?:\\*\\*)?(?:day|día)\\s+${day}\\b`, "im").test(response));
+  if (introductionIndex < 0 && !hasExactDayShape) return response;
+
+  const artifactStartIndex = lines.findIndex((line, index) =>
+    index > introductionIndex && /^#{1,2}\s+\S/.test(line.trim()),
+  );
+  if (artifactStartIndex < 0) return response;
+
+  lines.splice(artifactStartIndex, 0, "## Requested Artifact", "");
+  return lines.join("\n");
 }
 
 /** Returns only paths deliberately declared in an artifact's Sources Used section. */
@@ -284,11 +340,10 @@ export function extractQaChecklist(response: string): Array<{
     const inlineEvidence = match[3]?.trim();
     const followingEvidence = lines[index + 1]?.replace(/\*\*|__/g, "").trim().match(/^(?:[-*]\s*)?(?:evidence|evidencia)\s*:\s*(.+)$/i)?.[1]?.trim();
     const evidence = inlineEvidence || followingEvidence;
-    if (!evidence) continue;
     items.push({
       criterion,
       status: match[1].toLowerCase() as "pass" | "fail",
-      evidence,
+      evidence: evidence ?? "",
     });
     pendingCriterion = null;
   }
@@ -318,21 +373,30 @@ export function isQaFeedbackRepeated(previous: string | null, current: string | 
 }
 
 export function qaChecklistCoversCriteria(
-  items: Array<{ criterion: string }>,
+  items: Array<{ criterion: string; evidence?: string }>,
   criteria: string[],
 ): boolean {
-  const expectedCriteria = expectedQaCriteria(criteria);
-  const actualCriteria = new Set(items.map((item) => normalizeCriterion(item.criterion)));
-  return expectedCriteria.every((criterion) => actualCriteria.has(normalizeCriterion(criterion)));
+  return matchQaCriteria(items, criteria).every((match) => match.item && hasQaEvidence(match.item));
 }
 
 export function findMissingQaCriteria(
   items: Array<{ criterion: string }>,
   criteria: string[],
 ): string[] {
-  const actualCriteria = new Set(items.map((item) => normalizeCriterion(item.criterion)));
-  return expectedQaCriteria(criteria)
-    .filter((criterion) => !actualCriteria.has(normalizeCriterion(criterion)));
+  return matchQaCriteria(items, criteria).filter((match) => !match.item).map((match) => match.criterion);
+}
+
+export function findQaCriteriaWithoutEvidence(
+  items: Array<{ criterion: string; evidence?: string }>,
+  criteria: string[],
+): string[] {
+  return matchQaCriteria(items, criteria)
+    .filter((match) => match.item && !hasQaEvidence(match.item))
+    .map((match) => match.criterion);
+}
+
+function hasQaEvidence(item: { evidence?: string }): boolean {
+  return item.evidence === undefined || Boolean(item.evidence.trim());
 }
 
 function expectedQaCriteria(criteria: string[]): string[] {
@@ -347,6 +411,54 @@ function normalizeCriterion(criterion: string): string {
     .replace(/[^a-z0-9áéíóúüñ]+/gi, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function matchQaCriteria(
+  items: Array<{ criterion: string; evidence?: string }>,
+  criteria: string[],
+): Array<{ criterion: string; item?: { criterion: string; evidence?: string } }> {
+  const available = new Set(items.map((_, index) => index));
+  return expectedQaCriteria(criteria).map((criterion, criterionIndex) => {
+    let bestIndex = -1;
+    let bestScore = 0;
+    for (const itemIndex of available) {
+      const item = items[itemIndex]!;
+      const score = qaCriterionMatchScore(criterion, item.criterion, criterionIndex + 1);
+      if (score > bestScore) {
+        bestIndex = itemIndex;
+        bestScore = score;
+      }
+    }
+    if (bestIndex < 0 || bestScore < 0.6) return { criterion };
+    available.delete(bestIndex);
+    return { criterion, item: items[bestIndex] };
+  });
+}
+
+function qaCriterionMatchScore(expected: string, actual: string, expectedId: number): number {
+  const explicitId = /\bAC[-\s]?(\d+)\b/i.exec(actual)?.[1];
+  if (explicitId) return Number(explicitId) === expectedId ? 1 : 0;
+  const expectedNormalized = normalizeCriterion(expected);
+  const actualNormalized = normalizeCriterion(actual.replace(/\bAC[-\s]?\d+\s*:?/gi, ""));
+  if (expectedNormalized === actualNormalized) return 1;
+  const expectedTokens = criterionTokens(expectedNormalized);
+  const actualTokens = criterionTokens(actualNormalized);
+  const expectedNumbers = expectedTokens.filter((token) => /^\d+$/.test(token));
+  const actualNumbers = actualTokens.filter((token) => /^\d+$/.test(token));
+  if (expectedNumbers.join(",") !== actualNumbers.join(",")) return 0;
+  const expectedNegated = expectedTokens.some((token) => token === "not" || token === "no");
+  const actualNegated = actualTokens.some((token) => token === "not" || token === "no");
+  if (expectedNegated !== actualNegated) return 0;
+  const expectedSet = new Set(expectedTokens);
+  const actualSet = new Set(actualTokens);
+  const overlap = [...expectedSet].filter((token) => actualSet.has(token)).length;
+  if (overlap < 2) return 0;
+  return Math.max(overlap / expectedSet.size, overlap / actualSet.size);
+}
+
+function criterionTokens(value: string): string[] {
+  const stopWords = new Set(["a", "an", "the", "el", "la", "los", "las", "un", "una", "de", "del", "y", "and", "is", "are", "es", "son", "must", "should", "debe"]);
+  return value.split(" ").filter((token) => token && !stopWords.has(token));
 }
 
 function extractBulletSection(response: string, sectionName: string): string[] {
@@ -417,12 +529,14 @@ function extractSectionFiles(response: string, sectionName: string): string[] {
       }
       continue;
     }
-    if (/^#{0,6}\s*[A-Za-z][A-Za-z\s-]+:?\s*$/.test(line) && !/^-\s+/.test(line)) {
+    if (/^#{1,6}\s+/.test(line) || (/^#{0,6}\s*[A-Za-z][A-Za-z\s-]+:?\s*$/.test(line) && !/^-\s+/.test(line))) {
       break;
     }
     const match = line.match(/^-\s+(.+)$/);
     if (match?.[1]) {
-      files.push(extractFirstPath(match[1]) ?? cleanFilePath(match[1]));
+      const declaredValue = cleanFilePath(match[1]);
+      if (isNoFileSentinel(declaredValue)) break;
+      files.push(extractFirstPath(match[1]) ?? declaredValue);
       continue;
     }
     if (files.length > 0) {
@@ -443,6 +557,10 @@ function extractReferencedFiles(response: string): string[] {
 
 function cleanFilePath(value: string): string {
   return value.trim().replace(/^[`'"]+|[`'",.)\]]+$/g, "");
+}
+
+function isNoFileSentinel(value: string): boolean {
+  return /^(?:none|n\/?a|not applicable|no files?)$/i.test(value.trim());
 }
 
 function canonicalFileKey(value: string): string {
@@ -471,7 +589,7 @@ function isRequestedArtifactBoundary(value: string): boolean {
 
 function extractExpectedDayCount(instruction: string): number | null {
   const goal = /^Goal:\s*(.+)$/im.exec(instruction)?.[1]?.trim() ?? instruction.trim();
-  const requestsArtifact = /\b(?:produce|create|draft|write|generate|design|prepare|crear|diseñar|redactar|generar|preparar)\b/i.test(goal);
+  const requestsArtifact = /\b(?:produce|create|draft|write|generate|design|prepare|crear|crea|diseñar|diseña|redactar|redacta|generar|genera|preparar|prepara)\b/i.test(goal);
   const namesPlan = /\b(?:plan|schedule|itinerary|calendario|programa)\b/i.test(goal);
   if (!requestsArtifact || !namesPlan) {
     return null;
@@ -496,14 +614,27 @@ function extractExplicitDayNumbers(artifact: string): Set<number> {
 type DayField = "objective" | "actions" | "evidence" | "acceptance signal" | "risks" | "human approval boundary";
 
 const DAY_FIELD_PATTERNS: Record<DayField, RegExp[]> = {
-  objective: [/\bobjective\s*:/i, /\bobjetivo\s*:/i],
-  actions: [/\b(?:concrete\s+)?actions?\s*:/i, /\b(?:acciones?|actividad(?:es)?)\s*:/i],
-  evidence: [/\b(?:expected\s+)?evidence\s*:/i, /\bevidencia(?:\s+esperada)?\s*:/i],
-  "acceptance signal": [/\bacceptance\s+signal\s*:/i, /\bseñal\s+de\s+aceptación\s*:/i],
-  risks: [/\brisks?\s*:/i, /\briesgos?\s*:/i],
+  objective: [/\bobjective\s*:/i, /\bobjetivo\s*:/i, /^\s*(?:#{1,6}\s*)?(?:objective|objetivo)\s*$/im],
+  actions: [
+    /\b(?:concrete\s+)?actions?\s*:/i,
+    /\b(?:acciones?|actividad(?:es)?)\s*:/i,
+    /^\s*(?:#{1,6}\s*)?(?:(?:concrete\s+)?actions?|acciones?|actividades?)\s*$/im,
+  ],
+  evidence: [
+    /\b(?:expected\s+)?evidence\s*:/i,
+    /\bevidencia(?:\s+esperada)?\s*:/i,
+    /^\s*(?:#{1,6}\s*)?(?:expected\s+evidence|evidence|evidencia(?:\s+esperada)?)\s*$/im,
+  ],
+  "acceptance signal": [
+    /\bacceptance\s+signal\s*:/i,
+    /\bseñal\s+de\s+aceptación\s*:/i,
+    /^\s*(?:#{1,6}\s*)?(?:acceptance\s+signal|señal\s+de\s+aceptación)\s*$/im,
+  ],
+  risks: [/\brisks?\s*:/i, /\briesgos?\s*:/i, /^\s*(?:#{1,6}\s*)?(?:risks?|riesgos?)\s*$/im],
   "human approval boundary": [
     /\bhuman\s+approval\s+boundary\s*:/i,
     /\b(?:límite|frontera)\s+de\s+aprobación\s+humana\s*:/i,
+    /^\s*(?:#{1,6}\s*)?(?:human\s+approval\s+boundary|(?:límite|frontera)\s+de\s+aprobación\s+humana)\s*$/im,
   ],
 };
 

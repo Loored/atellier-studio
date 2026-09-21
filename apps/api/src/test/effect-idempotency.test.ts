@@ -81,6 +81,24 @@ describe("EffectIdempotencyService", () => {
     expect(operation).toHaveBeenCalledOnce();
   });
 
+  it("can make an explicitly keyed reversible effect durable and idempotent", async () => {
+    const { service } = createHarness();
+    const operation = vi.fn().mockResolvedValue({ state: "applied" });
+    const input = {
+      toolName: "workspace-change.apply",
+      classification: "reversible" as const,
+      idempotencyKey: "workspace-change:apply:change-fingerprint",
+      fingerprint: "workspace-change:apply-effect-fingerprint",
+    };
+
+    const first = await service.execute(input, operation);
+    const second = await service.execute(input, operation);
+
+    expect(first).toMatchObject({ disposition: "executed", result: { state: "applied" }, record: { classification: "reversible", status: "completed" } });
+    expect(second).toMatchObject({ disposition: "reused", result: { state: "applied" } });
+    expect(operation).toHaveBeenCalledOnce();
+  });
+
   it("reports an existing attempt as in-progress without duplicating the effect", async () => {
     const { repository, service } = createHarness();
     await repository.claim({
@@ -131,6 +149,44 @@ describe("EffectIdempotencyService", () => {
       error: "Remote rejected request",
     });
     expect(operation).toHaveBeenCalledOnce();
+  });
+
+  it("reconciles an exact failed effect after external state proves it completed", async () => {
+    const { repository, service } = createHarness();
+    const failed = await service.execute({
+      toolName: "workspace-change.apply",
+      classification: "reversible",
+      idempotencyKey: "change:apply:one",
+      fingerprint: "apply:fingerprint:one",
+    }, async () => { throw new Error("Receipt write failed"); });
+    expect(failed.disposition).toBe("failed");
+
+    const reconciled = await service.reconcile({
+      toolName: "workspace-change.apply",
+      idempotencyKey: "change:apply:one",
+      fingerprint: "apply:fingerprint:one",
+    }, { status: "applied" });
+
+    expect(reconciled).toMatchObject({ status: "completed", result: { status: "applied" } });
+    expect(reconciled?.error).toBeUndefined();
+    expect((await repository.findByKey("change:apply:one"))?.status).toBe("completed");
+  });
+
+  it("does not reconcile a fresh in-progress effect", async () => {
+    const { repository, service } = createHarness();
+    await repository.claim({
+      toolName: "workspace-change.apply",
+      classification: "reversible",
+      idempotencyKey: "change:apply:fresh",
+      fingerprint: "apply:fingerprint:fresh",
+      startedAt: "2026-08-24T12:00:00.000Z",
+    });
+
+    await expect(service.reconcile({
+      toolName: "workspace-change.apply",
+      idempotencyKey: "change:apply:fresh",
+      fingerprint: "apply:fingerprint:fresh",
+    }, { status: "applied" })).resolves.toBeNull();
   });
 
   it("rejects reuse of a key with a different fingerprint", async () => {

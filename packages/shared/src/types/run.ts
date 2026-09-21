@@ -8,6 +8,8 @@ import type {
   AutomatedContextReceiptAssessment,
   ContextReceiptEvaluation,
 } from "./agent-memory-context";
+import type { ToolInvocation } from "./tool-harness";
+import type { AgentRunEvaluation } from "./evaluation-ledger";
 
 export const RUN_TYPES = ["manual", "ingest", "query", "build", "review", "lint", "orchestration"] as const;
 
@@ -41,6 +43,8 @@ export type RunExecution = {
   definitionHash: string;
   definitionSnapshot: unknown;
   idempotencyKey: string;
+  /** Increments when an operator starts a fresh retry budget after a terminal attempt. */
+  retryGeneration?: number;
   attempt: number;
   maxAttempts: number;
   nextEventSequence: number;
@@ -91,6 +95,10 @@ export type Run = {
   contextReceipt?: AgentMemoryContextReceipt;
   contextEvaluation?: ContextReceiptEvaluation;
   automatedContextAssessment?: AutomatedContextReceiptAssessment;
+  toolInvocations?: ToolInvocation[];
+  /** Append-only terminal evidence. `evaluation` remains the latest record for v1 consumers. */
+  evaluationLedger?: AgentRunEvaluation[];
+  evaluation?: AgentRunEvaluation;
   input?: unknown;
   output?: unknown;
   execution?: RunExecution;

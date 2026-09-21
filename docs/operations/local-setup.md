@@ -106,7 +106,17 @@ AGENT_EXECUTOR_MODE=openai OPENAI_API_KEY=<YOUR_OPENAI_API_KEY> pnpm --filter @a
 
 Optional model and policy controls:
 
-For local Ollama execution, set `OLLAMA_MODEL_PROFILE` to select the profile model. The safe Mac default maps `cheap`, `standard`, and `deep` to `qwen3.5:4b`, avoiding VRAM pressure when orchestration steps overlap. Larger models can be opted into by changing the profile-specific variables. Those variables take precedence over the legacy `OLLAMA_MODEL` fallback. Role overrides remain available for specialist agents.
+For local Ollama execution, set `OLLAMA_MODEL_PROFILE` to select the profile model. The safe Mac default maps `cheap`, `standard`, and `deep` to `qwen3.5:4b`, avoiding sustained memory pressure. `OLLAMA_MODEL_QA=qwen3.5:9b` is the measured specialist exception: only QA steps load 9B because real 4B runs repeatedly ignored the verdict/checklist contract. Atellier executes orchestration steps sequentially, so 4B and 9B are not invoked concurrently by one Build Loop.
+
+Profile-specific variables take precedence over the legacy `OLLAMA_MODEL` fallback. Role overrides take precedence for their configured role, except when an approved frozen canary budget explicitly binds an exact model for that run.
+
+On Macs with limited unified memory, start the Ollama server with one resident model and a short idle lifetime before launching Atellier:
+
+```bash
+OLLAMA_MAX_LOADED_MODELS=1 OLLAMA_KEEP_ALIVE=30s /opt/homebrew/bin/ollama serve
+```
+
+This prevents the 4B fallback and 9B QA specialist from remaining loaded together after a role transition. These variables configure the Ollama server process itself; putting them only in Atellier's `.env` does not reconfigure an already-running Ollama server.
 
 `OLLAMA_CONTEXT_TOKENS=8192` is the local default for Context Receipt runs. It is sent with each Ollama request, so it does not require changing global Ollama server settings. Keep the setting at 8192 on the local Mac unless a measured run shows that a larger window is needed.
 
@@ -118,7 +128,7 @@ AGENT_MAX_HANDOFF_DEPTH=1
 AGENT_EXECUTION_TIMEOUT_MS=240000
 ```
 
-Keep the 120-second default for source-grounded local runs that must return a complete document; shorter limits can interrupt Ollama before the artifact is reviewable.
+Keep the 240-second default for source-grounded local runs that must return a complete document; shorter limits can interrupt Ollama before the artifact is reviewable.
 
 Current product risk: real execution can burn quota. Future work should make executor mode, model, and model profile highly visible in UI before running agents.
 
@@ -146,11 +156,11 @@ Exit codes are stable for automation: `0` ready/success, `1` failed or unexpecte
 ## Validation
 
 ```bash
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm test:api
-pnpm test:web
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm build
+corepack pnpm test:api
+corepack pnpm test:web
 ```
 
 Run the smallest relevant subset for the change.

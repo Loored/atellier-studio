@@ -1,4 +1,16 @@
-import type { AgentRunStreamEvent, ExecutorMode, RunAgentInput, RunAgentResult } from "@atellier/shared";
+import { createHash } from "node:crypto";
+import type {
+  AgentRunEvaluation,
+  AgentRunStreamEvent,
+  AgentValidationResult,
+  EvaluationTerminalStatus,
+  ExecutorMode,
+  ExecutionBudgetReceipt,
+  ModelProfile,
+  Run,
+  RunAgentInput,
+  RunAgentResult,
+} from "@atellier/shared";
 import {
   AgentExecutionCancelledError,
   type AgentExecutorService,
@@ -8,11 +20,16 @@ import { AgentService } from "./agent.service";
 import { MessageService } from "./message.service";
 import { RunService } from "./run.service";
 import { validateAgentResponse } from "./agent-response-validator";
+import { parseAgentToolRequest, ToolHarnessService } from "./tool-harness.service";
 
 export type AgentRunExecutionOptions = {
   signal?: AbortSignal;
   maxOutputTokens?: number;
   transformResponse?: (response: string) => string;
+  /** Internal-only receipt revalidated by DurableRuntimeService. */
+  executionBudget?: ExecutionBudgetReceipt;
+  /** Only the initial Build Loop artifact may recover a repeated post-tool request once. */
+  completeArtifactAfterTool?: boolean;
 };
 
 export class AgentExecutionTimeoutError extends Error {
@@ -44,6 +61,7 @@ export class AgentRunService {
       executionTimeoutMs?: number;
       verifiedRepoFiles?: string[];
     } = {},
+    private readonly toolHarness?: ToolHarnessService,
   ) {
     const rawDepth = options.maxHandoffDepth;
     const rawTimeout = options.executionTimeoutMs;
@@ -89,7 +107,7 @@ export class AgentRunService {
     lineage = new Set<string>(),
     options: AgentRunExecutionOptions = {},
   ): Promise<RunAgentResult | null> {
-    const { signal } = options;
+    const { signal, executionBudget } = options;
     const agent = await this.agents.getById(agentId);
     if (!agent) {
       return null;
@@ -103,15 +121,24 @@ export class AgentRunService {
     ])].sort();
     emit?.({ type: "status", status: "queued" });
 
+    const modelProfile = input.modelProfileOverride ?? "standard";
+    const boundedContext = executionBudget
+      ? this.truncateUtf8(input.context, executionBudget.limits.contextBytes)
+      : input.context;
     const run = await this.runs.create({
       agentId,
       type: "manual",
       status: "running",
       input: {
         instruction: input.instruction,
-        context: input.context,
+        context: boundedContext,
         executorMode: selectedExecutorMode,
         ...(input.modelProfileOverride && { modelProfile: input.modelProfileOverride }),
+        ...(executionBudget && {
+          controlBudgetReceiptId: executionBudget.id,
+          controlBundleFingerprint: executionBudget.bundleFingerprint,
+          controlBudgetAssignmentFingerprint: executionBudget.assignmentFingerprint,
+        }),
         verifiedRepoFiles: verifiedFiles,
         ...(input.orchestrationStep && {
           orchestrationRunId: input.orchestrationStep.orchestrationRunId,
@@ -155,16 +182,95 @@ export class AgentRunService {
     });
 
     try {
-      const execution = await this.executeWithTimeout(executor, {
+      const timeoutMs = executionBudget
+        ? Math.min(this.executionTimeoutMs, executionBudget.limits.executionTimeoutMs)
+        : this.executionTimeoutMs;
+      const deadline = Date.now() + timeoutMs;
+      const remainingTimeoutMs = () => {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new AgentExecutionTimeoutError(timeoutMs);
+        return remaining;
+      };
+      const modelOverride = executionBudget?.modelProfiles[modelProfile];
+      const allowedReadTools = this.toolHarness?.listCatalog().definitions
+        .filter((tool) => tool.classification === "read" && tool.autonomy === "automatic"
+          && tool.executionState === "available" && tool.allowedRoles.includes(agent.role)
+          && (!executionBudget || executionBudget.allowedTools.includes(tool.name)))
+        .map((tool) => tool.name) ?? [];
+      let execution = await this.executeWithTimeout(executor, {
         agent,
         instruction: input.instruction,
-        context: input.context,
+        context: boundedContext,
         verifiedFiles,
         signal,
         maxOutputTokens: options.maxOutputTokens,
         modelProfileOverride: input.modelProfileOverride,
-      });
+        modelOverride,
+        allowedReadTools,
+      }, remainingTimeoutMs());
       assertExecutionActive(signal);
+
+      const toolRequest = parseAgentToolRequest(execution.response);
+      if (toolRequest) {
+        if (!this.toolHarness) {
+          throw new Error("Tool Harness is not configured for agent execution.");
+        }
+        const toolResponse = await this.toolHarness.invoke({
+          parentRunId: run.id,
+          toolName: toolRequest.toolName,
+          agentRole: agent.role,
+          input: toolRequest.input,
+        }, executionBudget ? { allowedTools: executionBudget.allowedTools } : undefined);
+        assertExecutionActive(signal);
+        const resultContext = toolResponse.result === undefined
+          ? `Tool request was ${toolResponse.invocation.status}: ${toolResponse.invocation.outputSummary}`
+          : JSON.stringify(toolResponse.result).slice(0, 6000);
+        execution = await this.executeWithTimeout(executor, {
+          agent,
+          instruction: [
+            input.instruction,
+            "",
+            "A bounded Tool Harness result is available below. Use it to answer the original instruction. Do not request another tool.",
+            resultContext,
+          ].join("\n"),
+          context: boundedContext,
+          verifiedFiles,
+          signal,
+          maxOutputTokens: options.maxOutputTokens,
+          modelProfileOverride: input.modelProfileOverride,
+          modelOverride,
+          allowedReadTools: [],
+        }, remainingTimeoutMs());
+        assertExecutionActive(signal);
+        if (options.completeArtifactAfterTool
+          && toolResponse.invocation.status === "succeeded"
+          && (!executionBudget || executionBudget.limits.maxRetries >= 1)
+          && parseAgentToolRequest(execution.response)) {
+          await this.runs.appendLog(run.id, {
+            level: "warn",
+            message: "Builder repeated a tool request after the bounded result; one final artifact-only completion is allowed without invoking another tool.",
+          });
+          execution = await this.executeWithTimeout(executor, {
+            agent,
+            instruction: [
+              input.instruction,
+              "",
+              "The previous read-only tool result has already been returned. No further tool request can be executed.",
+              "Return the complete Requested Artifact now, with every operator-required entry and field. Do not return TOOL_REQUEST, an introduction, or a promise to produce the artifact later.",
+              "Bounded result:",
+              resultContext,
+            ].join("\n"),
+            context: boundedContext,
+            verifiedFiles,
+            signal,
+            maxOutputTokens: options.maxOutputTokens,
+            modelProfileOverride: input.modelProfileOverride,
+            modelOverride,
+            allowedReadTools: [],
+          }, remainingTimeoutMs());
+          assertExecutionActive(signal);
+        }
+      }
 
       const settledResponse = options.transformResponse
         ? options.transformResponse(execution.response)
@@ -225,6 +331,7 @@ export class AgentRunService {
           messageId: assistantMessage.id,
           response: settledResponse,
           needsHuman: execution.needsHuman,
+          ...(execution.resolvedModel ? { resolvedModel: execution.resolvedModel } : {}),
           validation: {
             role: validation.role,
             profile: validation.profile,
@@ -243,10 +350,22 @@ export class AgentRunService {
       if (!completedRun) {
         return null;
       }
+      const evaluatedRun = await this.recordTerminalEvaluation({
+        run: completedRun,
+        terminalStatus: "completed",
+        validation,
+        needsHuman: execution.needsHuman,
+        executorMode: selectedExecutorMode,
+        modelProfile: input.modelProfileOverride ?? "standard",
+        resolvedModel: execution.resolvedModel,
+        agentRole: agent.role,
+        configurationFingerprint: executionBudget?.bundleFingerprint,
+      });
+      if (!evaluatedRun) return null;
 
       const updatedAgent = await this.agents.updateStatus(agentId, {
         status: execution.needsHuman ? "needs-human" : "done",
-        lastRunId: completedRun.id,
+        lastRunId: evaluatedRun.id,
         currentStep: null,
       });
 
@@ -256,7 +375,7 @@ export class AgentRunService {
 
       const result = {
         agent: updatedAgent,
-        run: completedRun,
+        run: evaluatedRun,
         userMessage,
         assistantMessage,
       };
@@ -299,7 +418,27 @@ export class AgentRunService {
         level: cancelled ? "warn" : "error",
         message,
       });
-      await this.runs.updateStatus(run.id, cancelled ? "cancelled" : "failed", { error: message });
+      const terminalRun = await this.runs.updateStatus(run.id, cancelled ? "cancelled" : "failed", { error: message });
+      if (terminalRun) {
+        try {
+          await this.recordTerminalEvaluation({
+            run: terminalRun,
+            terminalStatus: terminalRun.status === "cancelled" ? "cancelled" : "failed",
+            needsHuman: false,
+            executorMode: selectedExecutorMode,
+            modelProfile: input.modelProfileOverride ?? "standard",
+            agentRole: agent.role,
+            configurationFingerprint: executionBudget?.bundleFingerprint,
+            error: {
+              kind: cancelled ? "cancelled" : error instanceof AgentExecutionTimeoutError ? "timeout" : "executor",
+              message,
+            },
+          });
+        } catch (evaluationError) {
+          const evaluationMessage = evaluationError instanceof Error ? evaluationError.message : "Unable to record terminal evaluation.";
+          await this.runs.appendLog(run.id, { level: "error", message: `Terminal evaluation was not recorded: ${evaluationMessage}` });
+        }
+      }
       await this.agents.updateStatus(agentId, {
         status: cancelled ? "idle" : "blocked",
         lastRunId: run.id,
@@ -308,6 +447,107 @@ export class AgentRunService {
       emit?.({ type: "error", message });
       throw error;
     }
+  }
+
+  private async recordTerminalEvaluation(input: {
+    run: Run;
+    terminalStatus: EvaluationTerminalStatus;
+    validation?: AgentValidationResult;
+    needsHuman: boolean;
+    executorMode: ExecutorMode;
+    modelProfile: ModelProfile;
+    resolvedModel?: string;
+    agentRole: string;
+    configurationFingerprint?: string;
+    error?: AgentRunEvaluation["error"];
+  }): Promise<Run | null> {
+    const toolInvocations = (input.run.toolInvocations ?? []).reduce(
+      (counts, invocation) => {
+        counts[invocation.status] += 1;
+        return counts;
+      },
+      { succeeded: 0, denied: 0, failed: 0 },
+    );
+    const runInput = input.run.input && typeof input.run.input === "object"
+      ? input.run.input as Record<string, unknown>
+      : {};
+    const orchestration = {
+      runId: this.stringRunInput(runInput, "orchestrationRunId"),
+      stepId: this.stringRunInput(runInput, "orchestrationStepId"),
+      logicalStepId: this.stringRunInput(runInput, "orchestrationLogicalStepId"),
+      repairAttempt: this.numberRunInput(runInput, "orchestrationRepairAttempt"),
+      repairKind: this.stringRunInput(runInput, "orchestrationRepairKind"),
+    };
+    const hasOrchestrationEvidence = Object.values(orchestration).some((value) => value !== undefined);
+    const validationPassed = input.validation?.passed ?? false;
+    const outcome = input.terminalStatus === "cancelled"
+      ? "cancelled" as const
+      : input.terminalStatus === "completed"
+        ? validationPassed ? (input.needsHuman ? "needs-human" : "passed") : "failed"
+        : "failed" as const;
+    const startedAt = input.run.createdAt;
+    const completedAt = input.run.updatedAt;
+    const durationMs = Math.max(0, Date.parse(completedAt) - Date.parse(startedAt));
+    const fingerprintSource = {
+      runId: input.run.id,
+      terminalStatus: input.terminalStatus,
+      outcome,
+      validationPassed,
+      needsHuman: input.needsHuman,
+      executorMode: input.executorMode,
+      modelProfile: input.modelProfile,
+      resolvedModel: input.resolvedModel,
+      agentRole: input.agentRole,
+      configurationFingerprint: input.configurationFingerprint,
+      orchestration: hasOrchestrationEvidence ? orchestration : undefined,
+      contextReceiptHash: this.stringRunInput(runInput, "orchestrationContextReceiptHash"),
+      toolInvocations,
+      startedAt,
+      completedAt,
+      durationMs,
+      error: input.error,
+    };
+    const evaluation: AgentRunEvaluation = {
+      schemaVersion: 2,
+      evaluationId: `terminal:${input.run.id}`,
+      fingerprint: createHash("sha256").update(JSON.stringify(fingerprintSource)).digest("hex"),
+      runId: input.run.id,
+      terminalStatus: input.terminalStatus,
+      outcome,
+      validationPassed,
+      needsHuman: input.needsHuman,
+      executorMode: input.executorMode,
+      modelProfile: input.modelProfile,
+      ...(input.resolvedModel ? { resolvedModel: input.resolvedModel } : {}),
+      agentRole: input.agentRole,
+      ...(input.configurationFingerprint ? { configurationFingerprint: input.configurationFingerprint } : {}),
+      ...(hasOrchestrationEvidence ? { orchestration } : {}),
+      ...(this.stringRunInput(runInput, "orchestrationContextReceiptHash") ? { contextReceiptHash: this.stringRunInput(runInput, "orchestrationContextReceiptHash") } : {}),
+      toolInvocations,
+      startedAt,
+      completedAt,
+      durationMs,
+      ...(input.error ? { error: input.error } : {}),
+      recordedAt: new Date().toISOString(),
+    };
+    return this.runs.recordEvaluation(input.run.id, evaluation);
+  }
+
+  private stringRunInput(input: Record<string, unknown>, key: string): string | undefined {
+    const value = input[key];
+    return typeof value === "string" && value.trim() ? value : undefined;
+  }
+
+  private numberRunInput(input: Record<string, unknown>, key: string): number | undefined {
+    const value = input[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  }
+
+  private truncateUtf8(value: string | undefined, maxBytes: number): string | undefined {
+    if (!value) return value;
+    const source = Buffer.from(value, "utf8");
+    if (source.byteLength <= maxBytes) return value;
+    return source.subarray(0, Math.max(0, maxBytes)).toString("utf8").replace(/\uFFFD$/u, "");
   }
 
   private *chunkText(content: string, chunkSize: number): Generator<string> {
@@ -416,7 +656,7 @@ export class AgentRunService {
       content: handoffExecution.response,
     });
 
-    await this.runs.complete(handoffRun.id, {
+    const completedHandoffRun = await this.runs.complete(handoffRun.id, {
       summary: `${targetAgent.name} completed handoff execution.`,
       output: {
         handoffFromRunId: options.sourceRunId,
@@ -425,6 +665,18 @@ export class AgentRunService {
         validation,
       },
     });
+
+    if (completedHandoffRun) {
+      await this.recordTerminalEvaluation({
+        run: completedHandoffRun,
+        terminalStatus: "completed",
+        validation,
+        needsHuman: true,
+        executorMode: options.executorMode,
+        modelProfile: "standard",
+        agentRole: targetAgent.role,
+      });
+    }
 
     await this.agents.updateStatus(targetAgent.id, {
       status: "needs-human",
@@ -439,9 +691,13 @@ export class AgentRunService {
     }
   }
 
-  private async executeWithTimeout(executor: AgentExecutorService, input: ExecuteAgentInstructionInput) {
+  private async executeWithTimeout(
+    executor: AgentExecutorService,
+    input: ExecuteAgentInstructionInput,
+    timeoutMs = this.executionTimeoutMs,
+  ) {
     const controller = new AbortController();
-    const timeoutError = new AgentExecutionTimeoutError(this.executionTimeoutMs);
+    const timeoutError = new AgentExecutionTimeoutError(timeoutMs);
     let timedOut = false;
     const cancelFromUpstream = (): void => {
       controller.abort(input.signal?.reason);
@@ -456,7 +712,7 @@ export class AgentRunService {
     const timeoutId = setTimeout(() => {
       timedOut = true;
       controller.abort(timeoutError);
-    }, this.executionTimeoutMs);
+    }, timeoutMs);
 
     const aborted = new Promise<never>((_resolve, reject) => {
       const rejectForAbort = (): void => {

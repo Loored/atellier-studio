@@ -85,10 +85,25 @@ export async function orchestrationsRoutes(fastify: FastifyInstance, services: A
     if (modelProfileOverrideRaw && !isOneOf(modelProfileOverrideRaw, MODEL_PROFILES)) {
       return badRequest(reply, "Model profile override is invalid.");
     }
+    const canaryId = optionalStringField(body, "canaryId");
+    if (canaryId && !/^canary-[a-f0-9]{16}$/.test(canaryId)) {
+      return badRequest(reply, "Canary ID is invalid.");
+    }
+    const semanticRepairLimitRaw = body.semanticRepairLimit;
+    if (semanticRepairLimitRaw !== undefined
+      && (typeof semanticRepairLimitRaw !== "number"
+        || !Number.isInteger(semanticRepairLimitRaw)
+        || semanticRepairLimitRaw < 1
+        || semanticRepairLimitRaw > 3)) {
+      return badRequest(reply, "Semantic repair limit must be an integer from 1 through 3.");
+    }
+    const semanticRepairLimit = semanticRepairLimitRaw as number | undefined;
 
     const input: StartSkillOrchestrationInput = {
       skillId,
       goal,
+      semanticRepairLimit,
+      canaryId,
       context,
       taskId,
       executorModeOverride,

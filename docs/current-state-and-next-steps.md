@@ -1,4 +1,6 @@
-# Atellier Studio — Current State and Next Steps
+# Atellier Studio — Historical State and Next Steps
+
+> **Historical snapshot.** This long-form review describes the May 2026 planning state and contains completed work that is no longer actionable. Use [`docs/operational-status.md`](operational-status.md) and [`docs/roadmap.md`](roadmap.md) to choose new work.
 
 > **2026-05-13 — Knowledge Graph v2 landed (PRs #29-#32).**
 > Force-directed live map clustered by layer, inspector with markdown render + run timeline, ⌘K search, URL-synced filters, sesión viva polling, time-travel slider with snapshot ticks, mobile tab, and Office↔Graph navigation. The Knowledge Graph is now the system's operational-memory surface; see [`docs/knowledge-graph.md`](knowledge-graph.md) for the inventory and [`docs/roadmap.md`](roadmap.md) for what's next.
