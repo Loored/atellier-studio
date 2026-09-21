@@ -33,6 +33,12 @@ import {
 } from "./durable-runtime.service";
 import { createEffectIdempotencyRepository } from "./effect-idempotency.repository";
 import { EffectIdempotencyService } from "./effect-idempotency.service";
+import { ToolHarnessService } from "./tool-harness.service";
+import { ReversibleWorkspaceService } from "./reversible-workspace.service";
+import { ControlBundleService } from "./control-bundle.service";
+import { WorkspaceChangeService } from "./workspace-change.service";
+import { GitIsolatedWorktreeService } from "./isolated-worktree.service";
+import { SupervisedCodeChangeService } from "./supervised-code-change.service";
 
 export type AppServices = {
   agents: AgentService;
@@ -44,6 +50,11 @@ export type AppServices = {
   executionQueue: ExecutionQueueService;
   durableRuntime: DurableRuntimeService;
   effectIdempotency: EffectIdempotencyService;
+  toolHarness: ToolHarnessService;
+  controlBundles: ControlBundleService;
+  reversibleWorkspace: ReversibleWorkspaceService;
+  workspaceChanges: WorkspaceChangeService;
+  supervisedCodeChanges: SupervisedCodeChangeService;
   skillOrchestrations: SkillOrchestrationService;
   wiki: WikiService;
   codexWorkers: CodexWorkerService;
@@ -58,6 +69,8 @@ export type AppServices = {
 export type CreateAppServicesOptions = {
   storageMode?: StorageMode;
   atelierRoot?: string;
+  /** Explicit workspace root for isolated tests; production defaults to the repository owning atelier/. */
+  workspaceRoot?: string;
   agentExecutorMode?: AgentExecutorMode;
   /** Test/local harness override for deterministic executor scenarios. */
   agentExecutor?: AgentExecutorService;
@@ -105,6 +118,10 @@ export type CreateAppServicesOptions = {
   codexWorkerTimeoutMs?: number;
   codexWorkerMaxOutputBytes?: number;
   codexWorkerAllowedWorkingDirectories?: string[];
+  /** Explicit local opt-in. Reversible workspace writes remain disabled by default. */
+  reversibleWorkspaceWritesEnabled?: boolean;
+  /** Explicit local opt-in. Supervised code previews run only in disposable git worktrees. */
+  supervisedCodeChangesEnabled?: boolean;
 };
 
 export function resolveAtellierRoot(input?: string): string {
@@ -137,7 +154,7 @@ async function listVerifiedRepoFiles(repoRoot: string, relativeDir: string): Pro
 export async function createAppServices(options: CreateAppServicesOptions = {}): Promise<AppServices> {
   const storageMode = options.storageMode ?? "mongo";
   const atelierRootResolved = resolveAtellierRoot(options.atelierRoot);
-  const repoRootResolved = path.resolve(atelierRootResolved, "..");
+  const repoRootResolved = options.workspaceRoot ? path.resolve(options.workspaceRoot) : path.resolve(atelierRootResolved, "..");
   const wiki = new WikiService(atelierRootResolved);
   const agents = new AgentService(storageMode);
   const tasks = new TaskService(storageMode);
@@ -145,6 +162,23 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     createEffectIdempotencyRepository(storageMode),
   );
   const runs = new RunService(storageMode, wiki, tasks, effectIdempotency);
+  const toolHarness = new ToolHarnessService(wiki, runs, undefined, undefined, repoRootResolved);
+  const reversibleWorkspace = new ReversibleWorkspaceService(repoRootResolved);
+  const controlBundles = new ControlBundleService(wiki, runs);
+  const workspaceChanges = new WorkspaceChangeService(
+    wiki,
+    reversibleWorkspace,
+    effectIdempotency,
+    options.reversibleWorkspaceWritesEnabled === true,
+  );
+  const supervisedCodeChanges = new SupervisedCodeChangeService(
+    wiki,
+    repoRootResolved,
+    atelierRootResolved,
+    new GitIsolatedWorktreeService(repoRootResolved),
+    effectIdempotency,
+    options.supervisedCodeChangesEnabled === true,
+  );
   const messages = new MessageService(storageMode);
   const repoFileHints = [
     ...(await listVerifiedRepoFiles(repoRootResolved, "apps/web/src/features/wiki")),
@@ -272,14 +306,14 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     maxHandoffDepth: options.maxHandoffDepth,
     executionTimeoutMs: options.executionTimeoutMs,
     verifiedRepoFiles: repoFileHints,
-  });
+  }, toolHarness);
 
-  const skillOrchestrations = new SkillOrchestrationService(agents, agentRuns, runs, wiki, tasks);
+  const skillOrchestrations = new SkillOrchestrationService(agents, agentRuns, runs, wiki, tasks, toolHarness);
   const runEvents = new RunEventService(storageMode, runs);
   const executionQueue = new ExecutionQueueService(runs, runEvents, {
     leaseMs: options.runtimeLeaseMs,
     retryBaseDelayMs: storageMode === "memory" ? 0 : undefined,
-  });
+  }, agents);
   const codexWorkerExecutor = options.codexWorkerRealEnabled
     ? new RealCodexWorkerExecutor({
         repositoryRoot: repoRootResolved,
@@ -293,7 +327,7 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     onDiagnostic: options.runtimeDiagnosticSink,
     pollMs: options.runtimePollMs,
     workerId: options.runtimeWorkerId,
-  });
+  }, controlBundles);
 
   const services: AppServices = {
     agents,
@@ -305,6 +339,11 @@ export async function createAppServices(options: CreateAppServicesOptions = {}):
     executionQueue,
     durableRuntime,
     effectIdempotency,
+    toolHarness,
+    controlBundles,
+    reversibleWorkspace,
+    workspaceChanges,
+    supervisedCodeChanges,
     skillOrchestrations,
     wiki,
     codexWorkers: new CodexWorkerService(

@@ -45,8 +45,10 @@ import type {
   WikiPageResponse,
   WikiQueryInput,
   WikiQueryResponse,
+  WikiRetrievalPolicy,
   WikiWritePageInput,
 } from "@atellier/shared";
+import { WIKI_RETRIEVAL_POLICIES } from "@atellier/shared";
 
 const WIKI_LOG_EVENT_TYPES: WikiLogEventType[] = [
   "initialization",
@@ -59,6 +61,7 @@ const WIKI_LOG_EVENT_TYPES: WikiLogEventType[] = [
   "decision",
   "manual",
 ];
+const WIKI_SOURCE_TYPES = ["note", "research", "client", "decision", "other"] as const;
 
 const ATELLIER_API_URL = process.env.ATELLIER_API_URL ?? "http://127.0.0.1:4000";
 
@@ -99,7 +102,7 @@ function asNumber(v: unknown): number | undefined {
 }
 
 // ─── Tool definitions ──────────────────────────────────────────────────────
-const TOOLS: Tool[] = [
+export const TOOLS: Tool[] = [
   {
     name: "wiki_query",
     description:
@@ -112,8 +115,14 @@ const TOOLS: Tool[] = [
         limit: { type: "number", description: "Maximum number of matches to return." },
         sourceType: {
           type: "string",
-          enum: ["note", "research", "client", "decision", "other"],
+          enum: WIKI_SOURCE_TYPES,
           description: "Restrict matches to a specific source type.",
+        },
+        retrievalPolicy: {
+          type: "string",
+          enum: WIKI_RETRIEVAL_POLICIES,
+          description:
+            "Memory trust policy: balanced (default ranking), evidence-first (prefer raw/source evidence), or trusted-only (exclude context-only material).",
         },
       },
       required: ["query"],
@@ -264,13 +273,22 @@ const TOOLS: Tool[] = [
 ];
 
 // ─── Handlers ──────────────────────────────────────────────────────────────
-async function handleWikiQuery(args: Record<string, unknown>): Promise<CallToolResult> {
+export async function handleWikiQuery(args: Record<string, unknown>): Promise<CallToolResult> {
   const query = asString(args.query);
   if (!query) return fail("wiki_query requires a non-empty 'query' string.");
+  const sourceType = asString(args.sourceType);
+  if (sourceType && !WIKI_SOURCE_TYPES.includes(sourceType as (typeof WIKI_SOURCE_TYPES)[number])) {
+    return fail(`wiki_query 'sourceType' must be one of: ${WIKI_SOURCE_TYPES.join(", ")}.`);
+  }
+  const retrievalPolicy = asString(args.retrievalPolicy);
+  if (retrievalPolicy && !WIKI_RETRIEVAL_POLICIES.includes(retrievalPolicy as WikiRetrievalPolicy)) {
+    return fail(`wiki_query 'retrievalPolicy' must be one of: ${WIKI_RETRIEVAL_POLICIES.join(", ")}.`);
+  }
   const input: WikiQueryInput = {
     query,
     limit: asNumber(args.limit),
-    sourceType: args.sourceType as WikiQueryInput["sourceType"] | undefined,
+    sourceType: sourceType as WikiQueryInput["sourceType"] | undefined,
+    retrievalPolicy: retrievalPolicy as WikiRetrievalPolicy | undefined,
   };
   return ok(await callApi<WikiQueryResponse>("POST", "/wiki/query", input));
 }
@@ -408,7 +426,9 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((error) => {
-  process.stderr.write(`[atellier-mcp-server] fatal: ${(error as Error).message}\n`);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== "test") {
+  main().catch((error) => {
+    process.stderr.write(`[atellier-mcp-server] fatal: ${(error as Error).message}\n`);
+    process.exit(1);
+  });
+}

@@ -57,7 +57,7 @@ describe("AnthropicAgentExecutorService", () => {
       context: "Mongo cluster v6.",
     });
 
-    expect(result).toEqual({ response: "Plan ready.", needsHuman: true });
+    expect(result).toEqual({ response: "Plan ready.", needsHuman: true, resolvedModel: "claude-opus-4-7" });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

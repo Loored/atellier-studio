@@ -99,6 +99,26 @@ export class AgentService {
     return next;
   }
 
+  async resetAfterInterruptedRun(id: string, runId: string): Promise<Agent | null> {
+    if (this.storageMode === "mongo") {
+      const agent = await AgentModel.findOneAndUpdate(
+        { _id: id, lastRunId: runId, status: "executing" },
+        { $set: { status: "idle" }, $unset: { currentStep: "" } },
+        { new: true },
+      );
+      return agent ? toJsonRecord<Agent>(agent) : null;
+    }
+
+    const current = this.records.get(id);
+    if (!current || current.lastRunId !== runId || current.status !== "executing") {
+      return null;
+    }
+    const next: Agent = { ...current, status: "idle", updatedAt: toIso(new Date()) };
+    delete next.currentStep;
+    this.records.set(id, next);
+    return next;
+  }
+
   async updateInstructions(id: string, input: UpdateAgentInstructionsInput): Promise<Agent | null> {
     if (this.storageMode === "mongo") {
       const agent = await AgentModel.findByIdAndUpdate(

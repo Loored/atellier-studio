@@ -9,6 +9,7 @@ import {
   OrchestrationCancelledError,
   SkillOrchestrationService,
 } from "./skill-orchestration.service";
+import { ControlBundleService } from "./control-bundle.service";
 
 export type DurableRuntimeOptions = {
   inline?: boolean;
@@ -65,6 +66,7 @@ export class DurableRuntimeService {
     private readonly queue: ExecutionQueueService,
     private readonly skillOrchestrations: SkillOrchestrationService,
     options: DurableRuntimeOptions = {},
+    private readonly controlBundles?: ControlBundleService,
   ) {
     this.inline = options.inline ?? false;
     this.onDiagnostic = options.onDiagnostic;
@@ -89,6 +91,9 @@ export class DurableRuntimeService {
 
   async enqueueSkill(input: StartSkillOrchestrationInput): Promise<StartSkillOrchestrationResponse> {
     const run = await this.skillOrchestrations.enqueue(input);
+    if (input.canaryId) {
+      await this.controlBundles?.reserveCanaryExecutionBudget({ canaryId: input.canaryId, runId: run.id });
+    }
     await this.queue.recordQueued(run);
     this.wake();
     return { runId: run.id };
@@ -170,10 +175,11 @@ export class DurableRuntimeService {
   }
 
   private async executeOnce(): Promise<boolean> {
+    const recovered = await this.queue.reconcileExpiredExecutions();
     const reconciled = await this.queue.reconcileCompletedFinalizing();
     const run = await this.queue.claim(this.workerId);
     if (!run) {
-      return reconciled > 0;
+      return recovered > 0 || reconciled > 0;
     }
 
     this.currentRunId = run.id;
@@ -209,10 +215,13 @@ export class DurableRuntimeService {
     }, Math.min(Math.max(Math.floor(this.queue.leaseMs / 6), 250), 1_000));
 
     try {
+      const executionBudget = await this.controlBundles?.resolveRuntimeBudget(run);
       await this.skillOrchestrations.executeClaimed(run, {
+        executionBudget,
         isCancellationRequested: () => this.queue.isCancellationRequested(run.id),
         signal: runController.signal,
         onStepStarted: async (step) => {
+          if (executionBudget) await this.controlBundles?.resolveRuntimeBudget(run);
           await this.queue.setPhase(run.id, this.workerId, "running", step.id);
           await this.queue.recordStepStarted(
             run.id,

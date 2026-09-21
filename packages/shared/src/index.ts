@@ -12,3 +12,6 @@ export * from "./types/knowledge-graph";
 export * from "./types/effect-execution";
 export * from "./types/review-learning";
 export * from "./types/agent-memory-context";
+export * from "./types/tool-harness";
+export * from "./types/evaluation-ledger";
+export * from "./types/control-bundle";

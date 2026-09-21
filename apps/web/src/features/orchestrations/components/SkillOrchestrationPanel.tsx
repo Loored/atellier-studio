@@ -213,6 +213,56 @@ export function SkillOrchestrationPanel() {
             </div>
           )}
 
+          {liveStatus?.performance && liveStatus.performance.measuredRuns > 0 ? (
+            <details className="mb-3 rounded-lg border border-purple/20 bg-purple/[0.035] px-2.5 py-2" aria-label="Orchestration performance">
+              <summary className="cursor-pointer text-[0.74rem] font-bold text-purple">
+                Performance · {liveStatus.performance.measuredRuns} measured run(s) · {formatDuration(liveStatus.performance.totalDurationMs)}
+              </summary>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <PerformanceBreakdown title="By phase" entries={liveStatus.performance.byPhase} />
+                <PerformanceBreakdown title="By model" entries={liveStatus.performance.byModel} />
+              </div>
+              <p className="mb-0 mt-2 text-[0.64rem] text-ink-faint">
+                Sum of terminal child execution receipts; retries are included.
+              </p>
+            </details>
+          ) : null}
+
+          {liveStatus?.qualityEvaluation ? (
+            <div
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.qualityEvaluation.verdict === "verified"
+                  ? "border-teal/25 bg-teal/[0.05]"
+                  : liveStatus.qualityEvaluation.verdict === "rejected"
+                    ? "border-orange/30 bg-orange/[0.07]"
+                    : "border-purple/20 bg-purple/[0.04]",
+              )}
+              role={liveStatus.qualityEvaluation.verdict === "rejected" ? "alert" : "status"}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn(
+                  "text-[0.76rem]",
+                  liveStatus.qualityEvaluation.verdict === "verified" ? "text-teal" : liveStatus.qualityEvaluation.verdict === "rejected" ? "text-orange" : "text-purple",
+                )}>
+                  Quality receipt · {liveStatus.qualityEvaluation.verdict}
+                </strong>
+                <span className="text-[0.66rem] text-ink-faint">independent of review</span>
+              </div>
+              {liveStatus.qualityEvaluation.findings.length ? (
+                <ul className="m-0 mt-1.5 grid gap-1 p-0 list-none">
+                  {liveStatus.qualityEvaluation.findings.map((finding, index) => (
+                    <li key={`${finding.code}-${index}`} className="text-[0.68rem] leading-[1.4] text-ink-muted">
+                      <b className="text-ink">{finding.dimension}</b> · {finding.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="m-0 mt-1 text-[0.7rem] text-ink-muted">Server checks verified this artifact family; it still does not approve a human review.</p>
+              )}
+            </div>
+          ) : null}
+
           {liveStatus?.contextReceipt && (
             <details className="mb-3 rounded-lg border border-teal/20 bg-teal/[0.035] px-2.5 py-2" aria-label="Memory context receipt">
               <summary className="cursor-pointer text-[0.74rem] font-bold text-teal">
@@ -342,6 +392,33 @@ export function SkillOrchestrationPanel() {
             </div>
           )}
 
+          {liveStatus?.qaChecklistCompletion && liveStatus.qaChecklistCompletion.attemptsUsed > 0 && (
+            <div
+              role={liveStatus.qaChecklistCompletion.exhausted ? "alert" : "status"}
+              aria-live="polite"
+              className={cn(
+                "mb-3 rounded-lg border px-2.5 py-2.5",
+                liveStatus.qaChecklistCompletion.exhausted
+                  ? "border-orange/30 bg-orange/[0.07]"
+                  : "border-teal/25 bg-teal/[0.05]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className={cn("text-[0.76rem]", liveStatus.qaChecklistCompletion.exhausted ? "text-orange" : "text-teal")}>
+                  {liveStatus.qaChecklistCompletion.exhausted ? "QA checklist needs input" : "QA checklist completed"}
+                </strong>
+                <span className="text-[0.68rem] text-ink-faint tabular-nums">
+                  {liveStatus.qaChecklistCompletion.attemptsUsed}/{liveStatus.qaChecklistCompletion.maxAttempts} targeted attempt
+                </span>
+              </div>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted overflow-wrap-anywhere">
+                {liveStatus.qaChecklistCompletion.exhausted
+                  ? (liveStatus.qaChecklistCompletion.blockerMessages[0] ?? "QA did not complete the missing checklist evidence.")
+                  : `QA completed ${liveStatus.qaChecklistCompletion.missingCriteria.length} missing criterion/criteria on ${liveStatus.qaChecklistCompletion.finalStepId}.`}
+              </p>
+            </div>
+          )}
+
           {liveStatus?.qaChecklist && (
             <div className="mb-3 rounded-lg border border-purple/20 bg-purple/[0.04] px-2.5 py-2.5" role="status">
               <div className="flex items-center justify-between gap-2">
@@ -367,6 +444,14 @@ export function SkillOrchestrationPanel() {
               <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted">
                 {liveStatus.repeatedFeedback.firstQaStepId} → {liveStatus.repeatedFeedback.repeatedQaStepId}
               </p>
+            </div>
+          )}
+
+          {liveStatus?.repairStall && (
+            <div role="alert" className="mb-3 rounded-lg border border-orange/30 bg-orange/[0.07] px-2.5 py-2.5">
+              <strong className="text-[0.76rem] text-orange">Repair stopped: no artifact progress</strong>
+              <p className="m-0 mt-1 text-[0.7rem] leading-[1.4] text-ink-muted">{liveStatus.repairStall.message}</p>
+              <p className="m-0 mt-1 text-[0.64rem] text-ink-faint">{liveStatus.repairStall.previousArtifactDigest.slice(0, 12)} → {liveStatus.repairStall.attemptedArtifactDigest.slice(0, 12)}</p>
             </div>
           )}
 
@@ -584,4 +669,35 @@ export function SkillOrchestrationPanel() {
       )}
     </section>
   );
+}
+
+function PerformanceBreakdown({
+  title,
+  entries,
+}: {
+  title: string;
+  entries: Array<{ key: string; runs: number; durationMs: number }>;
+}) {
+  return (
+    <div>
+      <strong className="block text-[0.67rem] uppercase tracking-[0.08em] text-ink-faint">{title}</strong>
+      <div className="mt-1 grid gap-1">
+        {entries.map((entry) => (
+          <div key={entry.key} className="flex items-center justify-between gap-2 text-[0.68rem] text-ink-muted">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{entry.key} · {entry.runs}</span>
+            <span className="flex-shrink-0 tabular-nums text-ink">{formatDuration(entry.durationMs)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1_000) return `${Math.round(durationMs)} ms`;
+  const seconds = durationMs / 1_000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remainingSeconds}s`;
 }

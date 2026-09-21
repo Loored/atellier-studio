@@ -1,4 +1,4 @@
-import type { Run } from "@atellier/shared";
+import type { ExecutionBudgetReceipt, Run } from "@atellier/shared";
 import { describe, expect, it, vi } from "vitest";
 import {
   DurableRuntimeService,
@@ -7,6 +7,7 @@ import {
 import type { ExecutionQueueService } from "../services/execution-queue.service";
 import type { SkillOrchestrationService } from "../services/skill-orchestration.service";
 import { OrchestrationCancelledError } from "../services/skill-orchestration.service";
+import type { ControlBundleService } from "../services/control-bundle.service";
 
 function deferred() {
   let resolve!: () => void;
@@ -46,6 +47,7 @@ function createClaimedRun(): Run {
 function createQueue(claim: ReturnType<typeof vi.fn>) {
   return {
     leaseMs: 3_000,
+    reconcileExpiredExecutions: vi.fn().mockResolvedValue(0),
     reconcileCompletedFinalizing: vi.fn().mockResolvedValue(0),
     claim,
     heartbeat: vi.fn().mockResolvedValue(true),
@@ -71,6 +73,33 @@ function createOrchestrations(executeClaimed: ReturnType<typeof vi.fn>) {
 }
 
 describe("durable runtime lifecycle", () => {
+  it("revalidates and propagates a reserved canary budget at claim and step boundaries", async () => {
+    const run = createClaimedRun();
+    const budget = {
+      id: "budget-test",
+      runId: run.id,
+      status: "reserved",
+      limits: { executionTimeoutMs: 10_000, maxRetries: 0, contextBytes: 1_000 },
+      modelProfiles: { cheap: "cheap-model", standard: "standard-model", deep: "deep-model" },
+      allowedTools: ["wiki.query"],
+    } as ExecutionBudgetReceipt;
+    const claim = vi.fn().mockResolvedValueOnce(run);
+    const queue = createQueue(claim);
+    const executeClaimed = vi.fn(async (_run, hooks) => {
+      await hooks.onStepStarted?.({ id: "step-1", label: "Step", phase: "plan", agentName: "Pepe PM", agentRole: "pm", objective: "Test", instruction: "Test" });
+    });
+    const controlBundles = {
+      resolveRuntimeBudget: vi.fn().mockResolvedValue(budget),
+    } as unknown as ControlBundleService;
+    const runtime = new DurableRuntimeService(queue, createOrchestrations(executeClaimed), { workerId: "worker-lifecycle" }, controlBundles);
+
+    await expect(runtime.runOnce()).resolves.toBe(true);
+
+    expect(executeClaimed.mock.calls[0]?.[1]?.executionBudget).toBe(budget);
+    expect(controlBundles.resolveRuntimeBudget).toHaveBeenCalledTimes(2);
+    expect(queue.markCompleted).toHaveBeenCalledWith(run.id, "worker-lifecycle");
+  });
+
   it("reconciles a completed parent left in finalizing before claiming new work", async () => {
     const claim = vi.fn().mockResolvedValue(null);
     const queue = createQueue(claim);

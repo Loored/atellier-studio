@@ -54,8 +54,8 @@ Avoid:
 - Vitest
 - React Testing Library
 - Markdown vault
-- Codex CLI later
-- MCP later
+- Controlled Codex Worker adapter
+- Local MCP server wrapper
 
 ## Architecture
 
@@ -90,8 +90,8 @@ Rules:
 - Keep changes small.
 - Do not add complex infrastructure early.
 - Do not build auth yet.
-- Do not build MCP yet.
-- Do not build pixel UI yet.
+- Do not broaden MCP beyond the existing local wrapper without an explicit product need.
+- Do not expand the pixel UI beyond its visualization role.
 - Do not build cloud deployment yet.
 - Do not build multiplayer.
 - Do not overwrite raw sources.

@@ -23,6 +23,7 @@ import type {
 } from "@atellier/shared";
 import { buildServer } from "../server";
 import { createAppServices } from "../services/app-services";
+import { WikiService } from "../services/wiki.service";
 
 describe("operational spine routes", () => {
   let server: FastifyInstance;
@@ -903,7 +904,7 @@ describe("operational spine routes", () => {
     expect(page.content).toContain("Atellier Studio Wiki Log");
   });
 
-  it("promotes an existing run to deliverable and refreshes deliverables index", async () => {
+  it("keeps run-generated deliverables out of the curated deliverables index", async () => {
     const createRunResponse = await server.inject({
       method: "POST",
       url: "/runs",
@@ -928,10 +929,10 @@ describe("operational spine routes", () => {
     });
     expect(deliverablesIndexResponse.statusCode).toBe(200);
     const deliverablesIndex = deliverablesIndexResponse.json<WikiPageResponse>();
-    expect(deliverablesIndex.content).toContain("Deliverables Index");
+    expect(deliverablesIndex.content).toContain("Curated Deliverables Index");
     expect(deliverablesIndex.content).toContain("| Type | Review |");
-    expect(deliverablesIndex.content).toContain(run.id);
-    expect(deliverablesIndex.content).toContain("| build | pending |");
+    expect(deliverablesIndex.content).not.toContain(run.id);
+    expect(deliverablesIndex.content).toContain("local operational evidence");
   });
 
   it("unlinks a run deliverable and updates deliverables index", async () => {
@@ -966,8 +967,35 @@ describe("operational spine routes", () => {
     });
     expect(deliverablesIndexResponse.statusCode).toBe(200);
     const deliverablesIndex = deliverablesIndexResponse.json<WikiPageResponse>();
-    expect(deliverablesIndex.content).toContain("Deliverables Index");
+    expect(deliverablesIndex.content).toContain("Curated Deliverables Index");
     expect(deliverablesIndex.content).not.toContain(run.id);
+  });
+
+  it("indexes curated deliverables while excluding generated deliverables from default wiki retrieval", async () => {
+    const wiki = new WikiService(atelierRoot);
+    await wiki.writePage(
+      "wiki/deliverables/weekly-operating-plan.md",
+      "# Weekly operating plan\n\n- Review: approved\n\nA curated operational plan.",
+    );
+    await wiki.writePage(
+      "wiki/deliverables/69f91ed4fd94e469cfec7e84-generated-plan.md",
+      "# Generated plan\n\nA local generated operational plan.",
+    );
+
+    const index = await wiki.readPage("wiki/deliverables/index.md");
+    expect(index.content).toContain("weekly-operating-plan.md");
+    expect(index.content).not.toContain("69f91ed4fd94e469cfec7e84-generated-plan.md");
+
+    const queryResponse = await server.inject({
+      method: "POST",
+      url: "/wiki/query",
+      payload: { query: "generated operational plan" },
+    });
+    expect(queryResponse.statusCode).toBe(200);
+    const query = queryResponse.json<WikiQueryResponse>();
+    expect(query.matches.map((match) => match.path)).not.toContain(
+      "wiki/deliverables/69f91ed4fd94e469cfec7e84-generated-plan.md",
+    );
   });
 
   it("supports handoff execution to a second agent", async () => {
@@ -1053,7 +1081,9 @@ describe("operational spine routes", () => {
     expect(status.orchestrationRunId).toBe(started.runId);
     expect(status.steps.length).toBeGreaterThan(0);
 
-    for (let attempt = 0; attempt < 20 && status.status !== "completed"; attempt += 1) {
+    // Parallel CI can make the inline orchestration exceed the old 400 ms
+    // polling window even though the worker is progressing normally.
+    for (let attempt = 0; attempt < 100 && status.status !== "completed"; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 20));
       const nextStatusResponse = await server.inject({
         method: "GET",

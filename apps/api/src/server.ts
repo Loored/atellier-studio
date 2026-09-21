@@ -12,6 +12,10 @@ import { tasksRoutes } from "./routes/tasks.routes";
 import { wikiRoutes } from "./routes/wiki.routes";
 import { codexRoutes } from "./routes/codex.routes";
 import { knowledgeRoutes } from "./routes/knowledge.routes";
+import { toolHarnessRoutes } from "./routes/tool-harness.routes";
+import { controlBundlesRoutes } from "./routes/control-bundles.routes";
+import { workspaceChangesRoutes } from "./routes/workspace-changes.routes";
+import { supervisedCodeChangesRoutes } from "./routes/supervised-code-changes.routes";
 
 export type BuildServerOptions = {
   storageMode?: StorageMode;
@@ -41,10 +45,13 @@ export type BuildServerOptions = {
   | "inlineDurableRuntime"
   | "runtimeLeaseMs"
   | "runtimePollMs"
+  | "workspaceRoot"
   | "codexWorkerRealEnabled"
   | "codexWorkerTimeoutMs"
   | "codexWorkerMaxOutputBytes"
   | "codexWorkerAllowedWorkingDirectories"
+  | "reversibleWorkspaceWritesEnabled"
+  | "supervisedCodeChangesEnabled"
 >;
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -117,9 +124,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   await fastify.register(async (instance) => orchestrationsRoutes(instance, services));
   await fastify.register(async (instance) => tasksRoutes(instance, services));
   await fastify.register(async (instance) => runsRoutes(instance, services));
+  await fastify.register(async (instance) => controlBundlesRoutes(instance, services));
+  await fastify.register(async (instance) => workspaceChangesRoutes(instance, services));
+  await fastify.register(async (instance) => supervisedCodeChangesRoutes(instance, services));
   await fastify.register(async (instance) => wikiRoutes(instance, services));
   await fastify.register(async (instance) => codexRoutes(instance, services));
   await fastify.register(async (instance) => knowledgeRoutes(instance, services));
+  await fastify.register(async (instance) => toolHarnessRoutes(instance, services));
 
   return fastify;
 }

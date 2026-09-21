@@ -848,6 +848,40 @@ describe("App", () => {
     });
   });
 
+  it("shows durable recovery evidence in the runs timeline", async () => {
+    listRunsMock.mockResolvedValue([{
+      id: "run-recovered",
+      type: "orchestration",
+      status: "cancelled",
+      execution: {
+        schemaVersion: 1,
+        kind: "skill-orchestration",
+        phase: "cancelled",
+        definitionHash: "recovery-test",
+        definitionSnapshot: {},
+        idempotencyKey: "run-recovered",
+        attempt: 1,
+        maxAttempts: 3,
+        nextEventSequence: 3,
+        availableAt: "2026-09-14T00:00:00.000Z",
+        cancelRequestedAt: "2026-09-14T00:01:00.000Z",
+        finishedAt: "2026-09-14T00:02:00.000Z",
+        lastError: "Cancellation completed after the prior worker lease expired.",
+      },
+      logs: [],
+      createdAt: "2026-09-14T00:00:00.000Z",
+      updatedAt: "2026-09-14T00:02:00.000Z",
+    }]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Runs" }));
+
+    expect(await screen.findByText("Recovered after worker interruption")).toBeInTheDocument();
+    expect(screen.getByText("The cancellation was applied durably and the expired lease was cleared.")).toBeInTheDocument();
+    expect(screen.getByTestId("run-recovery-recovered-cancellation")).toBeInTheDocument();
+  });
+
   it("updates run review status from the runs timeline", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1135,6 +1169,19 @@ describe("App", () => {
         complete: true,
         items: [{ criterion: "Artifact is complete", status: "pass", evidence: "All requested days are present." }],
       },
+      performance: {
+        schemaVersion: 1,
+        measuredRuns: 3,
+        totalDurationMs: 95_000,
+        byPhase: [
+          { key: "backend", runs: 2, durationMs: 70_000 },
+          { key: "qa", runs: 1, durationMs: 25_000 },
+        ],
+        byModel: [
+          { key: "qwen3.5:4b", runs: 2, durationMs: 70_000 },
+          { key: "qwen3.5:9b", runs: 1, durationMs: 25_000 },
+        ],
+      },
       contextReceipt: {
         schemaVersion: 1,
         query: "Build orchestration",
@@ -1190,6 +1237,11 @@ describe("App", () => {
     expect(scoped.getByText(/Last valid artifact: semantic-repair-2 · Last QA: qa-recheck-2/i)).toBeInTheDocument();
     expect(scoped.getByText("QA acceptance checklist")).toBeInTheDocument();
     expect(scoped.getByText(/Artifact is complete — All requested days are present/i)).toBeInTheDocument();
+    const performance = scoped.getByRole("group", { name: "Orchestration performance" });
+    expect(performance).toHaveTextContent("Performance · 3 measured run(s) · 1m 35s");
+    await user.click(within(performance).getByText(/Performance/i));
+    expect(performance).toHaveTextContent("qwen3.5:9b · 1");
+    expect(performance).toHaveTextContent("qa · 1");
     const receipt = scoped.getByRole("group", { name: "Memory context receipt" });
     expect(receipt).toHaveTextContent("Memory context · evidence-first · a1b2c3d4e5f6");
     await user.click(within(receipt).getByText(/Memory context/i));

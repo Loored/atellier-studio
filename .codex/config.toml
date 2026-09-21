@@ -1,10 +1,9 @@
 # .codex/config.toml
 
 # Keep this conservative. Do not grant broad network/write powers by default.
-# Add MCP servers later when the Operational Spine is stable.
+# The repository already ships a local MCP wrapper; do not add external or broad-permission servers by default.
 
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
-# Future MCP servers can be configured here.
-# Prefer enabled_tools/disabled_tools allowlists when adding MCP servers.
+# Prefer narrow enabled_tools/disabled_tools allowlists for any future MCP configuration.

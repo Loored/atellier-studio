@@ -8,6 +8,7 @@ export const QUERY_KEYS = {
   SYSTEM: "system",
   CLIENTS: "clients",
   PROJECTS: "projects",
+  TOOL_HARNESS: "tool-harness",
 } as const;
 
 export const queryKeys = {
@@ -50,6 +51,19 @@ export const queryKeys = {
   },
   system: {
     health: [QUERY_KEYS.SYSTEM, "health"] as const,
+  },
+  toolHarness: {
+    all: [QUERY_KEYS.TOOL_HARNESS] as const,
+    catalog: [QUERY_KEYS.TOOL_HARNESS, "catalog"] as const,
+    evaluations: [QUERY_KEYS.TOOL_HARNESS, "evaluations"] as const,
+    candidates: [QUERY_KEYS.TOOL_HARNESS, "candidates"] as const,
+    controlBundles: [QUERY_KEYS.TOOL_HARNESS, "control-bundles"] as const,
+    controlBundleProposals: [QUERY_KEYS.TOOL_HARNESS, "control-bundle-proposals"] as const,
+    controlBundleCanaries: [QUERY_KEYS.TOOL_HARNESS, "control-bundle-canaries"] as const,
+    workspaceChanges: [QUERY_KEYS.TOOL_HARNESS, "workspace-changes"] as const,
+    supervisedCodeChanges: [QUERY_KEYS.TOOL_HARNESS, "supervised-code-changes"] as const,
+    evaluationLedgerPairs: [QUERY_KEYS.TOOL_HARNESS, "evaluation-ledger-pairs"] as const,
+    controlBundleBudgetReceipts: [QUERY_KEYS.TOOL_HARNESS, "control-bundle-budget-receipts"] as const,
   },
   clients: {
     all: [QUERY_KEYS.CLIENTS] as const,

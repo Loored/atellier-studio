@@ -66,6 +66,66 @@ export async function runsRoutes(fastify: FastifyInstance, services: AppServices
   fastify.get("/runs/context-auto-assessment-summary", async () =>
     services.runs.summarizeAutomatedContextReceiptAssessments(),
   );
+  fastify.get("/evaluations/summary", async () => services.runs.summarizeEvaluations());
+  fastify.get("/evaluations/candidates", async () => ({ candidates: await services.runs.listLearningCandidates() }));
+  fastify.post("/evaluations/candidates/decisions", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) return badRequest(reply, "Request body must be an object.");
+    const candidateId = stringField(body, "candidateId");
+    const evidenceDigest = stringField(body, "evidenceDigest");
+    const note = stringField(body, "note");
+    if (!candidateId || !evidenceDigest || !note || !isOneOf(body.decision, ["accepted", "rejected", "deferred"] as const)) {
+      return badRequest(reply, "candidateId, evidenceDigest, decision, and operator note are required.");
+    }
+    if (candidateId.length > 80 || !/^[a-f0-9]{64}$/i.test(evidenceDigest) || note.length > 2000) {
+      return badRequest(reply, "Learning candidate decision fields are invalid.");
+    }
+    const candidate = await services.runs.getLearningCandidate(candidateId);
+    if (!candidate) return notFound(reply, "Learning candidate is not available for review.");
+    if (candidate.evidenceDigest !== evidenceDigest) {
+      return reply.code(409).send({ error: "Learning candidate evidence changed; refresh before deciding." });
+    }
+    try {
+      const decision = await services.wiki.recordLearningCandidateDecision({ candidateId, evidenceDigest, decision: body.decision, note, decidedAt: new Date().toISOString(), candidate });
+      return reply.code(decision.created ? 201 : 200).send(decision);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to record learning candidate decision.";
+      return reply.code(message.includes("different durable decision") ? 409 : 400).send({ error: message });
+    }
+  });
+  fastify.post("/evaluations/candidates/experiments", async (request, reply) => {
+    const body = bodyRecord(request.body);
+    if (!body) return badRequest(reply, "Request body must be an object.");
+    const candidateId = stringField(body, "candidateId");
+    const evidenceDigest = stringField(body, "evidenceDigest");
+    const note = stringField(body, "note");
+    if (!candidateId || !evidenceDigest || !note || candidateId.length > 80 || !/^[a-f0-9]{64}$/i.test(evidenceDigest) || note.length > 2000) return badRequest(reply, "Learning experiment fields are invalid.");
+    const candidate = await services.runs.getLearningCandidate(candidateId);
+    if (!candidate) return notFound(reply, "Learning candidate is not available for experiment.");
+    if (candidate.evidenceDigest !== evidenceDigest) return reply.code(409).send({ error: "Learning candidate evidence changed; refresh before preparing an experiment." });
+    if (candidate.status !== "accepted-for-experiment") return reply.code(409).send({ error: "Only an accepted current candidate can prepare a shadow experiment." });
+    try {
+      const experiment = await services.wiki.recordLearningShadowExperiment({ candidate, note, createdAt: new Date().toISOString() });
+      return reply.code(experiment.created ? 201 : 200).send(experiment);
+    } catch (error) { return badRequest(reply, error instanceof Error ? error.message : "Unable to prepare shadow experiment."); }
+  });
+  fastify.post("/evaluations/experiments/:id/observations", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = bodyRecord(request.body);
+    if (!id || !body || !isOneOf(body.quality, ["better", "same", "worse"] as const)) return badRequest(reply, "Experiment observation is invalid.");
+    const note = stringField(body, "note");
+    const durationMs = body.durationMs === undefined ? undefined : Number(body.durationMs);
+    const retries = body.retries === undefined ? undefined : Number(body.retries);
+    if (!note || note.length > 2000 || (durationMs !== undefined && (!Number.isInteger(durationMs) || durationMs < 0)) || (retries !== undefined && (!Number.isInteger(retries) || retries < 0)) || (body.needsHuman !== undefined && typeof body.needsHuman !== "boolean")) return badRequest(reply, "Experiment observation metrics are invalid.");
+    try {
+      return services.wiki.recordLearningShadowObservation({ experimentId: id, quality: body.quality, note, ...(durationMs === undefined ? {} : { durationMs }), ...(retries === undefined ? {} : { retries }), ...(typeof body.needsHuman === "boolean" ? { needsHuman: body.needsHuman } : {}), observedAt: new Date().toISOString() });
+    } catch (error) { return badRequest(reply, error instanceof Error ? error.message : "Unable to record shadow observation."); }
+  });
+  fastify.get("/evaluations/experiments/:id/comparison", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!id || id.length > 160) return badRequest(reply, "Experiment ID is invalid.");
+    return services.wiki.compareLearningShadowExperiment(id);
+  });
 
   fastify.post("/runs/context-auto-assessments/backfill", async (request, reply) => {
     const body = bodyRecord(request.body) ?? {};

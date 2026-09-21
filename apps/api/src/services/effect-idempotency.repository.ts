@@ -24,6 +24,12 @@ export interface EffectIdempotencyRepository {
     error: string,
     failedAt: string,
   ): Promise<EffectExecutionRecord | null>;
+  reconcile(
+    id: string,
+    expectedStatus: "in-progress" | "failed",
+    result: unknown,
+    completedAt: string,
+  ): Promise<EffectExecutionRecord | null>;
   findByKey(idempotencyKey: string): Promise<EffectExecutionRecord | null>;
 }
 
@@ -83,6 +89,27 @@ export class MemoryEffectIdempotencyRepository implements EffectIdempotencyRepos
       error,
       failedAt,
       updatedAt: failedAt,
+    };
+    this.recordsByKey.set(next.idempotencyKey, next);
+    return structuredClone(next);
+  }
+
+  async reconcile(
+    id: string,
+    expectedStatus: "in-progress" | "failed",
+    result: unknown,
+    completedAt: string,
+  ): Promise<EffectExecutionRecord | null> {
+    const current = this.findById(id);
+    if (!current || current.status !== expectedStatus) return null;
+    const next: EffectExecutionRecord = {
+      ...current,
+      status: "completed",
+      result,
+      error: undefined,
+      failedAt: undefined,
+      completedAt,
+      updatedAt: completedAt,
     };
     this.recordsByKey.set(next.idempotencyKey, next);
     return structuredClone(next);
@@ -153,6 +180,23 @@ export class MongoEffectIdempotencyRepository implements EffectIdempotencyReposi
           failedAt,
           updatedAt: new Date(failedAt),
         },
+      },
+      { new: true },
+    );
+    return record ? toJsonRecord<EffectExecutionRecord>(record) : null;
+  }
+
+  async reconcile(
+    id: string,
+    expectedStatus: "in-progress" | "failed",
+    result: unknown,
+    completedAt: string,
+  ): Promise<EffectExecutionRecord | null> {
+    const record = await EffectExecutionModel.findOneAndUpdate(
+      { _id: id, status: expectedStatus },
+      {
+        $set: { status: "completed", result, completedAt, updatedAt: new Date(completedAt) },
+        $unset: { error: 1, failedAt: 1 },
       },
       { new: true },
     );

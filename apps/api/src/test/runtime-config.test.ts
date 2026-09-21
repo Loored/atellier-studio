@@ -48,4 +48,16 @@ describe("Ollama profile routing", () => {
     process.env.OLLAMA_CONTEXT_TOKENS = "12288";
     expect(readRuntimeConfig().serviceOptions.ollamaContextTokens).toBe(12288);
   });
+
+  it("reads the QA specialist override independently from lightweight profile routing", () => {
+    process.env.AGENT_EXECUTOR_MODE = "ollama";
+    process.env.OLLAMA_MODEL_PROFILE = "standard";
+    process.env.OLLAMA_MODEL_STANDARD = "qwen3.5:4b";
+    process.env.OLLAMA_MODEL_QA = "qwen3.5:9b";
+
+    const config = readRuntimeConfig();
+
+    expect(config.serviceOptions.ollamaModel).toBe("qwen3.5:4b");
+    expect(config.serviceOptions.ollamaModelByRole).toEqual({ qa: "qwen3.5:9b" });
+  });
 });

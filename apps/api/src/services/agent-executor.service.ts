@@ -8,11 +8,17 @@ export type ExecuteAgentInstructionInput = {
   signal?: AbortSignal;
   maxOutputTokens?: number;
   modelProfileOverride?: ModelProfile;
+  /** Server-owned exact model selected by a verified Control Bundle budget. */
+  modelOverride?: string;
+  /** Read-only capability names permitted by the server for this run/role. */
+  allowedReadTools?: readonly string[];
 };
 
 export type ExecuteAgentInstructionResult = {
   response: string;
   needsHuman: boolean;
+  /** Exact model reported by the provider, or the submitted model when omitted. */
+  resolvedModel?: string;
 };
 
 export type AgentExecutorMode = "mock" | "openai" | "anthropic" | "groq" | "ollama";
@@ -350,12 +356,23 @@ function buildExecutorSystemPrompt(
   const customInstructions = input.agent.instructions?.trim();
 
   const verifiedFiles = [...new Set([...(repoFileHints ?? []), ...(input.verifiedFiles ?? [])])].sort();
+  const toolExamples: Record<string, string> = {
+    "wiki.query": '{"toolName":"wiki.query","input":{"query":"bounded question","limit":5}}',
+    "wiki.lint": '{"toolName":"wiki.lint","input":{}}',
+    "runs.read": '{"toolName":"runs.read","input":{"runIds":["existing-run-id-1","existing-run-id-2"]}}',
+    "workspace.search": '{"toolName":"workspace.search","input":{"query":"bounded text","limit":5}}',
+    "workspace.read": '{"toolName":"workspace.read","input":{"path":"docs/verified-file.md","startLine":1,"endLine":30}}',
+  };
+  const advertisedTools = [...new Set(input.allowedReadTools ?? [])].filter((name) => toolExamples[name]);
 
   return [
     `You are ${input.agent.name}, the ${input.agent.role} agent in Atellier Studio.`,
     "",
     roleExpertise,
     "This chat executor cannot edit repository files. Be truthful about that boundary.",
+    advertisedTools.length
+      ? `For an information need the context cannot answer, you may request at most one of these server-allowed read-only tools. Return only one line: TOOL_REQUEST: <one JSON object>. Available tool forms:\n${advertisedTools.map((name) => `- ${toolExamples[name]}`).join("\n")}\nUse runs.read for live run evidence; Wiki narrative is not a current run receipt. Never request another tool after a result.`
+      : "No Tool Harness requests are available for this step. Do not emit TOOL_REQUEST.",
     "For proposed code work, use a 'Candidate files' section with only verified existing repository paths. Reserve 'Changed files' only for a response that is backed by real diff evidence from the system.",
     "Do not claim you implemented code changes unless an external execution step actually edited files in the repository. Do not invent file edits, diffs, paths, or test results.",
     verifiedFiles.length
@@ -381,6 +398,7 @@ function buildExecutorUserPrompt(input: ExecuteAgentInstructionInput): string {
 }
 
 type ChatCompletionResponse = {
+  model?: string;
   choices?: Array<{
     message?: {
       content?: string | null;
@@ -420,7 +438,7 @@ export class OpenAiCompatibleAgentExecutorService implements AgentExecutorServic
         headers,
         signal: input.signal,
         body: JSON.stringify({
-          model: this.config.model,
+          model: input.modelOverride ?? this.config.model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -458,6 +476,7 @@ export class OpenAiCompatibleAgentExecutorService implements AgentExecutorServic
     return {
       response: content,
       needsHuman: true,
+      resolvedModel: data.model?.trim() || input.modelOverride || this.config.model,
     };
   }
 }
@@ -520,7 +539,7 @@ export class AnthropicAgentExecutorService implements AgentExecutorService {
         },
         signal: input.signal,
         body: JSON.stringify({
-          model: this.config.model,
+          model: input.modelOverride ?? this.config.model,
           max_tokens: input.maxOutputTokens ?? ANTHROPIC_MAX_TOKENS,
           temperature: ANTHROPIC_TEMPERATURE,
           // Naive prompt caching: the system prompt (role expertise + repo hints)
@@ -569,6 +588,7 @@ export class AnthropicAgentExecutorService implements AgentExecutorService {
     return {
       response: text,
       needsHuman: true,
+      resolvedModel: data.model?.trim() || input.modelOverride || this.config.model,
     };
   }
 }

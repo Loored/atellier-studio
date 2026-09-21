@@ -10,6 +10,7 @@ import {
   RUN_STATUSES,
   RUN_TYPES,
   type Run,
+  TOOL_INVOCATION_STATUSES,
 } from "@atellier/shared";
 
 const RunLogEntrySchema = new Schema(
@@ -29,6 +30,7 @@ const RunExecutionSchema = new Schema(
     definitionHash: { type: String, required: true },
     definitionSnapshot: { type: Schema.Types.Mixed, required: true },
     idempotencyKey: { type: String, required: true },
+    retryGeneration: { type: Number, default: 0, required: false },
     attempt: { type: Number, default: 0, required: true },
     maxAttempts: { type: Number, default: 3, required: true },
     nextEventSequence: { type: Number, default: 0, required: true },
@@ -87,6 +89,24 @@ const RunMemoryCaptureSchema = new Schema(
   { _id: false },
 );
 
+const ToolInvocationSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    parentRunId: { type: String, required: true },
+    toolName: { type: String, required: true },
+    agentRole: { type: String, enum: AGENT_ROLES, required: true },
+    classification: { type: String, enum: ["read", "reversible", "irreversible"], required: false },
+    status: { type: String, enum: TOOL_INVOCATION_STATUSES, required: true },
+    policy: { type: Schema.Types.Mixed, required: true },
+    inputDigest: { type: String, required: true },
+    outputSummary: { type: String, required: true },
+    evidencePaths: { type: [String], default: [] },
+    requestedAt: { type: String, required: true },
+    completedAt: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const RunSchema = new Schema<Run>(
   {
     taskId: String,
@@ -99,6 +119,9 @@ const RunSchema = new Schema<Run>(
     contextReceipt: { type: Schema.Types.Mixed, required: false },
     contextEvaluation: { type: Schema.Types.Mixed, required: false },
     automatedContextAssessment: { type: Schema.Types.Mixed, required: false },
+    toolInvocations: { type: [ToolInvocationSchema], required: false, default: [] },
+    evaluationLedger: { type: [Schema.Types.Mixed], required: false, default: [] },
+    evaluation: { type: Schema.Types.Mixed, required: false },
     input: Schema.Types.Mixed,
     output: Schema.Types.Mixed,
     execution: { type: RunExecutionSchema, required: false },

@@ -1,7 +1,5 @@
 import type {
-  AgentValidationResult,
-  OrchestrationQaChecklistSummary,
-  OrchestrationRepeatedFeedbackSummary,
+  BuildOrchestrationOutput,
   OrchestrationRepairSummary,
   Run,
 } from "@atellier/shared";
@@ -35,15 +33,7 @@ export type LiveFlowOrchestrationStatus = {
   nextStep: LiveFlowStepStatus | null;
 };
 
-type LiveFlowParentOutput = {
-  readiness?: "ready-for-human-review" | "needs-human" | "changes-required";
-  validation?: AgentValidationResult;
-  repair?: OrchestrationRepairSummary;
-  qaRetry?: OrchestrationRepairSummary;
-  semanticRepair?: OrchestrationRepairSummary;
-  qaChecklist?: OrchestrationQaChecklistSummary;
-  repeatedFeedback?: OrchestrationRepeatedFeedbackSummary;
-};
+type LiveFlowParentOutput = BuildOrchestrationOutput;
 
 export type LiveFlowOutcome = "success" | "needs-human" | "failed";
 
@@ -53,7 +43,7 @@ export type LiveFlowResult = {
   outcome: LiveFlowOutcome;
   exitCode: number;
   status: string;
-  readiness?: LiveFlowParentOutput["readiness"];
+  readiness?: NonNullable<LiveFlowParentOutput["readiness"]>;
   completedSteps: number;
   failedSteps: number;
   totalSteps: number;
@@ -65,7 +55,7 @@ export type LiveFlowResult = {
     total: number;
   };
   repairs: Array<{
-    kind: "deterministic" | "qa-format" | "semantic";
+    kind: "deterministic" | "qa-format" | "qa-checklist-completion" | "semantic";
     attemptsUsed: number;
     maxAttempts: number;
     resolved: boolean;
@@ -85,6 +75,7 @@ export function evaluateLiveFlow(
   const repairs = [
     summarizeRepair("deterministic", output.repair),
     summarizeRepair("qa-format", output.qaRetry),
+    summarizeRepair("qa-checklist-completion", output.qaChecklistCompletion),
     summarizeRepair("semantic", output.semanticRepair),
   ].filter((repair): repair is NonNullable<typeof repair> => Boolean(repair));
   const checklist = output.qaChecklist
@@ -161,6 +152,7 @@ function collectBlockers(output: LiveFlowParentOutput): string[] {
       .map((issue) => issue.message) ?? []),
     ...(output.repair?.blockerMessages ?? []),
     ...(output.qaRetry?.blockerMessages ?? []),
+    ...(output.qaChecklistCompletion?.blockerMessages ?? []),
     ...(output.semanticRepair?.blockerMessages ?? []),
     ...(output.repeatedFeedback?.detected
       ? [`Repeated QA feedback on ${output.repeatedFeedback.repeatedQaStepId}: ${output.repeatedFeedback.feedback}`]

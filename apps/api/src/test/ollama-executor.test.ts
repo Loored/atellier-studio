@@ -51,7 +51,7 @@ describe("OllamaAgentExecutorService", () => {
       instruction: "Draft the plan.",
     });
 
-    expect(result).toEqual({ response: "Local plan ready.", needsHuman: true });
+    expect(result).toEqual({ response: "Local plan ready.", needsHuman: true, resolvedModel: "llama3.2" });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -106,6 +106,20 @@ describe("OllamaAgentExecutorService", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string) as { max_tokens: number };
     expect(body.max_tokens).toBe(2048);
+  });
+
+  it("advertises only server-allowed read tools and does not advertise more tools after a result", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }));
+    const executor = new OllamaAgentExecutorService({ model: "qwen3.5:4b" });
+    await executor.execute({ agent: fixtureAgent, instruction: "Compare two live runs.", allowedReadTools: ["runs.read"] });
+    await executor.execute({ agent: fixtureAgent, instruction: "Answer using the tool result.", allowedReadTools: [] });
+    const prompt = (index: number) => {
+      const body = JSON.parse((fetchMock.mock.calls[index] as [string, RequestInit])[1].body as string) as { messages: { role: string; content: string }[] };
+      return body.messages.find((message) => message.role === "system")?.content ?? "";
+    };
+    expect(prompt(0)).toContain('"toolName":"runs.read"');
+    expect(prompt(0)).not.toContain('"toolName":"wiki.query"');
+    expect(prompt(1)).toContain("No Tool Harness requests are available");
   });
 
   it("uses the configured Ollama context window", async () => {
