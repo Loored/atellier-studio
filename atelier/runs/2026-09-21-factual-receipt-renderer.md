@@ -18,3 +18,5 @@ The fallback does not run without successful preflight receipts and does not app
 
 - Focused Build Loop, artifact-quality, calibration, and operational-contract tests passed (29 tests in the final factual-renderer validation).
 - Full workspace typecheck and `git diff --check` passed.
+- Publication validation passed: 295 API tests (7 Mongo-only skipped), 34 web tests, 2 MCP tests, and 18 launcher/evaluation tests.
+- Real-worktree and durable-canary integration tests have explicit 20-second local test timeouts; their production bounds and assertions are unchanged.

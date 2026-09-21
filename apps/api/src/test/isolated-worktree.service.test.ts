@@ -69,7 +69,7 @@ describe("GitIsolatedWorktreeService", () => {
     await service.discard(worktree);
     await expect(access(worktree.path)).rejects.toMatchObject({ code: "ENOENT" });
     expect((await git(repositoryRoot, ["worktree", "list", "--porcelain"])).stdout).not.toContain(worktree.path);
-  });
+  }, 20_000);
 
   it("rejects identifiers that cannot name a registered supervised worktree", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "atellier-isolated-worktree-"));

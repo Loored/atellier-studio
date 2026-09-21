@@ -19450,3 +19450,7 @@ The `exec3` measurement showed prompt-only factual grounding was insufficient fo
 - status: completed
 - reviewStatus: pending
 - deliverablePath: wiki/deliverables/6aad9bcae8d39c5ef0ce066a-atellier-build-loop-completed.md
+
+## [2026-09-21T05:06:00.000Z] repository_validation | Autonomous quality-gate publication validated
+- Summary: Full deterministic workspace validation passed before publication.
+- Details: 295 API tests passed (7 Mongo-only skipped), plus 34 web, 2 MCP, and 18 launcher/evaluation tests. Real-worktree and durable-canary integration tests use explicit local test timeouts; production limits remain unchanged.

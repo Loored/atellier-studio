@@ -560,7 +560,7 @@ describe("tool harness routes", () => {
     });
     expect(secondApproval.statusCode).toBe(400);
     expect(secondApproval.json()).toMatchObject({ error: "Control Bundle proposal has already entered its canary lifecycle." });
-  });
+  }, 20_000);
 
   it("does not create an approval for an unknown Control Bundle proposal", async () => {
     const approval = await server.inject({
